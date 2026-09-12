@@ -13,7 +13,6 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-authentication-plugin=mysql_native_password
-    # 不对外暴露 3306，容器内走 d5st-network。需 Navicat 远程连再手动开
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db-schema.sql:/docker-entrypoint-initdb.d/01-d5st-schema.sql:ro
@@ -31,11 +30,13 @@ services:
     image: casbin/casdoor:latest
     container_name: d5st-casdoor
     restart: unless-stopped
+    # ── 官方 MySQL 连接格式：dataSourceName 不含 DB 名，dbName 单独指定 ──
+    entrypoint: ["/bin/sh", "-c", "./server --createDatabase=true"]
     environment:
+      RUNNING_IN_DOCKER: "true"
       driverName: mysql
-      dataSourceName: "${MYSQL_USER:-d5st}:${MYSQL_PASSWORD:-d5st_pass_2026}@tcp(mysql:3306)/casdoor?charset=utf8mb4&parseTime=True&loc=Local"
-      runName: d5st-casdoor
-      isDemoMode: "false"
+      dataSourceName: "${MYSQL_USER:-d5st}:${MYSQL_PASSWORD:-d5st_pass_2026}@tcp(mysql:3306)/"
+      dbName: casdoor
       GIN_MODE: release
       TZ: Asia/Shanghai
     ports:
@@ -48,7 +49,7 @@ services:
     networks:
       - d5st-network
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/ >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 15
