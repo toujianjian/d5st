@@ -1,0 +1,34 @@
+<div class="card">
+  <div class="card-title">📖 留言板</div>
+  
+  <% if (!currentUser) { %>
+    <p style="margin-bottom:16px;color:var(--text-secondary);font-size:13px;">登录后可以留下昵称，未登录将显示"匿名用户"</p>
+  <% } %>
+  
+  <form method="POST" action="/messages/guestbook" style="margin-bottom:24px;">
+    <% if (!currentUser) { %>
+      <input type="text" name="author_name" class="form-input" placeholder="你的昵称" style="margin-bottom:12px;">
+    <% } %>
+    <textarea name="content" class="form-textarea" placeholder="说点什么吧..." required></textarea>
+    <button type="submit" class="btn btn-primary">发表留言</button>
+  </form>
+
+  <% if (messages && messages.length > 0) { %>
+    <ul class="post-list">
+      <% messages.forEach(function(m) { %>
+        <li class="post-item">
+          <div class="post-avatar">✉️</div>
+          <div class="post-body">
+            <div class="post-meta">
+              <span><%= m.real_name || m.author_name || '匿名' %></span>
+              <span><%= new Date(m.created_at).toLocaleString('zh-CN') %></span>
+            </div>
+            <div class="post-content"><%= m.content %></div>
+          </div>
+        </li>
+      <% }); %>
+    </ul>
+  <% } else { %>
+    <p style="text-align:center;color:var(--text-secondary);padding:40px;">还没有留言，来做第一个吧！</p>
+  <% } %>
+</div>

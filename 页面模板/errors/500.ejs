@@ -1,0 +1,8 @@
+<div class="error-page">
+  <div class="error-code">500</div>
+  <div class="error-message">服务器开小差了，请稍后重试</div>
+  <% if (typeof error !== 'undefined' && error) { %>
+    <pre style="background:var(--bg);padding:16px;border-radius:8px;text-align:left;max-width:600px;margin:16px auto;font-size:12px;overflow:auto;"><%= error %></pre>
+  <% } %>
+  <a href="/" class="btn btn-primary">返回首页</a>
+</div>

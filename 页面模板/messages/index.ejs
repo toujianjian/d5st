@@ -1,0 +1,142 @@
+<style>
+  .page-wrap {
+    position: relative; z-index: 1;
+    padding: 32px 20px;
+    display: flex; justify-content: center;
+  }
+  .msg-card {
+    width: 100%; max-width: 640px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 28px;
+    box-shadow: var(--shadow-soft);
+    padding: 32px 24px;
+    position: relative; overflow: hidden;
+    animation: popIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes popIn {
+    0% { opacity: 0; transform: translateY(24px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .msg-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+  }
+  .msg-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px 20px;
+    border-bottom: 1px solid rgba(211, 47, 47, 0.12);
+    margin-bottom: 8px;
+  }
+  .msg-title {
+    font-size: 22px; font-weight: 700; color: var(--text-dark);
+    font-family: 'Noto Serif SC', serif;
+  }
+  .msg-title i { color: var(--primary); margin-right: 6px; }
+  .count-badge {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white; font-size: 12px; font-weight: 600;
+    padding: 4px 12px; border-radius: 999px;
+  }
+  .conv-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 12px;
+    border-radius: 16px;
+    text-decoration: none; color: inherit;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid transparent;
+  }
+  .conv-item:hover {
+    background: rgba(211, 47, 47, 0.05);
+    border-color: rgba(211, 47, 47, 0.15);
+    transform: translateX(4px);
+  }
+  .conv-avatar {
+    width: 52px; height: 52px; flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: white; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(211, 47, 47, 0.3);
+  }
+  .conv-body { flex: 1; min-width: 0; }
+  .conv-top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .conv-name {
+    font-size: 15px; font-weight: 600; color: var(--text-dark);
+  }
+  .conv-time {
+    font-size: 11px; color: var(--text-muted); flex-shrink: 0; margin-left: 8px;
+  }
+  .conv-preview {
+    font-size: 13px; color: var(--text-muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .conv-right { display: flex; align-items: center; gap: 8px; }
+  .unread-badge {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white; font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+    min-width: 20px; text-align: center;
+    box-shadow: 0 2px 8px rgba(211, 47, 47, 0.3);
+  }
+  .divider { height: 1px; background: rgba(211, 47, 47, 0.08); margin: 0 12px; }
+  .empty-box {
+    text-align: center; padding: 48px 20px; color: var(--text-muted);
+  }
+  .empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.5; }
+  .empty-text { font-size: 15px; margin-bottom: 20px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 28px; border-radius: 999px;
+    font-size: 14px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: 'Noto Serif SC', serif;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.35);
+  }
+  .btn.primary:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(211, 47, 47, 0.5); }
+</style>
+
+<div class="page-wrap">
+  <div class="msg-card">
+    <div class="msg-header">
+      <h2 class="msg-title"><i class="fas fa-envelope"></i> 私信</h2>
+      <% if (typeof conversations !== 'undefined' && conversations && conversations.length > 0) { %>
+        <span class="count-badge"><%= conversations.length %></span>
+      <% } %>
+    </div>
+
+    <% if (typeof conversations !== 'undefined' && conversations && conversations.length > 0) { %>
+      <% conversations.forEach(function(c) { %>
+        <a href="/messages/chat/<%= c.other_id %>" class="conv-item">
+          <div class="conv-avatar"><%= c.avatar || '👤' %></div>
+          <div class="conv-body">
+            <div class="conv-top">
+              <span class="conv-name"><%= c.real_name || c.username %></span>
+              <span class="conv-time"><%= new Date(c.last_time).toLocaleString('zh-CN') %></span>
+            </div>
+            <div class="conv-preview"><%= c.last_message %></div>
+          </div>
+          <% if (c.unread_count > 0) { %>
+            <span class="unread-badge"><%= c.unread_count %></span>
+          <% } %>
+        </a>
+      <% }); %>
+    <% } else { %>
+      <div class="empty-box">
+        <div class="empty-icon">💌</div>
+        <div class="empty-text">还没有私信，去贴吧认识同学吧！</div>
+        <a href="/forum" class="btn primary"><i class="fas fa-comments"></i> 进入贴吧</a>
+      </div>
+    <% } %>
+  </div>
+</div>

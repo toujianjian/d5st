@@ -1,0 +1,99 @@
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h3>📊 概览</h3>
+    <a href="/admin">仪表盘</a>
+    <h3>📋 内容管理</h3>
+    <a href="/admin/forum" class="active">帖子管理</a>
+    <a href="/admin/comments">评论管理</a>
+    <a href="/admin/reports">举报管理</a>
+    <h3>🔔 通知与弹窗</h3>
+    <a href="/admin/notifications">全局通知</a>
+    <a href="/admin/popups">弹窗管理</a>
+    <h3>🏠 首页设置</h3>
+    <a href="/admin/home-links">首页链接</a>
+    <a href="/admin/home-banners">首页横幅</a>
+    <h3>🛠️ 系统</h3>
+    <a href="/admin/path-redirects">路径重定向</a>
+    <a href="/admin/recycle-bin">回收站</a>
+    <a href="/admin/export-users">导出用户</a>
+    <a href="/admin/settings">系统设置</a>
+  </aside>
+  <div class="admin-content">
+    <div class="card">
+      <div class="card-title">📝 帖子管理 <span style="font-size:13px;color:#999;font-weight:normal;">共 <%= posts.length %> 条</span></div>
+      <table class="table">
+        <thead><tr><th>ID</th><th>标题</th><th>作者</th><th>分类</th><th>浏览</th><th>置顶</th><th>精华</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          <% posts.forEach(function(p) { %>
+            <tr>
+              <td><%= p.id %></td>
+              <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= p.title || '' %>">
+                <a href="/forum/<%= p.id %>" target="_blank" style="color:var(--primary);text-decoration:none;">
+                  <%= p.title || p.content %></a>
+              </td>
+              <td><%= p.username %></td>
+              <td><%= p.category || '-' %></td>
+              <td><%= p.views || 0 %></td>
+              <td>
+                <% if (!p.is_deleted) { %>
+                <button class="btn btn-sm <%= p.is_top ? 'btn-warning' : 'btn-ghost' %>" onclick="toggleTop(<%= p.id %>, this)">
+                  <%= p.is_top ? '✓ 置顶' : '置顶' %>
+                </button>
+                <% } else { %>-<% } %>
+              </td>
+              <td>
+                <% if (!p.is_deleted) { %>
+                <button class="btn btn-sm <%= p.is_hot ? 'btn-warning' : 'btn-ghost' %>" onclick="toggleHot(<%= p.id %>, this)">
+                  <%= p.is_hot ? '✓ 精华' : '精华' %>
+                </button>
+                <% } else { %>-<% } %>
+              </td>
+              <td style="font-size:12px;"><%= (p.created_at || '').slice(0,16) %></td>
+              <td><%= p.is_deleted ? '<span class="badge badge-danger">已删除</span>' : '<span class="badge badge-success">正常</span>' %></td>
+              <td>
+                <% if (!p.is_deleted) { %>
+                  <button class="btn btn-danger btn-sm" onclick="deletePost(<%= p.id %>)">删除</button>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<style>
+  .btn-sm { padding: 4px 12px; font-size: 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
+  .btn-warning { background: #fff3e0; color: #e65100; border-color: #ffcc80; }
+  .btn-warning:hover { background: #ffe0b2; }
+  .btn-ghost { background: transparent; color: #888; border: 1px solid #ddd; }
+  .btn-ghost:hover { color: #d32f2f; border-color: #d32f2f; }
+</style>
+<script>
+function deletePost(id) {
+  if (!confirm('确定删除该帖子？')) return;
+  fetch('/admin/forum/delete/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert(data.error || '失败'); });
+}
+function toggleTop(id, btn) {
+  fetch('/admin/forum/toggle-top/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = data.is_top ? '✓ 置顶' : '置顶';
+        btn.className = 'btn btn-sm ' + (data.is_top ? 'btn-warning' : 'btn-ghost');
+      }
+    });
+}
+function toggleHot(id, btn) {
+  fetch('/admin/forum/toggle-hot/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = data.is_hot ? '✓ 精华' : '精华';
+        btn.className = 'btn btn-sm ' + (data.is_hot ? 'btn-warning' : 'btn-ghost');
+      }
+    });
+}
+</script>

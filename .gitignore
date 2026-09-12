@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.local
+*.log
+casdoor-data/
+npm-debug.log*
+.DS_Store
+
+# Local SQLite dev DB
+d5st.db
+d5st.db-*
+
+# OS / IDE
+.idea/
+.vscode/
+*.swp
+Thumbs.db

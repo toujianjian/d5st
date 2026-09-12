@@ -1,0 +1,66 @@
+<style>
+  .video-player-wrap {
+    background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 20px;
+    aspect-ratio: 16/9;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .video-player-wrap video, .video-player-wrap iframe { width: 100%; height: 100%; border: 0; }
+  .video-detail {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px; padding: 24px;
+    box-shadow: var(--shadow-soft); margin-bottom: 20px;
+  }
+  .video-detail h1 { font-family: 'Noto Serif SC', serif; margin-bottom: 12px; color: var(--text-dark); }
+  .video-detail .meta-row { display: flex; gap: 20px; color: var(--text-light); font-size: 13px; margin-bottom: 16px; }
+  .video-detail .desc { color: var(--text-dark); line-height: 1.8; white-space: pre-wrap; }
+  .video-related h3 { font-family: 'Noto Serif SC', serif; margin-bottom: 12px; color: var(--text-dark); }
+  .related-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .related-item {
+    background: var(--glass-bg); backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border); border-radius: 12px;
+    padding: 10px; text-decoration: none; color: inherit;
+    transition: all 0.25s ease;
+  }
+  .related-item:hover { transform: translateY(-2px); }
+  .related-item .title { font-size: 13px; font-weight: 500; color: var(--text-dark); }
+</style>
+
+<div class="page-container">
+  <% if (typeof video !== 'undefined' && video) { %>
+  <div class="video-player-wrap">
+    <% if (video.video_url && /youtube|youtu\.be|bilibili|b23\.tv|vimeo/.test(video.video_url)) { %>
+      <iframe src="<%= video.video_url %>" allowfullscreen></iframe>
+    <% } else { %>
+      <video src="<%= video.video_url %>" controls></video>
+    <% } %>
+  </div>
+
+  <div class="video-detail">
+    <h1><%= video.title %></h1>
+    <div class="meta-row">
+      <span><i class="fas fa-user"></i> <%= video.author %></span>
+      <span><i class="fas fa-eye"></i> <%= video.views %></span>
+      <span><i class="fas fa-clock"></i> <%= (video.created_at || '').slice(0,10) %></span>
+      <span><i class="fas fa-tag"></i> <%= video.category || '其他' %></span>
+    </div>
+    <% if (video.description) { %>
+      <div class="desc"><%= video.description %></div>
+    <% } %>
+  </div>
+
+  <% if (typeof related !== 'undefined' && related && related.length > 0) { %>
+  <div class="video-related">
+    <h3>相关视频</h3>
+    <div class="related-list">
+      <% related.forEach(function(r) { %>
+        <a href="/videos/<%= r.id %>" class="related-item">
+          <div class="title"><%= r.title %></div>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+  <% } %>
+  <% } %>
+</div>

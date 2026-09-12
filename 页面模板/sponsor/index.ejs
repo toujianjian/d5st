@@ -1,0 +1,173 @@
+<style>
+.page-wrap { padding: 40px 32px; max-width: 720px; margin: 0 auto; width: 100%; }
+.sponsor-glass {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 28px;
+  box-shadow: 0 16px 56px rgba(211,47,47,0.12);
+  padding: 48px 40px;
+  text-align: center;
+}
+.sponsor-icon {
+  width: 80px; height: 80px; margin: 0 auto 16px;
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px; color: #fff;
+  box-shadow: 0 8px 32px rgba(211,47,47,0.35);
+  animation: heartbeat 1.8s ease-in-out infinite;
+}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.sponsor-title { font-family: 'ZCOOL XiaoWei', serif; font-size: 28px; color: #b71c1c; margin-bottom: 8px; letter-spacing: 2px; }
+.sponsor-sub { color: #666; font-size: 15px; margin-bottom: 32px; line-height: 1.7; }
+
+.amount-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
+.amount-chip {
+  padding: 10px 24px;
+  background: rgba(255,255,255,0.8);
+  border: 2px solid rgba(211,47,47,0.15);
+  border-radius: 999px;
+  color: #666; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s ease;
+  font-family: 'Noto Serif SC', serif;
+}
+.amount-chip:hover { border-color: #d32f2f; color: #d32f2f; }
+.amount-chip.active {
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+  border-color: #b71c1c;
+  color: #fff;
+}
+
+.amount-input-wrap {
+  margin: 20px 0 28px;
+  display: flex; align-items: center; gap: 12px; justify-content: center;
+}
+.currency-symbol { font-size: 24px; font-weight: 700; color: #b71c1c; }
+.amount-input {
+  width: 160px; padding: 14px 20px;
+  border: 2px solid rgba(211,47,47,0.15);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.9);
+  font-size: 20px; font-weight: 700; color: #b71c1c; text-align: center;
+  outline: none; transition: border-color 0.25s;
+}
+.amount-input:focus { border-color: #d32f2f; }
+.points-hint { font-size: 13px; color: #888; margin-top: 8px; }
+
+.btn.primary {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 16px 48px;
+  background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+  color: #fff; font-size: 16px; font-weight: 600;
+  border-radius: 999px; border: none; cursor: pointer;
+  text-decoration: none; width: 100%; justify-content: center;
+  box-shadow: 0 10px 28px rgba(211,47,47,0.4);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: 'Noto Serif SC', serif;
+}
+.btn.primary:hover { transform: translateY(-3px); box-shadow: 0 14px 36px rgba(211,47,47,0.5); }
+
+.error-banner {
+  background: #ffebee; color: #c62828;
+  padding: 12px 20px; border-radius: 14px;
+  font-size: 13px; margin-bottom: 20px;
+  border: 1px solid rgba(198,40,40,0.2);
+}
+
+.section-title {
+  margin: 40px 0 16px; font-size: 18px; color: #b71c1c; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-title::before {
+  content: ''; width: 4px; height: 20px; border-radius: 4px;
+  background: linear-gradient(180deg, #d32f2f, #b71c1c);
+}
+
+.sponsors-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.sponsor-card {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(20px);
+  border-radius: 18px; padding: 20px;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.6);
+  box-shadow: 0 8px 24px rgba(211,47,47,0.08);
+  transition: transform 0.25s ease;
+}
+.sponsor-card:hover { transform: translateY(-3px); }
+.sponsor-avatar {
+  width: 50px; height: 50px; margin: 0 auto 10px;
+  background: linear-gradient(135deg, #d32f2f, #b71c1c);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 20px;
+}
+.sponsor-name { font-weight: 600; color: #2d2d2d; margin-bottom: 4px; }
+.sponsor-amount { font-size: 13px; color: #b71c1c; font-weight: 600; }
+
+@media (max-width: 600px) {
+  .page-wrap { padding: 24px 16px; }
+  .sponsor-glass { padding: 32px 20px; border-radius: 22px; }
+  .sponsor-title { font-size: 22px; }
+}
+</style>
+
+<div class="page-wrap">
+  <div class="sponsor-glass">
+    <div class="sponsor-icon"><i class="fas fa-heart"></i></div>
+    <h1 class="sponsor-title">支持 D5ST 校园社区</h1>
+    <p class="sponsor-sub">你的每一份支持，都将帮助我们更好地运营社区</p>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="error-banner"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/sponsor">
+      <div class="amount-row">
+        <button type="button" class="amount-chip" data-amount="5">¥5</button>
+        <button type="button" class="amount-chip active" data-amount="10">¥10</button>
+        <button type="button" class="amount-chip" data-amount="20">¥20</button>
+        <button type="button" class="amount-chip" data-amount="50">¥50</button>
+        <button type="button" class="amount-chip" data-amount="100">¥100</button>
+      </div>
+
+      <div class="amount-input-wrap">
+        <span class="currency-symbol">¥</span>
+        <input type="number" name="amount" id="amount-input" class="amount-input" value="10" min="1" max="10000" step="1" required>
+      </div>
+      <p class="points-hint">1 元 = 100 积分</p>
+
+      <button type="submit" class="btn primary"><i class="fas fa-rocket"></i> 立即支持</button>
+    </form>
+  </div>
+
+  <% if (typeof sponsors !== 'undefined' && sponsors && sponsors.length > 0) { %>
+  <h3 class="section-title"><i class="fas fa-medal"></i> 感谢以下赞助者</h3>
+  <div class="sponsors-grid">
+    <% sponsors.forEach(function(s) { %>
+      <div class="sponsor-card">
+        <div class="sponsor-avatar"><%= (s.real_name || s.username || 'U').charAt(0) %></div>
+        <div class="sponsor-name"><%= s.real_name || s.username %></div>
+        <div class="sponsor-amount">¥<%= s.amount %></div>
+      </div>
+    <% }); %>
+  </div>
+  <% } %>
+</div>
+
+<script>
+document.querySelectorAll('.amount-chip').forEach(function(chip) {
+  chip.addEventListener('click', function() {
+    document.querySelectorAll('.amount-chip').forEach(function(c) { c.classList.remove('active'); });
+    chip.classList.add('active');
+    document.getElementById('amount-input').value = chip.getAttribute('data-amount');
+  });
+});
+</script>

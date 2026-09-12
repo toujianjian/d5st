@@ -1,0 +1,227 @@
+<style>
+  .page-wrap {
+    position: relative; z-index: 1;
+    padding: 40px 20px;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 28px;
+  }
+  .profile-card {
+    width: 100%; max-width: 640px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 28px;
+    box-shadow: var(--shadow-soft);
+    padding: 40px 32px 32px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes popIn {
+    0% { opacity: 0; transform: translateY(30px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .profile-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+  }
+  .profile-avatar {
+    width: 120px; height: 120px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 56px; color: white; font-weight: 700;
+    font-family: 'ZCOOL XiaoWei', cursive;
+    box-shadow: 0 10px 32px rgba(211, 47, 47, 0.4);
+    border: 4px solid rgba(255, 255, 255, 0.6);
+    position: relative;
+    animation: floaty 4s ease-in-out infinite;
+  }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .profile-name {
+    font-size: 30px; font-weight: 700; color: var(--text-dark);
+    font-family: 'Noto Serif SC', serif;
+    margin-bottom: 6px;
+  }
+  .profile-handle {
+    font-size: 14px; color: var(--text-muted); margin-bottom: 12px;
+  }
+  .badges-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; }
+  .tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 500;
+  }
+  .tag-admin { background: linear-gradient(135deg, #ff6b35, #d32f2f); color: white; }
+  .tag-points { background: rgba(211, 47, 47, 0.1); color: var(--primary); }
+  .stats-row {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; padding: 20px 0 8px;
+    border-top: 1px solid rgba(211, 47, 47, 0.15);
+  }
+  .stat-col {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .stat-num {
+    font-size: 26px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-lbl { font-size: 12px; color: var(--text-muted); }
+  .quick-links {
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(211, 47, 47, 0.12);
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 22px; border-radius: 999px;
+    font-size: 14px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: 'Noto Serif SC', serif;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.35);
+  }
+  .btn.primary:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(211, 47, 47, 0.5); }
+  .btn.ghost {
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--primary);
+    border: 1px solid rgba(211, 47, 47, 0.25);
+  }
+  .btn.ghost:hover { background: var(--primary); color: white; border-color: var(--primary); transform: translateY(-3px); }
+  .section-card {
+    width: 100%; max-width: 640px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 24px;
+    box-shadow: var(--shadow-soft);
+    padding: 28px;
+    position: relative; overflow: hidden;
+    animation: popIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 0.1s;
+  }
+  .section-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+  }
+  .section-title {
+    font-size: 18px; font-weight: 700; color: var(--text-dark);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title i { color: var(--primary); }
+  .post-item {
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  .post-item:last-child { border-bottom: none; }
+  .post-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .post-content { font-size: 14px; color: var(--text-dark); line-height: 1.6; }
+  .medals-wrap { display: flex; flex-wrap: wrap; gap: 12px; }
+  .medal-chip {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, rgba(211, 47, 47, 0.08), rgba(183, 28, 28, 0.04));
+    border: 1px solid rgba(211, 47, 47, 0.15);
+    border-radius: 999px;
+    font-size: 13px; font-weight: 500; color: var(--primary-dark);
+  }
+  .empty-hint { text-align: center; padding: 24px; color: var(--text-muted); font-size: 14px; }
+  .tx-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tx-table th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .tx-table td { padding: 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.04); color: var(--text-dark); }
+  .tx-amount { color: var(--primary); font-weight: 600; }
+  .tx-points { color: #ff6b35; font-weight: 600; }
+</style>
+
+<div class="page-wrap">
+  <div class="profile-card">
+    <div class="profile-avatar">
+      <%= (typeof user !== 'undefined' && user && (user.real_name || user.username)) ? ((user.real_name || user.username).charAt(0)) : ((currentUser && (currentUser.real_name || currentUser.username)) ? (currentUser.real_name || currentUser.username).charAt(0) : 'U') %>
+    </div>
+    <div class="profile-name"><%= (typeof user !== 'undefined' && user) ? (user.real_name || user.username || '用户') : (currentUser.real_name || currentUser.username || '用户') %></div>
+    <div class="profile-handle">@<%= (typeof user !== 'undefined' && user) ? user.username : currentUser.username %></div>
+
+    <% if (typeof user !== 'undefined' && user) { %>
+    <div class="badges-row">
+      <% if (user.is_admin === 1) { %><span class="tag tag-admin"><i class="fas fa-crown"></i> 管理员</span><% } %>
+      <% if (user.points !== undefined && user.points !== null) { %><span class="tag tag-points">⭐ <%= user.points %> 积分</span><% } %>
+    </div>
+    <% } %>
+
+    <div class="stats-row">
+      <div class="stat-col">
+        <span class="stat-num"><%= typeof postCount !== 'undefined' ? postCount : 0 %></span>
+        <span class="stat-lbl">帖子</span>
+      </div>
+      <div class="stat-col">
+        <span class="stat-num"><%= typeof commentCount !== 'undefined' ? commentCount : 0 %></span>
+        <span class="stat-lbl">评论</span>
+      </div>
+      <div class="stat-col">
+        <span class="stat-num">LV.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+        <span class="stat-lbl">等级</span>
+      </div>
+    </div>
+
+    <div class="quick-links">
+      <a href="/user/edit" class="btn primary"><i class="fas fa-pen"></i> 编辑资料</a>
+      <a href="/user/achievements" class="btn ghost"><i class="fas fa-trophy"></i> 成就</a>
+      <a href="/forum" class="btn ghost"><i class="fas fa-comments"></i> 我的帖子</a>
+    </div>
+  </div>
+
+  <% if (typeof posts !== 'undefined' && posts && posts.length > 0) { %>
+  <div class="section-card">
+    <div class="section-title"><i class="fas fa-file-alt"></i> 我的帖子</div>
+    <% posts.forEach(function(post) { %>
+      <div class="post-item">
+        <div class="post-meta"><%= new Date(post.created_at).toLocaleString('zh-CN') %></div>
+        <div class="post-content"><%= post.content %></div>
+      </div>
+    <% }); %>
+  </div>
+  <% } %>
+
+  <% if (typeof medals !== 'undefined' && medals && medals.length > 0) { %>
+  <div class="section-card">
+    <div class="section-title"><i class="fas fa-medal"></i> 我的勋章</div>
+    <div class="medals-wrap">
+      <% medals.forEach(function(m) { %>
+        <span class="medal-chip">🏅 <%= m.medal_name %></span>
+      <% }); %>
+    </div>
+  </div>
+  <% } %>
+
+  <% if (typeof transactions !== 'undefined' && transactions && transactions.length > 0) { %>
+  <div class="section-card">
+    <div class="section-title"><i class="fas fa-heart"></i> 赞助记录</div>
+    <table class="tx-table">
+      <thead><tr><th>时间</th><th>金额</th><th>积分</th></tr></thead>
+      <tbody>
+        <% transactions.forEach(function(t) { %>
+          <tr>
+            <td><%= new Date(t.created_at).toLocaleString('zh-CN') %></td>
+            <td class="tx-amount">¥<%= t.amount_yuan %></td>
+            <td class="tx-points">+<%= t.points_added %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+</div>

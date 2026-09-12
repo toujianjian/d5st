@@ -1,0 +1,69 @@
+﻿<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h3>📊 概览</h3>
+    <a href="/admin">仪表盘</a>
+    <h3>📋 内容管理</h3>
+    <a href="/admin/forum">帖子管理</a>
+    <a href="/admin/comments">评论管理</a>
+    <a href="/admin/reports">举报管理</a>
+    <h3>🔔 通知与弹窗</h3>
+    <a href="/admin/notifications">全局通知</a>
+    <a href="/admin/popups">弹窗管理</a>
+    <h3>🏠 首页设置</h3>
+    <a href="/admin/home-links">首页链接</a>
+    <a href="/admin/home-banners">首页横幅</a>
+    <h3>🛠️ 系统</h3>
+    <a href="/admin/path-redirects">路径重定向</a>
+    <a href="/admin/recycle-bin">回收站</a>
+    <a href="/admin/export-users">导出用户</a>
+    <a href="/admin/settings">系统设置</a>
+  </aside>
+  <div class="admin-content">
+    <div class="card">
+      <div class="card-title">✏️ 编辑弹窗 #<%= popup.id %></div>
+      <form method="POST" action="/admin/popups/edit/<%= popup.id %>">
+        <div class="form-group">
+          <label class="form-label">标题</label>
+          <input type="text" name="title" class="form-input" value="<%= popup.title %>" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">内容</label>
+          <textarea name="content" class="form-textarea" required><%= popup.content %></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">类型</label>
+            <select name="type" class="form-select">
+              <option value="info" <%= popup.type === 'info' ? 'selected' : '' %>>信息</option>
+              <option value="success" <%= popup.type === 'success' ? 'selected' : '' %>>成功</option>
+              <option value="warning" <%= popup.type === 'warning' ? 'selected' : '' %>>警告</option>
+              <option value="error" <%= popup.type === 'error' ? 'selected' : '' %>>错误</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">目标页面</label>
+            <input type="text" name="target_pages" class="form-input" value="<%= popup.target_pages %>">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">排序</label>
+            <input type="number" name="sort_order" class="form-input" value="<%= popup.sort_order %>">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="display:flex;align-items:center;gap:8px;margin-top:24px;">
+              <input type="checkbox" name="show_once" value="1" <%= popup.show_once ? 'checked' : '' %>> 关闭后不再显示
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="is_active" value="1" <%= popup.is_active ? 'checked' : '' %>> 启用
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">保存</button>
+        <a href="/admin/popups" class="btn btn-ghost" style="margin-left:12px;">取消</a>
+      </form>
+    </div>
+  </div>
+</div>

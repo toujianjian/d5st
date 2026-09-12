@@ -1,0 +1,74 @@
+﻿<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h3>📊 概览</h3>
+    <a href="/admin">仪表盘</a>
+    <h3>📋 内容管理</h3>
+    <a href="/admin/forum">帖子管理</a>
+    <a href="/admin/comments">评论管理</a>
+    <a href="/admin/reports">举报管理</a>
+    <h3>🔔 通知与弹窗</h3>
+    <a href="/admin/notifications">全局通知</a>
+    <a href="/admin/popups">弹窗管理</a>
+    <h3>🏠 首页设置</h3>
+    <a href="/admin/home-links">首页链接</a>
+    <a href="/admin/home-banners">首页横幅</a>
+    <h3>🛠️ 系统</h3>
+    <a href="/admin/path-redirects">路径重定向</a>
+    <a href="/admin/recycle-bin">回收站</a>
+    <a href="/admin/export-users">导出用户</a>
+    <a href="/admin/settings">系统设置</a>
+  </aside>
+  <div class="admin-content">
+    <div class="card">
+      <div class="card-title">➕ 新增弹窗</div>
+      <form method="POST" action="/admin/popups">
+        <div class="form-group">
+          <label class="form-label">标题</label>
+          <input type="text" name="title" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">内容</label>
+          <textarea name="content" class="form-textarea" required></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label class="form-label">类型</label>
+            <select name="type" class="form-select">
+              <option value="info">信息</option>
+              <option value="success">成功</option>
+              <option value="warning">警告</option>
+              <option value="error">错误</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">目标页面（逗号分隔，all=全部）</label>
+            <input type="text" name="target_pages" class="form-input" value="home" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><input type="checkbox" name="show_once" value="1"> 关闭后不再显示</label>
+        </div>
+        <button type="submit" class="btn btn-primary">创建弹窗</button>
+      </form>
+    </div>
+    
+    <div class="card">
+      <div class="card-title">📋 弹窗列表</div>
+      <table class="table">
+        <thead><tr><th>ID</th><th>标题</th><th>页面</th><th>状态</th><th>排序</th><th>操作</th></tr></thead>
+        <tbody>
+          <% popups.forEach(function(p) { %>
+            <tr>
+              <td><%= p.id %></td>
+              <td><%= p.title %></td>
+              <td><%= p.target_pages %></td>
+              <td><%= p.is_active ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-default">停用</span>' %></td>
+              <td><%= p.sort_order %></td>
+              <td><a href="/admin/popups/edit/<%= p.id %>" class="btn btn-ghost btn-sm">编辑</a></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

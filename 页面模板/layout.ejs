@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= title ? (title + ' - ' + siteTitle) : siteTitle %></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="D5ST 校园社区 - 连接每一位同学，共享校园生活" />
+  <!-- 字体：优先使用本地已装的思源宋体/站酷小薇，未安装时回退系统衬线体，避免外部 CDN 拖慢首屏 -->
+  <link rel="stylesheet" href="/public/font-awesome/all.min.css" />
+  <link rel="stylesheet" href="/public/css/main.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+  <style>
+    :root {
+      --primary: #d32f2f;
+      --primary-dark: #b71c1c;
+      --primary-light: #ff5252;
+      --accent: #ff6b35;
+      --bg-light: #fff5f5;
+      --bg-card: rgba(255, 255, 255, 0.7);
+      --text-dark: #2d2d2d;
+      --text-light: #666;
+      --text-muted: #999;
+      --shadow-soft: 0 8px 32px rgba(211, 47, 47, 0.1);
+      --shadow-hover: 0 12px 48px rgba(211, 47, 47, 0.2);
+      --glass-bg: rgba(255, 255, 255, 0.25);
+      --glass-border: rgba(255, 255, 255, 0.4);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Noto Serif SC', serif;
+      background: linear-gradient(135deg, #fff5f5 0%, #ffe4e4 50%, #fff0f0 100%);
+      min-height: 100vh;
+      color: var(--text-dark);
+      overflow: hidden;
+    }
+    .main-wrapper {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      margin-left: 260px;
+      height: 100vh;
+      overflow-y: auto;
+      animation: slideInRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    @keyframes slideInRight {
+      0% { opacity: 0; transform: translateX(100px); }
+      100% { opacity: 1; transform: translateX(0); }
+    }
+    .page-transition-out {
+      animation: slideOutLeft 0.3s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+    }
+    @keyframes slideOutLeft {
+      0% { opacity: 1; transform: translateX(0); }
+      100% { opacity: 0; transform: translateX(-100px); }
+    }
+    .bg-animation {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .bg-shape {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.5;
+      animation: float 20s ease-in-out infinite;
+    }
+    .bg-shape-1 {
+      width: 500px; height: 500px;
+      background: linear-gradient(135deg, rgba(211, 47, 47, 0.3), rgba(183, 28, 28, 0.2));
+      top: -150px; right: -100px;
+    }
+    .bg-shape-2 {
+      width: 400px; height: 400px;
+      background: linear-gradient(135deg, rgba(255, 107, 53, 0.25), rgba(211, 47, 47, 0.15));
+      bottom: -100px; left: -100px;
+      animation-delay: -5s;
+    }
+    .bg-shape-3 {
+      width: 300px; height: 300px;
+      background: linear-gradient(135deg, rgba(211, 47, 47, 0.2), rgba(255, 82, 82, 0.1));
+      top: 40%; left: 20%;
+      animation-delay: -10s;
+    }
+    .bg-shape-4 {
+      width: 200px; height: 200px;
+      background: linear-gradient(135deg, rgba(255, 107, 53, 0.2), rgba(211, 47, 47, 0.1));
+      top: 20%; right: 30%;
+      animation-delay: -15s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(30px, -30px) rotate(5deg); }
+      50% { transform: translate(0, -50px) rotate(0deg); }
+      75% { transform: translate(-30px, -30px) rotate(-5deg); }
+    }
+    .particles { position: absolute; width: 100%; height: 100%; }
+    .particle {
+      position: absolute;
+      width: 6px; height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: sparkle 3s ease-in-out infinite;
+    }
+    .particle:nth-child(1) { top: 10%; left: 20%; }
+    .particle:nth-child(2) { top: 20%; left: 80%; animation-delay: 0.5s; }
+    .particle:nth-child(3) { top: 60%; left: 10%; animation-delay: 1s; }
+    .particle:nth-child(4) { top: 80%; left: 70%; animation-delay: 1.5s; }
+    .particle:nth-child(5) { top: 40%; left: 50%; animation-delay: 2s; }
+    @keyframes sparkle {
+      0%, 100% { transform: scale(1); opacity: 0.3; }
+      50% { transform: scale(1.5); opacity: 0.6; }
+    }
+    .user-sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      height: 100vh;
+      width: 260px;
+      background: linear-gradient(180deg, #d32f2f 0%, #b71c1c 100%);
+      border-right: 1px solid #c62828;
+      box-shadow: 4px 0 24px rgba(211, 47, 47, 0.4);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 50;
+      animation: slideInLeft 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes slideInLeft {
+      0% { transform: translateX(-100%) scale(0.8); opacity: 0; }
+      60% { transform: translateX(10px) scale(1.02); }
+      80% { transform: translateX(-5px) scale(0.98); }
+      100% { transform: translateX(0) scale(1); opacity: 1; }
+    }
+    .sidebar-content { padding: 30px 20px; overflow-y: auto; flex: 1; }
+    .quick-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+    .quick-action-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      color: white; text-decoration: none;
+      font-size: 14px; font-weight: 500;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .quick-action-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+      transform: translateX(4px);
+    }
+    .quick-action-btn i { font-size: 16px; width: 20px; text-align: center; }
+    .user-avatar {
+      width: 80px; height: 80px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; color: white; font-weight: 700;
+      margin: 0 auto 16px;
+      box-shadow: 0 4px 15px rgba(211, 47, 47, 0.3);
+    }
+    .user-name { text-align: center; font-size: 20px; font-weight: 700; color: white; margin-bottom: 8px; }
+    .user-stats {
+      display: flex; justify-content: space-around;
+      padding: 16px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 16px;
+    }
+    .stat-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .stat-num { font-size: 18px; font-weight: 700; color: white; }
+    .stat-label { font-size: 12px; color: rgba(255, 255, 255, 0.8); }
+    .doc-btn {
+      position: fixed; top: 20px; right: 20px; z-index: 200;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 20px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 50px;
+      color: var(--text-dark); text-decoration: none;
+      font-size: 14px; font-weight: 500;
+      box-shadow: var(--shadow-soft);
+      transition: all 0.3s ease;
+    }
+    .doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); transform: translateY(-2px); }
+    .doc-btn i { font-size: 16px; }
+    .notification-ball { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; align-items: center; }
+    .site-footer {
+      position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 16px;
+      font-size: 12px; color: rgba(150, 150, 150, 0.6);
+      z-index: 100; pointer-events: none;
+    }
+    .footer-version { background: rgba(100, 100, 100, 0.1); padding: 4px 10px; border-radius: 10px; }
+    .footer-lv {
+      background: linear-gradient(135deg, #ffd700, #ff6b35);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 600;
+    }
+    .notification-btn {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 6px 20px rgba(211, 47, 47, 0.4);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative; z-index: 2;
+    }
+    .notification-btn:hover { transform: scale(1.1); box-shadow: 0 8px 28px rgba(211, 47, 47, 0.5); }
+    .notification-btn i { font-size: 24px; color: white; }
+    .notification-btn .badge {
+      position: absolute; top: -4px; right: -4px;
+      width: 20px; height: 20px;
+      background: #ef4444; border-radius: 50%;
+      font-size: 12px; font-weight: 700; color: white;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid white;
+    }
+    .notification-panel {
+      position: absolute; right: 60px; top: 50%;
+      transform: translateY(-50%) translateX(20px);
+      width: 320px; max-height: 400px;
+      background: white; border-radius: 20px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2);
+      opacity: 0; visibility: hidden;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      overflow: hidden;
+    }
+    .notification-ball:hover .notification-panel {
+      opacity: 1; visibility: visible;
+      transform: translateY(-50%) translateX(0);
+    }
+    .notification-panel-header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white; font-weight: 700; font-size: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .notification-list { max-height: 340px; overflow-y: auto; padding: 8px 0; }
+    .notification-item {
+      padding: 14px 20px; border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      cursor: pointer; transition: all 0.2s ease;
+    }
+    .notification-item:hover { background: rgba(211, 47, 47, 0.05); }
+    .notification-item:last-child { border-bottom: none; }
+    .notification-item-title { font-weight: 600; font-size: 14px; color: var(--text-dark); margin-bottom: 4px; }
+    .notification-item-content { font-size: 13px; color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .notification-item-time { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+    .notification-empty { padding: 40px 20px; text-align: center; color: var(--text-muted); }
+    .notification-empty i { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+    .popup-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: none; align-items: center; justify-content: center;
+      z-index: 2000; backdrop-filter: blur(8px);
+    }
+    .popup-overlay.show { display: flex; }
+    .popup-container { background: white; border-radius: 24px; padding: 32px; width: 90%; max-width: 500px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); position: relative; }
+    .popup-close-btn {
+      position: absolute; top: 16px; right: 16px;
+      width: 36px; height: 36px; border: none;
+      background: rgba(0, 0, 0, 0.05); border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: var(--text-muted);
+    }
+    .popup-close-btn:hover { background: rgba(0, 0, 0, 0.1); color: var(--text-dark); }
+    .popup-title { font-size: 22px; font-weight: 700; color: var(--text-dark); text-align: center; margin-bottom: 16px; }
+    .popup-content { font-size: 15px; color: var(--text-light); line-height: 1.7; text-align: center; margin-bottom: 24px; }
+    .popup-btn {
+      display: block; width: 100%; padding: 14px 24px;
+      border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: white; transition: all 0.3s ease;
+    }
+    .popup-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+    @media (max-width: 1024px) {
+      .main-wrapper { margin-left: 0; margin-top: 50px; }
+      .user-sidebar { display: none; }
+      .doc-btn { display: none; }
+      .glass-header { display: none; }
+    }
+    @media (max-width: 768px) {
+      .site-footer { display: none; }
+    }
+    .mobile-nav {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 50px;
+      background: linear-gradient(135deg, #d32f2f, #b71c1c);
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px; z-index: 100;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    @media (max-width: 1024px) {
+      .mobile-nav { display: flex; }
+    }
+    .mobile-nav-btn {
+      color: white; text-decoration: none; font-size: 14px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .mobile-nav-menu {
+      display: flex; align-items: center; gap: 8px;
+      overflow-x: auto; flex: 1;
+      scrollbar-width: none; -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .mobile-nav-menu::-webkit-scrollbar { display: none; }
+    .mobile-nav-link {
+      color: white; text-decoration: none; font-size: 13px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 12px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 20px;
+      white-space: nowrap; flex-shrink: 0;
+      transition: all 0.25s ease;
+    }
+    .mobile-nav-link:hover, .mobile-nav-link.active {
+      background: rgba(255,255,255,0.32);
+    }
+    .mobile-nav-link i { font-size: 12px; }
+    .mobile-nav-title { color: white; font-size: 16px; font-weight: 600; }
+    body.page-body { overflow: auto; }
+  </style>
+  <script src="/public/js/main.js" defer></script>
+  <% if (typeof pageScript !== 'undefined' && pageScript) { %>
+  <script src="<%= pageScript %>" defer></script>
+  <% } %>
+</head>
+<body class="page-body" id="page-body">
+  <nav class="mobile-nav">
+    <a href="/" class="mobile-nav-btn" title="首页"><i class="fas fa-home"></i></a>
+    <div class="mobile-nav-menu">
+      <a href="/forum" class="mobile-nav-link"><i class="fas fa-comment-dots"></i>贴吧</a>
+      <a href="/search" class="mobile-nav-link"><i class="fas fa-search"></i>搜索</a>
+      <a href="/secret" class="mobile-nav-link"><i class="fas fa-key"></i>保密号</a>
+      <a href="/sponsor" class="mobile-nav-link"><i class="fas fa-heart"></i>赞助</a>
+      <a href="/messages/guestbook" class="mobile-nav-link"><i class="fas fa-book"></i>留言板</a>
+      <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+      <a href="/messages" class="mobile-nav-link"><i class="fas fa-envelope"></i>私信</a>
+      <a href="/user" class="mobile-nav-link"><i class="fas fa-user"></i><%= currentUser.real_name || currentUser.username %></a>
+      <% if (currentUser.is_admin === 1) { %>
+      <a href="/admin" class="mobile-nav-link"><i class="fas fa-cog"></i>管理</a>
+      <% } %>
+      <a href="/logout" class="mobile-nav-link"><i class="fas fa-sign-out-alt"></i>退出</a>
+      <% } else { %>
+      <a href="/login" class="mobile-nav-link"><i class="fas fa-sign-in-alt"></i>登录 / 注册</a>
+      <% } %>
+    </div>
+  </nav>
+
+  <a href="/" class="doc-btn"><i class="fas fa-home"></i> 首页</a>
+
+  <div class="bg-animation">
+    <div class="bg-shape bg-shape-1"></div>
+    <div class="bg-shape bg-shape-2"></div>
+    <div class="bg-shape bg-shape-3"></div>
+    <div class="bg-shape bg-shape-4"></div>
+    <div class="particles">
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+      <div class="particle"></div>
+    </div>
+  </div>
+
+  <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+  <aside class="user-sidebar" id="userSidebar">
+    <div class="sidebar-content">
+      <div class="user-avatar"><%= currentUser.real_name ? currentUser.real_name.charAt(0) : (currentUser.username || 'U').charAt(0) %></div>
+      <div class="user-name"><%= currentUser.real_name || currentUser.username || '用户' %></div>
+      <div class="user-stats">
+        <div class="stat-item">
+          <span class="stat-num"><%= typeof postCount !== 'undefined' ? postCount : 0 %></span>
+          <span class="stat-label">帖子</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num"><%= typeof commentCount !== 'undefined' ? commentCount : 0 %></span>
+          <span class="stat-label">评论</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-num"><%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+          <span class="stat-label">等级</span>
+        </div>
+      </div>
+      <div class="quick-actions">
+        <a href="/" class="quick-action-btn"><i class="fas fa-home"></i> 首页</a>
+        <a href="/forum" class="quick-action-btn"><i class="fas fa-comment-dots"></i> 贴吧</a>
+        <a href="/secret" class="quick-action-btn"><i class="fas fa-key"></i> 保密号</a>
+        <a href="/sponsor" class="quick-action-btn"><i class="fas fa-heart"></i> 赞助</a>
+        <a href="/messages" class="quick-action-btn"><i class="fas fa-envelope"></i> 私信</a>
+        <a href="/search" class="quick-action-btn"><i class="fas fa-search"></i> 搜索</a>
+        <a href="/user" class="quick-action-btn"><i class="fas fa-user"></i> 个人中心</a>
+        <% if (currentUser.is_admin === 1) { %>
+        <a href="/admin" class="quick-action-btn"><i class="fas fa-cog"></i> 管理后台</a>
+        <% } %>
+        <a href="/logout" class="quick-action-btn"><i class="fas fa-sign-out-alt"></i> 退出</a>
+      </div>
+    </div>
+  </aside>
+  <% } %>
+
+  <div class="main-wrapper" id="mainWrapper">
+    <%- body %>
+  </div>
+
+  <script>
+    function navigateWithTransition(url) {
+      var mainWrapper = document.getElementById('mainWrapper');
+      if (mainWrapper) {
+        mainWrapper.classList.add('page-transition-out');
+        setTimeout(function() { window.location.href = url; }, 300);
+      } else {
+        window.location.href = url;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      loadPopups();
+      loadNotifications();
+    });
+
+    async function loadPopups() {
+      try {
+        var response = await fetch('/api/popups');
+        var popups = await response.json();
+        if (popups.length > 0) {
+          for (var i = 0; i < popups.length; i++) {
+            showPopup(popups[i]);
+          }
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function showPopup(popup) {
+      var overlay = document.createElement('div');
+      overlay.className = 'popup-overlay';
+      var container = document.createElement('div');
+      container.className = 'popup-container';
+      var closeBtn = document.createElement('button');
+      closeBtn.className = 'popup-close-btn';
+      closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+      closeBtn.onclick = function() { overlay.classList.remove('show'); setTimeout(function(){ document.body.removeChild(overlay); }, 300); };
+      var title = document.createElement('h3');
+      title.className = 'popup-title';
+      title.textContent = popup.title || '';
+      var content = document.createElement('div');
+      content.className = 'popup-content';
+      content.innerHTML = popup.content || '';
+      var btn = document.createElement('button');
+      btn.className = 'popup-btn';
+      btn.textContent = '知道了';
+      btn.onclick = closeBtn.onclick;
+      container.appendChild(closeBtn);
+      container.appendChild(title);
+      container.appendChild(content);
+      container.appendChild(btn);
+      overlay.appendChild(container);
+      document.body.appendChild(overlay);
+      setTimeout(function() { overlay.classList.add('show'); }, 100);
+    }
+
+    async function loadNotifications() {
+      var list = document.getElementById('notificationList');
+      var btn = document.getElementById('notificationBtn');
+      if (!list || !btn) return;
+      try {
+        var response = await fetch('/api/notifications');
+        var notifications = await response.json();
+        if (notifications && notifications.length > 0) {
+          list.innerHTML = notifications.map(function(n) {
+            return '<div class="notification-item" data-id="' + n.id + '">' +
+              '<div class="notification-item-title">' + (n.title || '通知') + '</div>' +
+              '<div class="notification-item-content">' + (n.content || '') + '</div>' +
+              '<div class="notification-item-time">' + (n.created_at || '') + '</div></div>';
+          }).join('');
+          var badge = document.createElement('span');
+          badge.className = 'badge';
+          badge.textContent = notifications.length > 9 ? '9+' : notifications.length;
+          btn.appendChild(badge);
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    document.querySelector('.mode-toggle')?.addEventListener('click', function() {
+      document.body.classList.toggle('night-mode');
+    });
+  </script>
+
+  <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+  <div class="notification-ball">
+    <div class="notification-panel">
+      <div class="notification-panel-header"><i class="fas fa-bell"></i> 通知</div>
+      <div class="notification-list" id="notificationList">
+        <div class="notification-empty"><i class="fas fa-bell-slash"></i><p>暂无通知</p></div>
+      </div>
+    </div>
+    <button class="notification-btn" id="notificationBtn"><i class="fas fa-bell"></i></button>
+  </div>
+  <% } %>
+
+  <div class="site-footer">
+    <span class="footer-version">D5ST v1.0</span>
+    <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+    <span class="footer-lv">LV.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+    <% } %>
+  </div>
+</body>
+</html>

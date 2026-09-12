@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: d5st-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-d5st_root_2026}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-d5st}
+      MYSQL_USER: ${MYSQL_USER:-d5st}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-d5st_pass_2026}
+      TZ: Asia/Shanghai
+      CHARACTER_SET_SERVER: utf8mb4
+      COLLATION_SERVER: utf8mb4_unicode_ci
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db-schema.sql:/docker-entrypoint-initdb.d/01-d5st-schema.sql:ro
+      - ./docker/casdoor-init.sql:/docker-entrypoint-initdb.d/02-casdoor-schema.sql:ro
+    networks:
+      - d5st-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-d5st_root_2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  casdoor:
+    image: casdoor/casdoor:latest
+    container_name: d5st-casdoor
+    restart: unless-stopped
+    environment:
+      CASDOOR_ADMIN_USER: ${CASDOOR_ADMIN_USER:-admin}
+      CASDOOR_ADMIN_PASSWORD: ${CASDOOR_ADMIN_PASSWORD:-d5st_admin_2026}
+      CASDOOR_SERVER_PORT: 8000
+      CASDOOR_DATABASE_TYPE: mysql
+      CASDOOR_DATABASE_HOST: mysql
+      CASDOOR_DATABASE_PORT: 3306
+      CASDOOR_DATABASE_USER: ${MYSQL_USER:-d5st}
+      CASDOOR_DATABASE_PASSWORD: ${MYSQL_PASSWORD:-d5st_pass_2026}
+      CASDOOR_DATABASE_NAME: casdoor
+      CASDOOR_ORIGIN: ${APP_URL:-http://localhost:35555}
+      TZ: Asia/Shanghai
+    ports:
+      - "${CASDOOR_PORT:-8000}:8000"
+    volumes:
+      - casdoor_data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - d5st-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: d5st-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${APP_PORT:-35555}
+      HOST: 0.0.0.0
+      # ── 数据库（USE_MYSQL=1 生产走 MySQL，删除即 SQLite）──
+      USE_MYSQL: "1"
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-d5st}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-d5st_pass_2026}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-d5st}
+      # ── Casdoor ──
+      CASDOOR_ENDPOINT: http://casdoor:8000
+      CASDOOR_CLIENT_ID: ${CASDOOR_CLIENT_ID:-d5st_client}
+      CASDOOR_CLIENT_SECRET: ${CASDOOR_CLIENT_SECRET:-d5st_client_secret_2026}
+      CASDOOR_ORGANIZATION: ${CASDOOR_ORGANIZATION:-d5st}
+      CASDOOR_APPLICATION: ${CASDOOR_APPLICATION:-d5st-app}
+      CASDOOR_WEBHOOK_SECRET: ${CASDOOR_WEBHOOK_SECRET:-d5st_webhook_secret_2026}
+      # ── 应用 ──
+      APP_URL: ${APP_URL:-http://localhost:35555}
+      SESSION_SECRET: ${SESSION_SECRET:-d5st_session_secret_change_in_production}
+      ENABLE_DEV_LOGIN: ${ENABLE_DEV_LOGIN:-0}
+      TZ: Asia/Shanghai
+    ports:
+      - "${APP_PORT:-35555}:35555"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      casdoor:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    networks:
+      - d5st-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${APP_PORT:-35555}/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  mysql_data:
+  casdoor_data:
+
+networks:
+  d5st-network:
+    driver: bridge

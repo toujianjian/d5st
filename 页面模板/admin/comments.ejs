@@ -1,0 +1,65 @@
+﻿<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h3>📊 概览</h3>
+    <a href="/admin">仪表盘</a>
+    <h3>📋 内容管理</h3>
+    <a href="/admin/forum">帖子管理</a>
+    <a href="/admin/comments">评论管理</a>
+    <a href="/admin/comments" class="active">评论管理</a>
+    <a href="/admin/reports">举报管理</a>
+    <h3>🔔 通知与弹窗</h3>
+    <a href="/admin/notifications">全局通知</a>
+    <a href="/admin/popups">弹窗管理</a>
+    <h3>🏠 首页设置</h3>
+    <a href="/admin/home-links">首页链接</a>
+    <a href="/admin/home-banners">首页横幅</a>
+    <h3>🛠️ 系统</h3>
+    <a href="/admin/path-redirects">路径重定向</a>
+    <a href="/admin/recycle-bin">回收站</a>
+    <a href="/admin/export-users">导出用户</a>
+    <a href="/admin/settings">系统设置</a>
+  </aside>
+  <div class="admin-content">
+    <div class="card">
+      <div class="card-title">💬 评论管理 <span style="font-size:13px;color:#999;font-weight:normal;">共 <%= comments.length %> 条</span></div>
+      <table class="table">
+        <thead><tr><th>ID</th><th>内容</th><th>作者</th><th>所在帖子</th><th>时间</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          <% comments.forEach(function(c) { %>
+            <tr>
+              <td><%= c.id %></td>
+              <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= c.content %>"><%= c.content %></td>
+              <td><%= c.real_name || c.username %></td>
+              <td>
+                <% if (c.post_id) { %>
+                  <a href="/forum/<%= c.post_id %>" target="_blank" style="color:var(--primary);"><%= c.post_title ? c.post_title.slice(0, 30) : '#' + c.post_id %></a>
+                <% } else { %>-<% } %>
+              </td>
+              <td style="font-size:12px;"><%= (c.created_at || '').slice(0,16) %></td>
+              <td><%= c.is_deleted ? '<span class="badge badge-danger">已删除</span>' : '<span class="badge badge-success">正常</span>' %></td>
+              <td>
+                <% if (!c.is_deleted) { %>
+                  <button class="btn btn-danger btn-sm" onclick="delComment(<%= c.id %>)">删除</button>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (comments.length === 0) { %>
+            <tr><td colspan="7" style="text-align:center;color:#999;padding:30px;">暂无评论</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<style>
+  .btn-sm { padding: 4px 12px; font-size: 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
+</style>
+<script>
+function delComment(id) {
+  if (!confirm('确定删除该评论？')) return;
+  fetch('/admin/comments/delete/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert(data.error || '失败'); });
+}
+</script>

@@ -1,0 +1,237 @@
+<style>
+  .login-wrap {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px;
+  }
+  .login-card {
+    width: 100%; max-width: 440px;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 28px;
+    box-shadow: 0 24px 64px rgba(211, 47, 47, 0.22);
+    padding: 48px 36px 36px;
+    text-align: center;
+    position: relative;
+    animation: loginPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes loginPop {
+    0% { opacity: 0; transform: translateY(32px) scale(0.94); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .login-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+    border-radius: 28px 28px 0 0;
+  }
+  .login-card::after {
+    content: '';
+    position: absolute; top: -60px; right: -60px;
+    width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(211, 47, 47, 0.15), transparent 70%);
+    pointer-events: none;
+  }
+  .login-logo {
+    width: 88px; height: 88px;
+    margin: 0 auto 20px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-radius: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 42px; color: white;
+    box-shadow: 0 14px 32px rgba(211, 47, 47, 0.4);
+    font-family: 'ZCOOL XiaoWei', 'Noto Serif SC', serif;
+    font-weight: 700;
+    position: relative;
+    letter-spacing: 2px;
+  }
+  .login-title {
+    font-size: 26px; font-weight: 700;
+    color: var(--text-dark);
+    font-family: 'ZCOOL XiaoWei', 'Noto Serif SC', serif;
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+  }
+  .login-sub {
+    font-size: 13px; color: var(--text-muted);
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+  }
+  .login-error {
+    background: rgba(211, 47, 47, 0.08);
+    border: 1px solid rgba(211, 47, 47, 0.25);
+    border-radius: 14px;
+    padding: 12px 16px;
+    color: var(--primary-dark);
+    font-size: 13px;
+    margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px;
+    text-align: left;
+  }
+  .login-error i { color: var(--primary); flex-shrink: 0; }
+  .login-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    text-decoration: none;
+    border-radius: 999px;
+    font-size: 16px; font-weight: 600;
+    font-family: 'Noto Serif SC', serif;
+    box-shadow: 0 12px 28px rgba(211, 47, 47, 0.4);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .login-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 18px 40px rgba(211, 47, 47, 0.5);
+  }
+  .login-btn:active { transform: translateY(-1px); }
+  .login-btn i { font-size: 16px; }
+  .login-btn-shine {
+    position: absolute; top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.6s ease;
+  }
+  .login-btn:hover .login-btn-shine { left: 100%; }
+  .login-divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 0 0 16px;
+  }
+  .login-divider::before, .login-divider::after {
+    content: ''; flex: 1; height: 1px;
+    background: rgba(211, 47, 47, 0.2);
+  }
+  .login-divider-text {
+    font-size: 11px; color: var(--text-muted);
+    letter-spacing: 2px;
+  }
+  .login-links {
+    display: flex; justify-content: center; gap: 20px;
+    font-size: 13px;
+  }
+  .login-link {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.25s ease;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .login-link:hover { color: var(--primary); }
+  .login-link i { font-size: 11px; }
+  .login-footer {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px dashed rgba(211, 47, 47, 0.2);
+    font-size: 12px; color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .login-footer i { color: var(--primary); }
+  .casdoor-notice {
+    background: rgba(255, 152, 0, 0.12);
+    border: 1px solid rgba(255, 152, 0, 0.35);
+    border-radius: 14px;
+    padding: 14px 16px;
+    color: #c66a00;
+    font-size: 13px;
+    margin-bottom: 18px;
+    display: flex; align-items: flex-start; gap: 10px;
+    text-align: left;
+    line-height: 1.6;
+  }
+  .casdoor-notice i { color: #ff9800; flex-shrink: 0; margin-top: 2px; }
+  .casdoor-notice code {
+    background: rgba(0,0,0,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    word-break: break-all;
+  }
+  .login-btn-dev {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
+    padding: 12px 24px;
+    background: rgba(255,255,255,0.4);
+    color: var(--primary-dark);
+    text-decoration: none;
+    border: 1px dashed rgba(211, 47, 47, 0.3);
+    border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    font-family: 'Noto Serif SC', serif;
+    transition: all 0.3s ease;
+    margin-bottom: 8px;
+  }
+  .login-btn-dev:hover {
+    background: rgba(255,255,255,0.6);
+    border-color: var(--primary);
+  }
+  .login-btn-dev i { font-size: 13px; }
+  .login-btn-dev.admin {
+    color: var(--primary-dark);
+    border-color: rgba(211, 47, 47, 0.4);
+  }
+  @media (max-width: 480px) {
+    .login-card { padding: 36px 24px 28px; border-radius: 24px; }
+    .login-logo { width: 76px; height: 76px; font-size: 36px; }
+    .login-title { font-size: 22px; }
+  }
+</style>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">D5</div>
+    <h1 class="login-title">D5ST 校园社区</h1>
+    <div class="login-sub">登录 / 注册</div>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="login-error">
+        <i class="fas fa-exclamation-circle"></i>
+        <span><%= error %></span>
+      </div>
+    <% } %>
+
+    <% if (typeof casdoorUnavailable !== 'undefined' && casdoorUnavailable) { %>
+      <div class="casdoor-notice">
+        <i class="fas fa-triangle-exclamation"></i>
+        <div>
+          <strong>Casdoor 服务不可达</strong><br>
+          配置地址：<code><%= endpoint %></code><br>
+          请先启动 Casdoor（<code>docker compose up -d casdoor</code>）或配置 <code>CASDOOR_ENDPOINT</code>。
+        </div>
+      </div>
+    <% } %>
+
+    <a href="/auth/login" class="login-btn">
+      <i class="fas fa-sign-in-alt"></i>
+      <span>使用 Casdoor 登录</span>
+      <span class="login-btn-shine"></span>
+    </a>
+
+    <% if (typeof allowDevLogin !== 'undefined' && allowDevLogin) { %>
+      <a href="/auth/dev-login?username=dev_user" class="login-btn-dev">
+        <i class="fas fa-flask"></i>
+        <span>演示登录（开发模式）</span>
+      </a>
+      <a href="/auth/dev-login?username=admin&admin=1" class="login-btn-dev admin">
+        <i class="fas fa-user-shield"></i>
+        <span>演示管理员登录</span>
+      </a>
+    <% } %>
+
+    <div class="login-divider"><span class="login-divider-text">更多</span></div>
+    <div class="login-links">
+      <a href="/forgot-password" class="login-link"><i class="fas fa-key"></i> 忘记密码</a>
+      <a href="/" class="login-link"><i class="fas fa-home"></i> 返回首页</a>
+    </div>
+
+    <div class="login-footer">
+      <i class="fas fa-shield-alt"></i>
+      <span>本站使用 Casdoor 统一认证</span>
+    </div>
+  </div>
+</div>

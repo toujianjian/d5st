@@ -1,0 +1,127 @@
+<style>
+  .page-wrap {
+    position: relative; z-index: 1;
+    padding: 40px 20px;
+    display: flex; justify-content: center;
+  }
+  .edit-card {
+    width: 100%; max-width: 520px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 28px;
+    box-shadow: var(--shadow-soft);
+    padding: 40px 36px;
+    position: relative; overflow: hidden;
+    animation: popIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes popIn {
+    0% { opacity: 0; transform: translateY(24px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .edit-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+  }
+  .edit-title {
+    font-size: 24px; font-weight: 700; color: var(--text-dark);
+    margin-bottom: 6px;
+    font-family: 'Noto Serif SC', serif;
+  }
+  .edit-subtitle {
+    font-size: 13px; color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+  .err-banner {
+    background: #ffebee; color: #c62828;
+    padding: 12px 16px; border-radius: 12px;
+    font-size: 13px; margin-bottom: 20px;
+    border-left: 4px solid var(--primary);
+  }
+  .form-group { margin-bottom: 20px; }
+  .form-label {
+    display: block;
+    font-size: 13px; font-weight: 600; color: var(--text-dark);
+    margin-bottom: 8px;
+  }
+  .form-input {
+    width: 100%;
+    padding: 14px 18px;
+    font-size: 15px;
+    border: 2px solid rgba(211, 47, 47, 0.12);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--text-dark);
+    font-family: 'Noto Serif SC', serif;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    outline: none;
+  }
+  .form-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(211, 47, 47, 0.12);
+    background: white;
+    transform: translateY(-1px);
+  }
+  .form-input::placeholder { color: var(--text-muted); }
+  .form-actions {
+    display: flex; gap: 12px; margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid rgba(211, 47, 47, 0.12);
+  }
+  .btn {
+    flex: 1;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 22px; border-radius: 999px;
+    font-size: 15px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: 'Noto Serif SC', serif;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.35);
+  }
+  .btn.primary:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(211, 47, 47, 0.5); }
+  .btn.ghost {
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--text-dark);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  .btn.ghost:hover { background: rgba(0,0,0,0.05); transform: translateY(-3px); }
+</style>
+
+<div class="page-wrap">
+  <div class="edit-card">
+    <h2 class="edit-title">✏️ 编辑资料</h2>
+    <p class="edit-subtitle">完善个人信息，让同学们更好地认识你</p>
+
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="err-banner"><i class="fas fa-exclamation-circle"></i> 保存失败，请重试</div>
+    <% } %>
+
+    <form method="POST" action="/user/edit">
+      <div class="form-group">
+        <label class="form-label">昵称</label>
+        <input type="text" name="nickname" class="form-input" value="<%= (typeof user !== 'undefined' && user) ? (user.nickname || '') : (currentUser && currentUser.nickname ? currentUser.nickname : '') %>" placeholder="给自己起个昵称">
+      </div>
+      <div class="form-group">
+        <label class="form-label">年级</label>
+        <input type="text" name="grade" class="form-input" value="<%= (typeof user !== 'undefined' && user) ? (user.grade || '') : (currentUser && currentUser.grade ? currentUser.grade : '') %>" placeholder="如：八年级">
+      </div>
+      <div class="form-group">
+        <label class="form-label">班级</label>
+        <input type="text" name="class_name" class="form-input" value="<%= (typeof user !== 'undefined' && user) ? (user.class_name || '') : (currentUser && currentUser.class_name ? currentUser.class_name : '') %>" placeholder="如：1班">
+      </div>
+      <div class="form-group">
+        <label class="form-label">学号</label>
+        <input type="text" name="student_no" class="form-input" value="<%= (typeof user !== 'undefined' && user) ? (user.student_no || '') : (currentUser && currentUser.student_no ? currentUser.student_no : '') %>" placeholder="如：001">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn primary"><i class="fas fa-check"></i> 保存</button>
+        <a href="/user" class="btn ghost">取消</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,128 @@
+<style>
+  .profile-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px; padding: 28px;
+    display: flex; align-items: center; gap: 24px;
+    box-shadow: var(--shadow-soft); margin-bottom: 20px;
+  }
+  .profile-avatar {
+    width: 90px; height: 90px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 40px; color: white; font-weight: 700;
+    box-shadow: 0 4px 15px rgba(211,47,47,0.3); flex-shrink: 0;
+  }
+  .profile-info { flex: 1; }
+  .profile-name { font-size: 22px; font-weight: 700; color: var(--text-dark); font-family: 'Noto Serif SC', serif; }
+  .profile-meta { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+  .profile-stats { display: flex; gap: 24px; margin-top: 12px; }
+  .stat-item .num { font-size: 18px; font-weight: 700; color: var(--primary-dark); }
+  .stat-item .lbl { font-size: 12px; color: var(--text-light); }
+  .follow-btn {
+    padding: 10px 24px; border-radius: 999px; border: 1px solid var(--primary);
+    background: rgba(211,47,47,0.1); color: var(--primary-dark);
+    font-size: 13px; font-weight: 500; cursor: pointer;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.25s ease;
+  }
+  .follow-btn:hover { background: var(--primary); color: white; }
+  .follow-btn.following { background: var(--primary); color: white; }
+  .posts-section h3 { font-family: 'Noto Serif SC', serif; margin-bottom: 12px; color: var(--text-dark); }
+</style>
+
+<div class="page-container">
+  <% if (typeof user !== 'undefined' && user) { %>
+  <div class="profile-card">
+    <div class="profile-avatar"><%= (user.real_name || user.username || 'U').charAt(0) %></div>
+    <div class="profile-info">
+      <div class="profile-name"><%= user.real_name || user.username %></div>
+      <div class="profile-meta">
+        <% if (user.grade) { %><i class="fas fa-school"></i> <%= user.grade %><% } %>
+        <% if (user.class_name) { %> · <%= user.class_name %><% } %>
+      </div>
+      <div class="profile-stats">
+        <div class="stat-item"><span class="num"><%= followerCount || 0 %></span> <span class="lbl">粉丝</span></div>
+        <div class="stat-item"><span class="num"><%= followingCount || 0 %></span> <span class="lbl">关注</span></div>
+        <div class="stat-item"><span class="num"><%= (typeof posts !== 'undefined' ? posts.length : 0) %></span> <span class="lbl">帖子</span></div>
+        <% if (typeof user.points !== 'undefined') { %>
+        <div class="stat-item"><span class="num"><%= user.points %></span> <span class="lbl">积分</span></div>
+        <% } %>
+      </div>
+    </div>
+    <% if (!isSelf && typeof currentUser !== 'undefined' && currentUser) { %>
+    <button id="followBtn" class="follow-btn <%= isFollowing ? 'following' : '' %>" data-id="<%= user.id %>">
+      <i class="fas <%= isFollowing ? 'fa-user-minus' : 'fa-user-plus' %>"></i>
+      <span><%= isFollowing ? '已关注' : '关注' %></span>
+    </button>
+    <% } %>
+  </div>
+
+  <div class="posts-section">
+    <h3 style="font-family:'Noto Serif SC',serif;margin-bottom:14px;color:var(--text-dark);display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-list" style="color:var(--primary);"></i> Ta 的帖子
+      <span style="font-size:13px;color:var(--text-muted);font-weight:normal;">共 <%= (typeof posts !== 'undefined' ? posts.length : 0) %> 条</span>
+    </h3>
+    <% if (typeof posts !== 'undefined' && posts && posts.length > 0) { %>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <% posts.forEach(function(p) { %>
+          <a href="/forum/<%= p.id %>"
+             style="display:block;text-decoration:none;color:inherit;
+                    padding:16px 20px;
+                    background:var(--glass-bg);
+                    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+                    border:1px solid var(--glass-border);
+                    border-radius:16px;
+                    box-shadow:var(--shadow-soft);
+                    transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);"
+             onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='rgba(211,47,47,0.35)'"
+             onmouseout="this.style.transform='';this.style.borderColor=''">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:16px;font-weight:700;color:var(--text-dark);font-family:'Noto Serif SC',serif;">
+                <%= p.title || (p.content || '').slice(0, 50) %>
+              </span>
+              <% if (p.is_top) { %><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(211,47,47,0.12);color:#d32f2f;font-weight:600;">置顶</span><% } %>
+              <% if (p.is_hot) { %><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(255,107,53,0.15);color:#ff6b35;font-weight:600;">精华</span><% } %>
+              <% if (p.category) { %><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(33,150,243,0.12);color:#1976d2;font-weight:500;"><%= p.category %></span><% } %>
+            </div>
+            <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);align-items:center;">
+              <span><i class="fas fa-clock"></i> <%= (p.created_at || '').slice(0,16) %></span>
+              <span><i class="fas fa-eye"></i> <%= p.views || 0 %></span>
+              <% if (p.tags) { %><span style="color:var(--primary);"><i class="fas fa-tags"></i> <%= String(p.tags).split(/[,，\s]+/).filter(Boolean).slice(0,3).join(', ') %></span><% } %>
+            </div>
+          </a>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <div style="text-align:center;padding:50px 20px;background:var(--glass-bg);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:20px;color:var(--text-muted);">
+        <i class="fas fa-inbox" style="font-size:40px;display:block;margin-bottom:10px;opacity:0.4;"></i>
+        还没有发布过帖子
+      </div>
+    <% } %>
+  </div>
+
+  <script>
+  (function() {
+    var btn = document.getElementById('followBtn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      var id = btn.dataset.id;
+      fetch('/user/' + id + '/follow', { method: 'POST', headers: {'Content-Type':'application/json'} })
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+          if (data.following) {
+            btn.classList.add('following');
+            btn.querySelector('span').textContent = '已关注';
+            btn.querySelector('i').className = 'fas fa-user-minus';
+          } else {
+            btn.classList.remove('following');
+            btn.querySelector('span').textContent = '关注';
+            btn.querySelector('i').className = 'fas fa-user-plus';
+          }
+        });
+    });
+  })();
+  </script>
+  <% } %>
+</div>

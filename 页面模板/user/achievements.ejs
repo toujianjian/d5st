@@ -1,0 +1,146 @@
+<style>
+  .page-wrap {
+    position: relative; z-index: 1;
+    padding: 40px 20px;
+    display: flex; justify-content: center;
+  }
+  .ach-card {
+    width: 100%; max-width: 720px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 28px;
+    box-shadow: var(--shadow-soft);
+    padding: 40px 32px;
+    position: relative; overflow: hidden;
+    animation: popIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes popIn {
+    0% { opacity: 0; transform: translateY(24px) scale(0.96); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .ach-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+  }
+  .ach-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .ach-icon {
+    width: 80px; height: 80px; margin: 0 auto 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; color: white;
+    box-shadow: 0 8px 28px rgba(211, 47, 47, 0.4);
+    animation: floaty 3.5s ease-in-out infinite;
+  }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .ach-title {
+    font-size: 26px; font-weight: 700; color: var(--text-dark);
+    font-family: 'Noto Serif SC', serif;
+    margin-bottom: 4px;
+  }
+  .ach-subtitle { font-size: 13px; color: var(--text-muted); }
+  .wall-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 18px;
+  }
+  .medal-tile {
+    background: linear-gradient(135deg, rgba(211, 47, 47, 0.06), rgba(183, 28, 28, 0.03));
+    border: 1px solid rgba(211, 47, 47, 0.12);
+    border-radius: 20px;
+    padding: 24px 16px;
+    text-align: center;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative; overflow: hidden;
+    animation: tileIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  @keyframes tileIn {
+    0% { opacity: 0; transform: translateY(16px) scale(0.9); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .medal-tile:hover {
+    transform: translateY(-6px) scale(1.04);
+    box-shadow: 0 12px 36px rgba(211, 47, 47, 0.2);
+    border-color: var(--primary);
+  }
+  .medal-tile::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    transform: scaleX(0); transform-origin: center;
+    transition: transform 0.3s ease;
+  }
+  .medal-tile:hover::before { transform: scaleX(1); }
+  .medal-emoji {
+    font-size: 42px;
+    margin-bottom: 10px;
+    display: block;
+    filter: drop-shadow(0 4px 8px rgba(211, 47, 47, 0.25));
+  }
+  .medal-name {
+    font-weight: 600; color: var(--text-dark);
+    font-size: 14px; margin-bottom: 6px;
+  }
+  .medal-date {
+    font-size: 11px; color: var(--text-muted);
+  }
+  .empty-box {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+  }
+  .empty-icon {
+    font-size: 56px; margin-bottom: 16px;
+    opacity: 0.5;
+  }
+  .empty-text { font-size: 15px; margin-bottom: 20px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 28px; border-radius: 999px;
+    font-size: 14px; font-weight: 600;
+    text-decoration: none; cursor: pointer; border: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-family: 'Noto Serif SC', serif;
+  }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.35);
+  }
+  .btn.primary:hover { transform: translateY(-3px); box-shadow: 0 10px 32px rgba(211, 47, 47, 0.5); }
+</style>
+
+<div class="page-wrap">
+  <div class="ach-card">
+    <div class="ach-header">
+      <div class="ach-icon"><i class="fas fa-trophy"></i></div>
+      <h2 class="ach-title">🏅 我的成就</h2>
+      <p class="ach-subtitle">记录每一次成长与突破</p>
+    </div>
+
+    <% if (typeof medals !== 'undefined' && medals && medals.length > 0) { %>
+      <div class="wall-grid">
+        <% medals.forEach(function(m, idx) { %>
+          <div class="medal-tile" style="animation-delay: <%= Math.min(idx * 0.06, 0.6) %>s;">
+            <span class="medal-emoji">🏅</span>
+            <div class="medal-name"><%= m.medal_name %></div>
+            <div class="medal-date"><%= new Date(m.earned_at).toLocaleDateString('zh-CN') %></div>
+          </div>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <div class="empty-box">
+        <div class="empty-icon">🎖️</div>
+        <div class="empty-text">继续活跃就能解锁更多勋章！</div>
+        <a href="/forum" class="btn primary"><i class="fas fa-pen"></i> 去发帖</a>
+      </div>
+    <% } %>
+  </div>
+</div>

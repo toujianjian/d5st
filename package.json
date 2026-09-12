@@ -1,0 +1,27 @@
+{
+  "name": "d5st",
+  "version": "1.0.0",
+  "description": "D5ST 校园社区平台 - 基于 Node.js + Express + Casdoor 的现代校园网站系统",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "node 测试/test-auth.js"
+  },
+  "author": "d5st team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "csv-parse": "^5.5.0",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "express-ejs-layouts": "^2.5.1",
+    "express-session": "^1.18.1",
+    "mysql2": "^3.11.3",
+    "sql.js": "^1.11.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
