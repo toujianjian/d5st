@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -11,8 +9,6 @@ services:
       MYSQL_USER: ${MYSQL_USER:-d5st}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-d5st_pass_2026}
       TZ: Asia/Shanghai
-      CHARACTER_SET_SERVER: utf8mb4
-      COLLATION_SERVER: utf8mb4_unicode_ci
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -33,20 +29,17 @@ services:
       start_period: 20s
 
   casdoor:
-    image: casdoor/casdoor:latest
+    image: casbin/casdoor:latest
     container_name: d5st-casdoor
     restart: unless-stopped
     environment:
-      CASDOOR_ADMIN_USER: ${CASDOOR_ADMIN_USER:-admin}
-      CASDOOR_ADMIN_PASSWORD: ${CASDOOR_ADMIN_PASSWORD:-d5st_admin_2026}
-      CASDOOR_SERVER_PORT: 8000
-      CASDOOR_DATABASE_TYPE: mysql
-      CASDOOR_DATABASE_HOST: mysql
-      CASDOOR_DATABASE_PORT: 3306
-      CASDOOR_DATABASE_USER: ${MYSQL_USER:-d5st}
-      CASDOOR_DATABASE_PASSWORD: ${MYSQL_PASSWORD:-d5st_pass_2026}
-      CASDOOR_DATABASE_NAME: casdoor
-      CASDOOR_ORIGIN: ${APP_URL:-http://localhost:35555}
+      # ── Casdoor 官方环境变量（不是 CASDOOR_* 前缀）──
+      driverName: mysql
+      dataSourceName: "${MYSQL_USER:-d5st}:${MYSQL_PASSWORD:-d5st_pass_2026}@tcp(mysql:3306)/casdoor?charset=utf8mb4&parseTime=True&loc=Local"
+      runName: d5st-casdoor
+      defaultStorageProvider:
+      isDemoMode: "false"
+      GIN_MODE: release
       TZ: Asia/Shanghai
     ports:
       - "${CASDOOR_PORT:-8000}:8000"
@@ -74,7 +67,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${APP_PORT:-35555}
       HOST: 0.0.0.0
-      # ── 数据库（USE_MYSQL=1 生产走 MySQL，删除即 SQLite）──
+      # ── 数据库（USE_MYSQL=1 生产走 MySQL）──
       USE_MYSQL: "1"
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
