@@ -30,10 +30,10 @@ services:
     image: casbin/casdoor:latest
     container_name: d5st-casdoor
     restart: unless-stopped
-    # ── 官方 MySQL 连接格式：dataSourceName 不含 DB 名，dbName 单独指定 ──
+    # scratch 镜像没有 wget/curl，跳过 healthcheck
+    # 用 entrypoint 内置 --createDatabase=true 循环重试直到 MySQL 连通
     entrypoint: ["/bin/sh", "-c", "./server --createDatabase=true"]
     environment:
-      # 不设 RUNNING_IN_DOCKER，否则 Casdoor 会走 host.docker.internal
       driverName: mysql
       dataSourceName: "${MYSQL_USER:-d5st}:${MYSQL_PASSWORD:-d5st_pass_2026}@tcp(mysql:3306)/"
       dbName: casdoor
@@ -48,12 +48,6 @@ services:
         condition: service_healthy
     networks:
       - d5st-network
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/ >/dev/null 2>&1 || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 15
-      start_period: 30s
 
   app:
     build:
@@ -87,7 +81,7 @@ services:
       mysql:
         condition: service_healthy
       casdoor:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - ./:/app
       - /app/node_modules
