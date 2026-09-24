@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title><%= title ? (title + ' - ' + siteTitle) : siteTitle %></title>
+  <title><%= title && title !== siteTitle ? (title + ' - ' + siteTitle) : siteTitle %></title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="D5ST 校园社区 - 连接每一位同学，共享校园生活" />
   <!-- 字体：优先使用本地已装的思源宋体/站酷小薇，未安装时回退系统衬线体，避免外部 CDN 拖慢首屏 -->

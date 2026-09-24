@@ -15,3 +15,6 @@ d5st.db-*
 .vscode/
 *.swp
 Thumbs.db
+
+# 本地备份文件
+*.bak.*

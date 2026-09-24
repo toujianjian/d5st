@@ -6,6 +6,9 @@ const axios = require('axios');
 
 const C = {
   endpoint: (process.env.CASDOOR_ENDPOINT || 'http://localhost:8000').replace(/\/$/, ''),
+  // 公网可达的 Casdoor 地址：OAuth authorize URL 会跳给用户浏览器，
+  // 必须用浏览器能访问的地址；容器内网地址（如 d5st-casdoor）在这里不可用。
+  publicEndpoint: (process.env.CASDOOR_PUBLIC_ENDPOINT || process.env.CASDOOR_ENDPOINT || 'http://localhost:8000').replace(/\/$/, ''),
   clientId: process.env.CASDOOR_CLIENT_ID || 'd5st_client',
   clientSecret: process.env.CASDOOR_CLIENT_SECRET || 'd5st_client_secret_2026',
   organization: process.env.CASDOOR_ORGANIZATION || 'd5st',
@@ -16,33 +19,54 @@ const C = {
   webhookSecret: process.env.CASDOOR_WEBHOOK_SECRET || 'd5st_webhook_secret_2026'
 };
 
-// =================== 基础：管理员 token ===================
-// 每次调用 admin API 都拿最新 token，避免过期
-async function getAdminToken() {
+// =================== 基础：管理员会话 ===================
+// 新版 Casdoor 的 /api/login 返回的是会话 cookie（casdoor_session_id），
+// 而不是 JWT；admin API 用该 cookie 鉴权。这里做一次登录并缓存 cookie，
+// 避免每次 admin 调用都重新登录。
+let _adminCookie = null;
+let _adminCookieAt = 0;
+const ADMIN_SESSION_TTL = 50 * 60 * 1000; // 略小于 Casdoor 默认会话时长
+
+async function getAdminCookie(force = false) {
+  if (!force && _adminCookie && Date.now() - _adminCookieAt < ADMIN_SESSION_TTL) {
+    return _adminCookie;
+  }
   try {
-    const { data } = await axios.post(`${C.endpoint}/api/login`, {
+    const resp = await axios.post(`${C.endpoint}/api/login`, {
       username: C.adminUser,
       password: C.adminPassword,
-      organizationName: 'built-in',
-      applicationName: 'app-built-in'
+      // 新版 Casdoor 需要显式 type=login，否则返回 "unknown response type"
+      type: 'login',
+      organization: 'built-in',
+      application: 'app-built-in'
     }, { timeout: 10000 });
-    if (!data || !data.status || !data.data) {
+    const data = resp.data;
+    if (!data || data.status !== 'ok') {
       throw new Error(`Casdoor 登录失败: ${data?.msg || 'unknown'}`);
     }
-    return data.data; // jwt string
+    const setCookies = resp.headers['set-cookie'] || [];
+    const cookie = setCookies.map(c => c.split(';')[0]).join('; ');
+    if (!cookie) throw new Error('Casdoor 登录未返回会话 cookie');
+    _adminCookie = cookie;
+    _adminCookieAt = Date.now();
+    return cookie;
   } catch (err) {
-    console.error('[Casdoor] 获取管理员 token 失败:', err.message);
+    _adminCookie = null;
+    console.error('[Casdoor] 获取管理员会话失败:', err.message);
     throw err;
   }
 }
 
+// 兼容旧调用方：返回会话 cookie（不是 JWT）
+const getAdminToken = getAdminCookie;
+
 // =================== 底层：admin 通用请求 ===================
 async function admin(action, params = {}) {
-  const token = await getAdminToken();
+  const cookie = await getAdminCookie();
   const qs = new URLSearchParams(params).toString();
   const url = `${C.endpoint}/api/${action}${qs ? '?' + qs : ''}`;
   const { data } = await axios.get(url, {
-    headers: { 'Authorization': `Bearer ${token}` },
+    headers: { 'Cookie': cookie },
     timeout: 15000
   });
   if (!data.status) throw new Error(`Casdoor ${action} 失败: ${data.msg}`);
@@ -50,10 +74,10 @@ async function admin(action, params = {}) {
 }
 
 async function adminPost(action, body = {}) {
-  const token = await getAdminToken();
+  const cookie = await getAdminCookie();
   const { data } = await axios.post(`${C.endpoint}/api/${action}`, body, {
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Cookie': cookie,
       'Content-Type': 'application/json'
     },
     timeout: 15000
@@ -69,7 +93,7 @@ function getAuthUrl(extra = {}) {
     `profile email offline_access ${C.organization}:${C.application}`
   );
   const state = (extra.state || Math.random().toString(36).slice(2)) + '-' + Date.now();
-  return `${C.endpoint}/login/oauth/authorize` +
+  return `${C.publicEndpoint}/login/oauth/authorize` +
     `?client_id=${C.clientId}` +
     `&response_type=code` +
     `&redirect_uri=${redirectUri}` +

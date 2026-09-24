@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
     settings.forEach(s => { siteSettings[s.setting_key] = s.setting_value; });
     
     res.render('home/index', {
-      title: siteSettings.site_name || 'D5ST 校园社区',
+      title: '暂停营业代码出错',
       banners,
       links,
       posts,

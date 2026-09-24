@@ -17,7 +17,8 @@ if (USE_MYSQL) {
     connectionLimit: 10,
     queueLimit: 0,
     charset: 'utf8mb4',
-    timezone: '+08:00'
+    timezone: '+08:00',
+    multipleStatements: true
   });
   _ready = pool.getConnection().then(conn => {
     conn.release();
