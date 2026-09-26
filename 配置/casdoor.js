@@ -75,9 +75,11 @@ async function admin(action, params = {}) {
   return data.data;
 }
 
-async function adminPost(action, body = {}) {
+async function adminPost(action, body = {}, query = {}) {
   const cookie = await getAdminCookie();
-  const { data } = await axios.post(`${C.endpoint}/api/${action}`, body, {
+  const qs = new URLSearchParams(query).toString();
+  const url = qs ? `${C.endpoint}/api/${action}?${qs}` : `${C.endpoint}/api/${action}`;
+  const { data } = await axios.post(url, body, {
     headers: {
       'Cookie': cookie,
       'Content-Type': 'application/json'
@@ -200,7 +202,10 @@ async function listOrganizations() {
 }
 
 async function getApplication(org, app) {
-  return admin('get-application', { organization: org, application: app });
+  // Casdoor 的 get-application 端点期望 id 参数（格式 owner/name），
+  // 用 organization+application 会让 Casdoor 解析 ID 失败报
+  // "GetOwnerAndNameFromId() error, wrong token count for ID:"
+  return admin('get-application', { id: `${org}/${app}` });
 }
 
 async function createApplication(app) {
@@ -208,6 +213,12 @@ async function createApplication(app) {
 }
 
 async function updateApplication(app) {
+  // Casdoor update-application 端点要求 URL 带 id=owner/name 查询参数
+  // （与 get-application 一样），仅靠 body 里的 owner/name 会让 Casdoor 解析 ID 失败
+  // 报 "GetOwnerAndNameFromId() error, wrong token count for ID:"
+  if (app.id) {
+    return adminPost('update-application', app, { id: app.id });
+  }
   return adminPost('update-application', app);
 }
 

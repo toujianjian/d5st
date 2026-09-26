@@ -55,31 +55,64 @@ async function ensureOrganization() {
   }
 }
 
+// 注册表单必填配置：Email 和 Display name 设为非必填（本地开发无强制要求）
+// Casdoor 的 Application 没有 Require* 顶层字段，通过 SignupItem.required 控制必填星号
+const SIGNUP_ITEMS = [
+  { name: 'Username',     visible: true, required: true,  prompted: true, type: 'text',     label: '用户名',     placeholder: '请输入用户名' },
+  { name: 'Password',     visible: true, required: true,  prompted: true, type: 'password', label: '密码',       placeholder: '请输入密码' },
+  { name: 'Email',        visible: true, required: false, prompted: false, type: 'text',     label: '邮箱',       placeholder: '选填' },
+  { name: 'Display name', visible: true, required: false, prompted: false, type: 'text',     label: '显示名称', placeholder: '选填' }
+];
+
 async function ensureApplication() {
+  // 探测已有应用：先 get-application，失败则回退 list-applications
+  // （get-application 在容器启动初期或并发场景会偶发返回 null/throw，
+  //  list-applications 经我们修复后端点稳定）
+  let existing = null;
   try {
-    const existing = await casdoor.getApplication(C.organization, C.application);
-    if (existing) {
+    existing = await casdoor.getApplication(C.organization, C.application);
+  } catch (e) { /* ignore */ }
+  if (!existing) {
+    try {
+      const apps = await casdoor.listApplications(C.organization);
+      existing = apps.find(a => a.name === C.application) || null;
+    } catch (e) { /* ignore */ }
+  }
+  if (existing) {
       // 同步 URL 类字段到当前 APP_URL：避免本地/线上切换后 Casdoor 库里残留
       // 旧域名的 redirectUris 导致回调校验失败（典型表现：登录跳转到远程域名）
       const desiredRedirect = `${C.appUrl}/auth/callback`;
+      // 检测 signupItems 里 Email / Display name 是否仍 required（若仍 true 就同步）
+      const items = existing.signupItems || [];
+      const stillRequiresEmail = items.some(i => i.name === 'Email' && i.required);
+      const stillRequiresDisplayName = items.some(i => i.name === 'Display name' && i.required);
       const needSync =
         !(existing.redirectUris || []).includes(desiredRedirect) ||
         existing.homepageUrl !== C.appUrl ||
         existing.logoutUrl !== `${C.appUrl}/logout` ||
-        existing.redirectUrl !== C.appUrl;
+        existing.redirectUrl !== C.appUrl ||
+        stillRequiresEmail ||
+        stillRequiresDisplayName;
       if (needSync) {
         existing.redirectUris = [desiredRedirect];
         existing.homepageUrl = C.appUrl;
         existing.logoutUrl = `${C.appUrl}/logout`;
         existing.redirectUrl = C.appUrl;
+        // 只翻转 Email / Display name 的 required 为 false，保留 Casdoor 的其他默认项
+        // （Confirm password / Agreement / Tag 等）不被覆盖
+        existing.signupItems = (existing.signupItems || []).map(i =>
+          (i.name === 'Email' || i.name === 'Display name') ? { ...i, required: false } : i
+        );
+        // Casdoor update-application 端点要从 id 解析 owner/name，
+        // listApplications 返回的对象 id 可能为空，显式补上
+        existing.id = `${C.organization}/${C.application}`;
         await casdoor.updateApplication(existing);
-        LOG(`应用 "${C.application}" URL 字段已同步到 ${C.appUrl}`);
+        LOG(`应用 "${C.application}" URL + signupItems 已同步到当前配置`);
       } else {
         LOG(`应用 "${C.application}" 已存在`);
       }
       return existing;
-    }
-  } catch (e) { /* not found */ }
+  }
 
   LOG(`创建应用 "${C.application}" ...`);
   const app = {
@@ -133,6 +166,8 @@ async function ensureApplication() {
     signUpMethods: [
       { name: 'Password', title: '密码注册', prompt: '密码', clickToAuth: true }
     ],
+    // 注册表单必填：Email / Display name 非必填（参见顶部 SIGNUP_ITEMS 常量）
+    signupItems: SIGNUP_ITEMS,
     // 权限/组映射（用于 admin 判断）
     isAdmin: false,
     enablePasswordUpdate: true,
