@@ -2,14 +2,24 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
 
+// 分类文案（兼容旧数据）
 const CATEGORY_LABELS = {
   life: '☕ 生活', study: '📚 学习', emotion: '💗 情感',
-  campus: '🏫 校园', other: '✨ 其他', general: '其他'
+  campus: '🏫 校园', other: '✨ 其他', general: '✨ 其他'
+};
+
+// 帖子类型（参考 linfeng-community：图文帖 / 长文贴 / 短视频）
+const POST_TYPES = {
+  normal: { label: '图文帖', icon: '🖼️' },
+  long: { label: '长文贴', icon: '📝' },
+  video: { label: '视频贴', icon: '🎬' }
 };
 
 const PAGE_SIZE = 10;
 
-// 解析标签字符串 → 去重后的数组
+// MySQL 用 INSERT IGNORE，SQLite 用 INSERT OR IGNORE
+const IGNORE = pool.isMysql ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
+
 function parseTags(str) {
   if (!str) return [];
   return String(str).split(/[,，\s]+/).map(t => t.trim()).filter(Boolean);
@@ -26,114 +36,175 @@ async function syncPostTags(postId, tagNames) {
       tagId = existing[0].id;
     } else {
       const [insert] = await pool.query('INSERT INTO tags (name) VALUES (?)', [name]);
-      tagId = insert && insert.insertId ? insert.insertId : (await pool.query('SELECT id FROM tags WHERE name = ?', [name]))[0][0].id;
+      tagId = (insert && insert.insertId)
+        ? insert.insertId
+        : (await pool.query('SELECT id FROM tags WHERE name = ?', [name]))[0][0].id;
     }
     await pool.query(
-      'INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES (?, ?)',
+      `${IGNORE} INTO post_tags (post_id, tag_id) VALUES (?, ?)`,
       [postId, tagId]
     );
   }
 }
 
-// 获取一篇帖子关联的所有标签名称
 async function getPostTagNames(postId) {
-  const [rows] = await pool.query(
-    `SELECT t.name FROM tags t JOIN post_tags pt ON pt.tag_id = t.id WHERE pt.post_id = ? ORDER BY t.name`,
-    [postId]
-  );
-  return rows.map(r => r.name);
+  try {
+    const [rows] = await pool.query(
+      `SELECT t.name FROM tags t JOIN post_tags pt ON pt.tag_id = t.id WHERE pt.post_id = ? ORDER BY t.name`,
+      [postId]
+    );
+    return rows.map(r => r.name);
+  } catch (e) {
+    return [];
+  }
 }
 
+// 版块列表（圈子）
+async function getBoards() {
+  try {
+    const [boards] = await pool.query(
+      `SELECT b.*,
+        (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.is_deleted = 0) as post_count
+       FROM forum_boards b WHERE b.is_active = 1
+       ORDER BY b.sort_order ASC, b.id ASC`
+    );
+    return boards;
+  } catch (e) {
+    return [];
+  }
+}
+
+// 构造帖子查询条件
+function buildWhere({ boardId, category, tag }) {
+  let where = 'WHERE fp.is_deleted = 0';
+  const params = [];
+  if (boardId) {
+    where += ' AND fp.board_id = ?';
+    params.push(boardId);
+  }
+  if (category && category !== 'all') {
+    where += ' AND fp.category = ?';
+    params.push(category);
+  }
+  if (tag) {
+    where += ' AND fp.tags LIKE ?';
+    params.push('%' + tag + '%');
+  }
+  return { where, params };
+}
+
+function buildOrder(sort) {
+  // 置顶始终优先（对应后台「置顶」管理）
+  if (sort === 'hot') return 'fp.is_top DESC, like_count DESC, fp.created_at DESC';
+  if (sort === 'essence') return 'fp.is_top DESC, fp.is_hot DESC, fp.created_at DESC';
+  return 'fp.is_top DESC, fp.created_at DESC';
+}
+
+const POST_SELECT = `
+  SELECT fp.*, cu.username, cu.real_name, cu.avatar,
+    (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = fp.id AND pc.is_deleted = 0) as comment_count,
+    (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = fp.id) as like_count
+  FROM forum_posts fp
+  LEFT JOIN casdoor_users cu ON fp.user_id = cu.id
+`;
+
+function decorate(posts) {
+  return posts.map(p => ({
+    ...p,
+    author: p.real_name || p.username || '匿名',
+    likes: p.like_count || 0,
+    comments_count: p.comment_count || 0,
+    category_label: CATEGORY_LABELS[p.category] || p.category,
+    type_label: (POST_TYPES[p.post_type] || POST_TYPES.normal).label,
+    type_icon: (POST_TYPES[p.post_type] || POST_TYPES.normal).icon
+  }));
+}
+
+// 组装列表页公共数据（版块、热门标签、活跃用户、签到状态）
+async function buildSidebar(req) {
+  const boards = await getBoards();
+
+  let popularTags = [];
+  try {
+    const [tagsRows] = await pool.query(
+      `SELECT t.name, COUNT(*) as cnt FROM tags t
+       JOIN post_tags pt ON pt.tag_id = t.id
+       GROUP BY t.id ORDER BY cnt DESC LIMIT 15`
+    );
+    popularTags = tagsRows;
+  } catch (e) { /* 表不存在时忽略 */ }
+
+  let activeUsers = [];
+  try {
+    const [rows] = await pool.query(
+      `SELECT cu.id, cu.username, cu.real_name, cu.avatar, COUNT(fp.id) as post_count
+       FROM casdoor_users cu
+       JOIN forum_posts fp ON fp.user_id = cu.id AND fp.is_deleted = 0
+       GROUP BY cu.id ORDER BY post_count DESC LIMIT 5`
+    );
+    activeUsers = rows;
+  } catch (e) { /* ignore */ }
+
+  // 今日是否已签到（linfeng 签到体系）
+  let checkedIn = false;
+  if (req.session.user) {
+    try {
+      const [rows] = await pool.query(
+        'SELECT 1 FROM user_checkins WHERE user_id = ? AND checkin_date = CURDATE() LIMIT 1',
+        [req.session.user.id]
+      );
+      checkedIn = rows && rows.length > 0;
+    } catch (e) { /* ignore */ }
+  }
+
+  return { boards, popularTags, activeUsers, checkedIn };
+}
+
+// ============ 帖子列表 ============
 router.get('/', async (req, res) => {
   try {
+    const boardSlug = req.query.board || '';
     const category = req.query.category || '';
     const sort = req.query.sort || 'newest';
     const tag = req.query.tag || '';
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 
-    let where = 'WHERE fp.is_deleted = 0';
-    const params = [];
-
-    if (category && category !== 'all') {
-      where += ' AND fp.category = ?';
-      params.push(category);
-    }
-    if (tag) {
-      where += ' AND fp.tags LIKE ?';
-      params.push('%' + tag + '%');
+    let board = null;
+    let boardId = null;
+    if (boardSlug) {
+      const [b] = await pool.query('SELECT * FROM forum_boards WHERE slug = ? LIMIT 1', [boardSlug]);
+      if (b && b.length > 0) {
+        board = b[0];
+        boardId = board.id;
+      }
     }
 
-    // 总数
+    const { where, params } = buildWhere({ boardId, category, tag });
+
     const [totalRows] = await pool.query(
-      `SELECT COUNT(*) as cnt FROM forum_posts fp ${where}`,
-      params
+      `SELECT COUNT(*) as cnt FROM forum_posts fp ${where}`, params
     );
     const total = totalRows[0].cnt || 0;
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     const offset = (page - 1) * PAGE_SIZE;
 
-    // 排序
-    let orderBy = 'fp.is_top DESC, fp.created_at DESC';
-    if (sort === 'hot') {
-      orderBy = '(SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = fp.id) DESC, fp.is_top DESC, fp.created_at DESC';
-    } else if (sort === 'essence') {
-      orderBy = 'fp.is_hot DESC, fp.is_top DESC, fp.created_at DESC';
-    }
-
     const [posts] = await pool.query(
-      `SELECT fp.*, cu.username, cu.real_name, cu.avatar,
-        (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = fp.id AND pc.is_deleted = 0) as comment_count,
-        (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = fp.id) as like_count
-       FROM forum_posts fp 
-       LEFT JOIN casdoor_users cu ON fp.user_id = cu.id 
-       ${where}
-       ORDER BY ${orderBy} LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
+      `${POST_SELECT} ${where} ORDER BY ${buildOrder(sort)} LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
       params
     );
 
-    const decorated = posts.map(p => ({
-      ...p,
-      author: p.real_name || p.username || '匿名',
-      likes: p.like_count || 0,
-      comments_count: p.comment_count || 0,
-      category: CATEGORY_LABELS[p.category] || p.category
-    }));
-
-    // 所有活跃标签（按出现次数倒取前 15）
-  const [tagsRows] = await pool.query(
-    `SELECT t.name, COUNT(*) as cnt
-     FROM tags t
-     JOIN post_tags pt ON pt.tag_id = t.id
-     GROUP BY t.id
-     ORDER BY cnt DESC`
-  );
-  const tagMap = {};
-  for (const row of tagsRows) {
-    tagMap[row.name] = row.cnt;
-  }
-  const popularTags = Object.entries(tagMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([name, count]) => ({ name, count }));
-
-    // 活跃用户（发帖数前 5）
-    const [activeUsers] = await pool.query(
-      `SELECT cu.id, cu.username, cu.real_name, cu.avatar, COUNT(fp.id) as post_count
-       FROM casdoor_users cu
-       JOIN forum_posts fp ON fp.user_id = cu.id AND fp.is_deleted = 0
-       GROUP BY cu.id
-       ORDER BY post_count DESC LIMIT 5`
-    );
+    const sidebar = await buildSidebar(req);
 
     res.render('forum/index', {
-      title: '校园贴吧',
-      posts: decorated,
+      title: board ? board.name : '校园贴吧',
+      posts: decorate(posts),
+      board,
       activeCategory: category || 'all',
       activeSort: sort,
       activeTag: tag,
       page, totalPages, total,
-      popularTags,
-      activeUsers
+      postTypes: POST_TYPES,
+      ...sidebar
     });
   } catch (err) {
     console.error('贴吧加载失败:', err);
@@ -141,40 +212,96 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/new', (req, res) => {
+// ============ 发帖页 ============
+router.get('/new', async (req, res) => {
   if (!req.session.user) return res.redirect('/login');
-  res.render('forum/new', { title: '发帖' });
+  const boards = await getBoards();
+  res.render('forum/new', {
+    title: '发布帖子',
+    boards,
+    postTypes: POST_TYPES,
+    categories: CATEGORY_LABELS
+  });
 });
 
+// ============ 发布 ============
 router.post('/', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
-  const { title, content, category, tags } = req.body;
+  const { title, content, category, tags, post_type, cover_image, board_id } = req.body;
   if (!content || content.trim().length < 2) {
     return res.status(400).json({ error: '内容不能为空（至少 2 字）' });
   }
   const titleVal = (title && title.trim()) ? title.trim() : content.trim().slice(0, 30);
   const catVal = (category || 'general').trim();
   const tagsVal = tags ? String(tags).trim() : null;
+  const typeVal = POST_TYPES[post_type] ? post_type : 'normal';
+  const coverVal = (cover_image && cover_image.trim()) ? cover_image.trim() : null;
+  const boardVal = board_id ? Number(board_id) : null;
   try {
     const [result] = await pool.query(
-      'INSERT INTO forum_posts (user_id, title, content, category, tags) VALUES (?, ?, ?, ?, ?)',
-      [req.session.user.id, titleVal, content.trim(), catVal, tagsVal]
+      `INSERT INTO forum_posts (user_id, title, content, category, tags, post_type, cover_image, board_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.session.user.id, titleVal, content.trim(), catVal, tagsVal, typeVal, coverVal, boardVal]
     );
-    const postId = result && result.insertId ? result.insertId : (await pool.query('SELECT last_insert_rowid() as id'))[0][0].id;
+    let postId = result && result.insertId;
+    if (!postId) {
+      const [r] = await pool.query('SELECT LAST_INSERT_ID() as id');
+      postId = r[0].id;
+    }
     if (tagsVal) await syncPostTags(postId, tagsVal);
-    res.redirect('/forum');
+    // 发帖奖励积分（linfeng 积分体系）
+    try {
+      await pool.query(
+        `INSERT INTO user_points (user_id, points, exp) VALUES (?, 5, 5)
+         ON DUPLICATE KEY UPDATE points = points + 5, exp = exp + 5`,
+        [req.session.user.id]
+      );
+      await pool.query('UPDATE casdoor_users SET points = points + 5 WHERE id = ?', [req.session.user.id]);
+    } catch (e) { /* ignore */ }
+    res.redirect('/forum/' + postId);
   } catch (err) {
     console.error('发帖失败:', err);
     res.status(500).json({ error: '发布失败' });
   }
 });
 
+// ============ 每日签到 ============
+router.post('/checkin', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '请先登录' });
+  const userId = req.session.user.id;
+  try {
+    const [done] = await pool.query(
+      'SELECT 1 FROM user_checkins WHERE user_id = ? AND checkin_date = CURDATE() LIMIT 1',
+      [userId]
+    );
+    if (done && done.length > 0) {
+      return res.json({ success: false, msg: '今天已经签到过了' });
+    }
+    await pool.query(
+      'INSERT INTO user_checkins (user_id, checkin_date, points) VALUES (?, CURDATE(), 10)',
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO user_points (user_id, points, exp) VALUES (?, 10, 10)
+       ON DUPLICATE KEY UPDATE points = points + 10, exp = exp + 10`,
+      [userId]
+    );
+    await pool.query('UPDATE casdoor_users SET points = points + 10 WHERE id = ?', [userId]);
+    res.json({ success: true, points: 10, msg: '签到成功，积分 +10' });
+  } catch (err) {
+    res.status(500).json({ error: '签到失败' });
+  }
+});
+
+// ============ 帖子详情 ============
 router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const [rows] = await pool.query(
-      `SELECT fp.*, cu.username, cu.real_name, cu.avatar FROM forum_posts fp
+      `SELECT fp.*, cu.username, cu.real_name, cu.avatar, b.name as board_name, b.slug as board_slug
+       FROM forum_posts fp
        LEFT JOIN casdoor_users cu ON fp.user_id = cu.id
+       LEFT JOIN forum_boards b ON fp.board_id = b.id
        WHERE fp.id = ? AND fp.is_deleted = 0 LIMIT 1`,
       [id]
     );
@@ -195,13 +322,27 @@ router.get('/:id', async (req, res) => {
 
     let liked = false;
     if (req.session.user) {
-      const [l] = await pool.query('SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?', [id, req.session.user.id]);
+      const [l] = await pool.query(
+        'SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?', [id, req.session.user.id]
+      );
       liked = l && l.length > 0;
     }
 
-    const catLabel = CATEGORY_LABELS[post.category] || post.category;
+    // 楼中楼：按 parent_id 组装成树
+    const decorated = comments.map(c => ({
+      ...c,
+      author: c.real_name || c.username || '匿名',
+      replies: []
+    }));
+    const byId = {};
+    decorated.forEach(c => { byId[c.id] = c; });
+    const roots = [];
+    decorated.forEach(c => {
+      if (c.parent_id && byId[c.parent_id]) byId[c.parent_id].replies.push(c);
+      else roots.push(c);
+    });
 
-    // 上一篇/下一篇
+    // 上一篇 / 下一篇
     const [prevRows] = await pool.query(
       'SELECT id, title FROM forum_posts WHERE id < ? AND is_deleted = 0 ORDER BY id DESC LIMIT 1', [id]
     );
@@ -216,12 +357,11 @@ router.get('/:id', async (req, res) => {
       post: {
         ...post,
         author: post.real_name || post.username || '匿名',
-        category_label: catLabel,
+        category_label: CATEGORY_LABELS[post.category] || post.category,
+        type_label: (POST_TYPES[post.post_type] || POST_TYPES.normal).label,
+        type_icon: (POST_TYPES[post.post_type] || POST_TYPES.normal).icon,
         likes: likeCount,
-        comments: comments.map(c => ({
-          ...c,
-          author: c.real_name || c.username || '匿名'
-        })),
+        comments: roots,
         liked,
         prev: prevRows[0] || null,
         next: nextRows[0] || null
@@ -234,12 +374,15 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// ============ 点赞 / 取消 ============
 router.post('/like/:id', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const postId = req.params.id;
   const userId = req.session.user.id;
   try {
-    const [existing] = await pool.query('SELECT * FROM post_likes WHERE post_id = ? AND user_id = ?', [postId, userId]);
+    const [existing] = await pool.query(
+      'SELECT * FROM post_likes WHERE post_id = ? AND user_id = ?', [postId, userId]
+    );
     if (existing.length > 0) {
       await pool.query('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?', [postId, userId]);
       return res.json({ liked: false });
@@ -251,6 +394,7 @@ router.post('/like/:id', async (req, res) => {
   }
 });
 
+// ============ 评论 ============
 router.post('/comment/:id', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const postId = req.params.id;
@@ -278,15 +422,13 @@ router.get('/comments/:id', async (req, res) => {
        ORDER BY pc.created_at ASC`,
       [req.params.id]
     );
-    res.json(comments.map(c => ({
-      ...c,
-      real_name: c.real_name || c.username || '匿名'
-    })));
+    res.json(comments.map(c => ({ ...c, real_name: c.real_name || c.username || '匿名' })));
   } catch (err) {
     res.json([]);
   }
 });
 
+// ============ 举报 ============
 router.post('/report/:id', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const { reason } = req.body;

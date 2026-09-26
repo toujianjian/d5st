@@ -3,6 +3,11 @@
 -- 创建数据库：CREATE DATABASE d5st DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- ============================================================
 
+-- 关键：本文件会被 MySQL 容器的 docker-entrypoint-initdb.d 用 mysql 客户端执行，
+-- 该客户端默认字符集可能是 latin1，导致脚本里的中文被写成「双重编码」乱码
+-- （如 系统管理员 -> ç³»ç»Ÿç®¡ç†å'˜）。显式声明可彻底避免。
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS d5st DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE d5st;
 
@@ -60,19 +65,110 @@ CREATE TABLE IF NOT EXISTS sponsor_transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='赞助记录';
 
 -- 论坛帖子
+-- 字段设计参考 linfeng-community：
+--   post_type 图文帖(normal)/长文贴(long)/视频贴(video)
+--   is_top 置顶、is_hot 精华（对应后台「置顶/设为精华」管理）
+--   board_id 所属版块（对应「圈子」概念）
+--   category 兼容旧代码的一级分类
 CREATE TABLE IF NOT EXISTS forum_posts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
+  title VARCHAR(255) DEFAULT NULL,
   content TEXT NOT NULL,
+  category VARCHAR(50) NOT NULL DEFAULT 'general',
+  board_id INT DEFAULT NULL,
+  post_type VARCHAR(20) NOT NULL DEFAULT 'normal',
+  cover_image VARCHAR(500) DEFAULT NULL,
   tags VARCHAR(255) DEFAULT NULL,
-  section VARCHAR(50) DEFAULT 'general',
   views INT NOT NULL DEFAULT 0,
+  is_top TINYINT(1) NOT NULL DEFAULT 0,
+  is_hot TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   is_deleted TINYINT(1) NOT NULL DEFAULT 0,
   FOREIGN KEY (user_id) REFERENCES casdoor_users(id) ON DELETE CASCADE,
   INDEX idx_created_at (created_at),
-  INDEX idx_section (section)
+  INDEX idx_category (category),
+  INDEX idx_board (board_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='论坛帖子';
+
+-- 论坛版块（圈子）
+CREATE TABLE IF NOT EXISTS forum_boards (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  slug VARCHAR(50) NOT NULL,
+  description VARCHAR(500) DEFAULT NULL,
+  icon VARCHAR(20) DEFAULT '💬',
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_slug (slug),
+  INDEX idx_sort (sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='论坛版块';
+
+-- 话题标签
+CREATE TABLE IF NOT EXISTS tags (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(50) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='话题标签';
+
+-- 帖子-标签关联
+CREATE TABLE IF NOT EXISTS post_tags (
+  post_id INT NOT NULL,
+  tag_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (post_id, tag_id),
+  INDEX idx_tag (tag_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='帖子标签关联';
+
+-- 用户关注
+CREATE TABLE IF NOT EXISTS user_follows (
+  follower_id INT NOT NULL,
+  following_id INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (follower_id, following_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户关注';
+
+-- 视频作品（meyho 风格：列表/播放/分类/推荐）
+CREATE TABLE IF NOT EXISTS video_posts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  video_url VARCHAR(500) NOT NULL,
+  cover_url VARCHAR(500) DEFAULT NULL,
+  duration INT NOT NULL DEFAULT 0,
+  views INT NOT NULL DEFAULT 0,
+  category VARCHAR(50) NOT NULL DEFAULT 'campus',
+  is_recommended TINYINT(1) NOT NULL DEFAULT 0,
+  is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES casdoor_users(id) ON DELETE CASCADE,
+  INDEX idx_created (created_at),
+  INDEX idx_category (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='校园视频';
+
+-- 积分/经验（linfeng 签到与积分体系）
+CREATE TABLE IF NOT EXISTS user_points (
+  user_id INT NOT NULL PRIMARY KEY,
+  points INT NOT NULL DEFAULT 0,
+  exp INT NOT NULL DEFAULT 0,
+  level INT NOT NULL DEFAULT 1,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户积分经验';
+
+-- 每日签到
+CREATE TABLE IF NOT EXISTS user_checkins (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  checkin_date DATE NOT NULL,
+  points INT NOT NULL DEFAULT 10,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_user_date (user_id, checkin_date),
+  INDEX idx_date (checkin_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日签到';
 
 -- 用户勋章
 CREATE TABLE IF NOT EXISTS user_medals (
@@ -101,6 +197,7 @@ CREATE TABLE IF NOT EXISTS post_comments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   post_id INT NOT NULL,
   user_id INT NOT NULL,
+  parent_id INT DEFAULT NULL,
   content TEXT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_deleted TINYINT(1) NOT NULL DEFAULT 0,

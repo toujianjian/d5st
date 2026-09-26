@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
+    "seed": "node 配置/seed.js",
     "test": "node 测试/test-auth.js"
   },
   "author": "d5st team",

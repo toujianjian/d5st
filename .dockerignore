@@ -1,10 +1,39 @@
-node_modules
-npm-debug.log
-.env
-.env.local
+# 版本控制与 IDE
 .git
 .gitignore
-*.md
-测试
+.vscode
+.idea
+
+# 依赖
+node_modules
+npm-debug.log*
+
+# 运行时产物
+*.log
+build.log
+up.log
+d5st.db
+dist
+
+# 参考仓库（仅本地研究用，不进镜像）
+refs
+../refs
+
+# 本地 Casdoor 数据与 docker 辅助目录（沿用原有规则）
 casdoor-data
 .docker
+
+# 测试与文档（不进生产镜像）
+测试
+docs
+*.md
+!README.md
+
+# 本地环境变量
+.env
+.env.*
+!.env.example
+
+# 系统垃圾文件
+.DS_Store
+Thumbs.db

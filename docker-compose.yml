@@ -30,9 +30,10 @@ services:
     image: casbin/casdoor:latest
     container_name: d5st-casdoor
     restart: unless-stopped
-    # scratch 镜像没有 wget/curl，跳过 healthcheck
-    # 用 entrypoint 内置 --createDatabase=true 循环重试直到 MySQL 连通
-    entrypoint: ["/bin/sh", "-c", "./server --createDatabase=true"]
+    # 镜像无 wget/curl 做 healthcheck；MySQL 偶尔比 casdoor 慢一拍，
+    # 这里用 shell 循环重试：启动失败（连接被拒会 panic 退出）就 sleep 后重试，
+    # 直到 MySQL 就绪能常驻为止。
+    entrypoint: ["/bin/sh", "-c", "set +e; while true; do ./server --createDatabase=true; echo \"[casdoor] server 退出 (code $?)，5s 后重试\"; sleep 5; done"]
     environment:
       driverName: mysql
       dataSourceName: "${MYSQL_USER:-d5st}:${MYSQL_PASSWORD:-d5st_pass_2026}@tcp(mysql:3306)/"
@@ -73,7 +74,10 @@ services:
       CASDOOR_APPLICATION: ${CASDOOR_APPLICATION:-d5st-app}
       CASDOOR_WEBHOOK_SECRET: ${CASDOOR_WEBHOOK_SECRET:-d5st_webhook_secret_2026}
       CASDOOR_ADMIN_USER: ${CASDOOR_ADMIN_USER:-admin}
-      CASDOOR_ADMIN_PASSWORD: ${CASDOOR_ADMIN_PASSWORD:-d5st_admin_2026}
+      # Casdoor 内建管理员(built-in/admin)默认密码为 123，
+      # 必须与 Casdoor 实际 admin 密码一致，否则应用拿不到管理员会话，
+      # 无法自动创建组织/应用/Webhook，登录链路会整体失效。
+      CASDOOR_ADMIN_PASSWORD: ${CASDOOR_ADMIN_PASSWORD:-123}
       APP_URL: ${APP_URL:-http://s1.d5st.cn}
       SESSION_SECRET: ${SESSION_SECRET:-d5st_session_secret_change_in_production}
       ENABLE_DEV_LOGIN: ${ENABLE_DEV_LOGIN:-0}
@@ -85,9 +89,8 @@ services:
         condition: service_healthy
       casdoor:
         condition: service_started
-    volumes:
-      - ./:/app
-      - /app/node_modules
+    # 不挂载宿主目录：代码全部烘焙进镜像，
+    # 避免宿主/容器之间的路径与换行符差异带来的迁移兼容问题
     networks:
       - d5st-network
     healthcheck:

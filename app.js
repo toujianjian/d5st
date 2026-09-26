@@ -17,6 +17,10 @@ app.set('layout', 'layout');
 app.use(expressLayouts);
 
 app.use('/public', express.static(path.join(__dirname, '静态资源')));
+// Font Awesome 的 all.min.css 内部以 ../webfonts/ 引用字体（相对 CSS 自身），
+// 解析后是 /public/webfonts/，但字体实际放在 /public/font-awesome/webfonts/ 下，
+// 会导致所有图标 404。这里补一条映射，不改动原有目录结构。
+app.use('/public/webfonts', express.static(path.join(__dirname, '静态资源/font-awesome/webfonts')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -73,6 +77,7 @@ const publicPaths = [
   '/api/health',
   '/public',
   '/forum',
+  '/videos',
   '/search',
   '/',
   ''

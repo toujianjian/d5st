@@ -1,66 +1,111 @@
 <style>
-  .video-player-wrap {
-    background: #000; border-radius: 16px; overflow: hidden; margin-bottom: 20px;
-    aspect-ratio: 16/9;
-    display: flex; align-items: center; justify-content: center;
+  .p-wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 70px; }
+  .crumbs { font-size: 13px; color: var(--text-muted); margin-bottom: 14px; }
+  .crumbs a { color: var(--primary); text-decoration: none; }
+  .crumbs a:hover { text-decoration: underline; }
+
+  .p-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .p-layout { grid-template-columns: 1fr; } }
+
+  .player-box {
+    background: var(--glass-bg); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-soft);
   }
-  .video-player-wrap video, .video-player-wrap iframe { width: 100%; height: 100%; border: 0; }
-  .video-detail {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    border-radius: 18px; padding: 24px;
-    box-shadow: var(--shadow-soft); margin-bottom: 20px;
+  .player { width: 100%; aspect-ratio: 16/9; background: #000; display: block; }
+  .player-box .ph {
+    width: 100%; aspect-ratio: 16/9; background: linear-gradient(135deg,#d32f2f,#ff6b35);
+    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 56px;
   }
-  .video-detail h1 { font-family: 'Noto Serif SC', serif; margin-bottom: 12px; color: var(--text-dark); }
-  .video-detail .meta-row { display: flex; gap: 20px; color: var(--text-light); font-size: 13px; margin-bottom: 16px; }
-  .video-detail .desc { color: var(--text-dark); line-height: 1.8; white-space: pre-wrap; }
-  .video-related h3 { font-family: 'Noto Serif SC', serif; margin-bottom: 12px; color: var(--text-dark); }
-  .related-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-  .related-item {
-    background: var(--glass-bg); backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border); border-radius: 12px;
-    padding: 10px; text-decoration: none; color: inherit;
-    transition: all 0.25s ease;
+  .p-info { padding: 20px 22px 22px; }
+  .p-title { font-size: 20px; font-weight: 700; color: var(--text-dark); line-height: 1.4; margin-bottom: 10px; }
+  .p-meta { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--text-muted); flex-wrap: wrap; }
+  .p-meta .av {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700;
   }
-  .related-item:hover { transform: translateY(-2px); }
-  .related-item .title { font-size: 13px; font-weight: 500; color: var(--text-dark); }
+  .p-desc { margin-top: 14px; font-size: 14px; line-height: 1.8; color: var(--text-light); white-space: pre-wrap; }
+  .p-link { margin-top: 12px; font-size: 13px; }
+  .p-link a { color: var(--primary); }
+
+  .side-card {
+    background: var(--glass-bg); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px; padding: 18px; box-shadow: var(--shadow-soft);
+  }
+  .side-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+  .side-title i { color: var(--primary); }
+  .rel-item { display: flex; gap: 10px; padding: 8px 0; text-decoration: none; color: inherit; }
+  .rel-thumb {
+    width: 110px; height: 64px; border-radius: 10px; flex-shrink: 0; object-fit: cover;
+    background: linear-gradient(135deg,#ffe4e4,#ffd0d0);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .rel-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+  .rel-body { flex: 1; min-width: 0; }
+  .rel-name {
+    font-size: 13px; font-weight: 600; color: var(--text-dark); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .rel-meta { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 </style>
 
-<div class="page-container">
-  <% if (typeof video !== 'undefined' && video) { %>
-  <div class="video-player-wrap">
-    <% if (video.video_url && /youtube|youtu\.be|bilibili|b23\.tv|vimeo/.test(video.video_url)) { %>
-      <iframe src="<%= video.video_url %>" allowfullscreen></iframe>
-    <% } else { %>
-      <video src="<%= video.video_url %>" controls></video>
-    <% } %>
+<div class="p-wrap">
+  <div class="crumbs">
+    <a href="/videos">校园风采</a>
+    › <a href="/videos?category=<%= video.category %>"><%= video.category_icon %> <%= video.category_label %></a>
+    › <%= video.title %>
   </div>
 
-  <div class="video-detail">
-    <h1><%= video.title %></h1>
-    <div class="meta-row">
-      <span><i class="fas fa-user"></i> <%= video.author %></span>
-      <span><i class="fas fa-eye"></i> <%= video.views %></span>
-      <span><i class="fas fa-clock"></i> <%= (video.created_at || '').slice(0,10) %></span>
-      <span><i class="fas fa-tag"></i> <%= video.category || '其他' %></span>
+  <div class="p-layout">
+    <div>
+      <div class="player-box">
+        <% var isFile = /\.(mp4|webm|ogg|mov)(\?|$)/i.test(video.video_url); %>
+        <% if (isFile) { %>
+        <video class="player" controls preload="metadata" poster="<%= video.cover_url || '' %>">
+          <source src="<%= video.video_url %>" />
+          您的浏览器不支持视频播放
+        </video>
+        <% } else { %>
+        <a class="ph" href="<%= video.video_url %>" target="_blank" rel="noopener" title="打开视频链接">▶</a>
+        <% } %>
+        <div class="p-info">
+          <h1 class="p-title"><%= video.title %></h1>
+          <div class="p-meta">
+            <div class="av"><%= video.author.charAt(0) %></div>
+            <span><%= video.author %></span>
+            <span><i class="far fa-eye"></i> <%= video.views || 0 %> 次播放</span>
+            <span><i class="far fa-clock"></i> <%= String(video.created_at).slice(0, 10) %></span>
+            <span><i class="fas fa-folder"></i> <%= video.category_label %></span>
+          </div>
+          <% if (video.description) { %>
+          <div class="p-desc"><%= video.description %></div>
+          <% } %>
+          <div class="p-link"><a href="<%= video.video_url %>" target="_blank" rel="noopener"><i class="fas fa-external-link-alt"></i> 打开原始视频地址</a></div>
+        </div>
+      </div>
     </div>
-    <% if (video.description) { %>
-      <div class="desc"><%= video.description %></div>
-    <% } %>
-  </div>
 
-  <% if (typeof related !== 'undefined' && related && related.length > 0) { %>
-  <div class="video-related">
-    <h3>相关视频</h3>
-    <div class="related-list">
+    <div class="side-card">
+      <div class="side-title"><i class="fas fa-list"></i> 相关推荐</div>
+      <% if (related && related.length > 0) { %>
       <% related.forEach(function(r) { %>
-        <a href="/videos/<%= r.id %>" class="related-item">
-          <div class="title"><%= r.title %></div>
-        </a>
+      <a class="rel-item" href="/videos/<%= r.id %>">
+        <div class="rel-thumb">
+          <% if (r.cover_url) { %>
+          <img src="<%= r.cover_url %>" alt="" onerror="this.style.display='none'" />
+          <% } else { %>🎬<% } %>
+        </div>
+        <div class="rel-body">
+          <div class="rel-name"><%= r.title %></div>
+          <div class="rel-meta"><i class="far fa-eye"></i> <%= r.views || 0 %> · <%= String(r.created_at).slice(0,10) %></div>
+        </div>
+      </a>
       <% }); %>
+      <% } else { %>
+      <div style="text-align:center;padding:26px;color:var(--text-muted);font-size:13px;">暂无相关视频</div>
+      <% } %>
     </div>
   </div>
-  <% } %>
-  <% } %>
 </div>

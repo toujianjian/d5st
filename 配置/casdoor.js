@@ -15,7 +15,7 @@ const C = {
   application: process.env.CASDOOR_APPLICATION || 'd5st-app',
   appUrl: (process.env.APP_URL || 'http://localhost:35555').replace(/\/$/, ''),
   adminUser: process.env.CASDOOR_ADMIN_USER || 'admin',
-  adminPassword: process.env.CASDOOR_ADMIN_PASSWORD || 'd5st_admin_2026',
+  adminPassword: process.env.CASDOOR_ADMIN_PASSWORD || '123',
   webhookSecret: process.env.CASDOOR_WEBHOOK_SECRET || 'd5st_webhook_secret_2026'
 };
 
@@ -210,16 +210,19 @@ async function listApplications(org) {
 }
 
 // =================== 用户组（角色/权限映射） ===================
+// 注意：新版 Casdoor（:latest）已将用户组端点从 add-user-group / get-user-group /
+// list-user-groups 更名为 add-group / get-group / list-groups。
+// GET 约定用 id 参数（格式 owner/name），而非旧的 organization + userGroup。
 async function getUserGroup(org, group) {
-  return admin('get-user-group', { organization: org, userGroup: group });
+  return admin('get-group', { id: `${org}/${group}` });
 }
 
 async function createUserGroup(group) {
-  return adminPost('add-user-group', group);
+  return adminPost('add-group', group);
 }
 
 async function listUserGroups(org) {
-  return admin('list-user-groups', { organization: org, limit: 100 });
+  return admin('list-groups', { owner: org, limit: 100 });
 }
 
 // =================== 权限定义 ===================

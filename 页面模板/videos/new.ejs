@@ -1,77 +1,118 @@
 <style>
-  .video-form {
-    max-width: 640px; margin: 0 auto;
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    border-radius: 18px; padding: 28px;
-    box-shadow: var(--shadow-soft);
+  .n-wrap { max-width: 700px; margin: 0 auto; padding: 24px 20px 80px; }
+  .n-title { font-size: 24px; font-weight: 700; color: var(--text-dark); margin-bottom: 6px; display: flex; align-items: center; gap: 10px; }
+  .n-title i { color: var(--primary); }
+  .n-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+  .form-card {
+    background: var(--glass-bg); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px; padding: 26px; box-shadow: var(--shadow-soft);
   }
-  .video-form h2 { font-family: 'Noto Serif SC', serif; margin-bottom: 20px; text-align: center; }
-  .form-group { margin-bottom: 18px; }
-  .form-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-dark); margin-bottom: 8px; }
-  .form-input, .form-textarea, .form-select {
-    width: 100%; padding: 12px 16px;
-    border-radius: 12px; border: 1px solid rgba(0,0,0,0.08);
-    background: rgba(255,255,255,0.7); font-size: 14px;
-    transition: all 0.25s ease; font-family: inherit;
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-dark); margin-bottom: 7px; }
+  .field label i { color: var(--primary); margin-right: 5px; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 12px 14px; border-radius: 12px;
+    border: 1px solid rgba(211,47,47,.2); background: rgba(255,255,255,.78);
+    font-family: inherit; font-size: 14px; color: var(--text-dark);
   }
-  .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(211,47,47,0.1); }
-  .form-textarea { min-height: 100px; resize: vertical; }
-  .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
-  .btn-primary {
-    padding: 12px 28px; border-radius: 999px; border: none;
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white; font-size: 14px; font-weight: 500; cursor: pointer;
-    text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
-    transition: all 0.25s ease;
+  .field textarea { min-height: 100px; resize: vertical; }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none; border-color: var(--primary); background: rgba(255,255,255,.95);
   }
+  .hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
+  .check-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dark); }
+  .submit-row { display: flex; gap: 10px; margin-top: 22px; }
+  .btn-submit {
+    flex: 1; padding: 14px; border: none; border-radius: 14px; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;
+    font-size: 15px; font-weight: 600; transition: all .25s;
+  }
+  .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(211,47,47,.4); }
   .btn-cancel {
-    padding: 12px 24px; border-radius: 999px; border: 1px solid rgba(0,0,0,0.1);
-    background: rgba(255,255,255,0.5); color: var(--text-dark);
-    text-decoration: none; font-size: 14px;
+    padding: 14px 22px; border-radius: 14px; text-decoration: none;
+    border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.7);
+    color: var(--text-light); font-size: 15px; display: flex; align-items: center;
   }
-  .form-hint { font-size: 12px; color: var(--text-light); margin-top: 4px; }
 </style>
 
-<div class="page-container">
-  <form action="/videos" method="POST" class="video-form">
-    <h2><i class="fas fa-video" style="color: var(--primary);"></i> 上传视频</h2>
+<div class="n-wrap">
+  <div class="n-title"><i class="fas fa-upload"></i> 上传视频</div>
+  <div class="n-sub">分享校园里的精彩瞬间</div>
 
-    <div class="form-group">
-      <label class="form-label">视频标题 <span style="color:var(--primary)">*</span></label>
-      <input type="text" name="title" class="form-input" placeholder="给视频起个吸引人的名字" required maxlength="80" />
+  <form class="form-card" id="videoForm">
+    <div class="field">
+      <label><i class="fas fa-heading"></i> 标题</label>
+      <input type="text" id="title" placeholder="给视频起个标题" />
     </div>
 
-    <div class="form-group">
-      <label class="form-label">视频地址 <span style="color:var(--primary)">*</span></label>
-      <input type="url" name="video_url" class="form-input" placeholder="支持 YouTube / Bilibili / MP4 直链" required />
-      <p class="form-hint">嵌入地址：YouTube 填 /embed/xxx、Bilibili 填 /player/bvid/xxx、MP4 填直链</p>
+    <div class="field">
+      <label><i class="fas fa-link"></i> 视频地址</label>
+      <input type="text" id="video_url" placeholder="视频文件地址（mp4/webm）或站点播放页链接" />
+      <div class="hint">填写 .mp4/.webm 直链可在站内直接播放</div>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">分类</label>
-      <select name="category" class="form-select">
-        <option value="campus">🏫 校园</option>
-        <option value="sport">⚽ 运动</option>
-        <option value="event">⭐ 活动</option>
-        <option value="other">✨ 其他</option>
-      </select>
+    <div class="field">
+      <label><i class="fas fa-image"></i> 封面图地址</label>
+      <input type="text" id="cover_url" placeholder="封面图 URL（可选）" />
     </div>
 
-    <div class="form-group">
-      <label class="form-label">封面图片 URL</label>
-      <input type="url" name="cover_url" class="form-input" placeholder="选填，可选一张封面" />
+    <div class="row2">
+      <div class="field">
+        <label><i class="fas fa-folder"></i> 分类</label>
+        <select id="category">
+          <% Object.keys(categories).forEach(function(k) { %>
+          <option value="<%= k %>"><%= categories[k].icon %> <%= categories[k].label %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="field">
+        <label><i class="fas fa-clock"></i> 时长（秒）</label>
+        <input type="text" id="duration" placeholder="如 180" />
+      </div>
     </div>
 
-    <div class="form-group">
-      <label class="form-label">视频简介</label>
-      <textarea name="description" class="form-textarea" placeholder="简单描述一下视频内容..." maxlength="500"></textarea>
+    <div class="field">
+      <label><i class="fas fa-align-left"></i> 简介</label>
+      <textarea id="description" placeholder="介绍一下这个视频…"></textarea>
     </div>
 
-    <div class="form-actions">
-      <a href="/videos" class="btn-cancel"><i class="fas fa-times"></i> 取消</a>
-      <button type="submit" class="btn-primary"><i class="fas fa-upload"></i> 发布</button>
+    <div class="field">
+      <label class="check-row"><input type="checkbox" id="is_recommended" style="width:auto;" /> 设为首页推荐（进入轮播）</label>
+    </div>
+
+    <div class="submit-row">
+      <button type="submit" class="btn-submit"><i class="fas fa-paper-plane"></i> 发布</button>
+      <a href="/videos" class="btn-cancel">取消</a>
     </div>
   </form>
 </div>
+
+<script>
+  document.getElementById('videoForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var body = {
+      title: document.getElementById('title').value,
+      video_url: document.getElementById('video_url').value,
+      cover_url: document.getElementById('cover_url').value,
+      category: document.getElementById('category').value,
+      duration: document.getElementById('duration').value,
+      description: document.getElementById('description').value,
+      is_recommended: document.getElementById('is_recommended').checked ? 1 : 0
+    };
+    if (!body.title || !body.video_url) { alert('标题和视频地址必填'); return; }
+    try {
+      var r = await fetch('/videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (r.redirected) { window.location.href = r.url; return; }
+      if (r.ok) { window.location.href = '/videos'; return; }
+      var d = await r.json().catch(function () { return {}; });
+      alert(d.error || '发布失败');
+    } catch (err) { alert('发布失败'); }
+  });
+</script>
