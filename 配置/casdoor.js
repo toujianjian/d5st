@@ -69,7 +69,9 @@ async function admin(action, params = {}) {
     headers: { 'Cookie': cookie },
     timeout: 15000
   });
-  if (!data.status) throw new Error(`Casdoor ${action} 失败: ${data.msg}`);
+  // Casdoor 语义：status==='ok' 成功，'error' 失败。旧逻辑只看 falsy，
+  // 会把 status:'error'（truthy）误判为成功并返回 null，掩盖所有真实错误。
+  if (data.status !== 'ok') throw new Error(`Casdoor ${action} 失败: ${data.msg || JSON.stringify(data).slice(0, 200)}`);
   return data.data;
 }
 
@@ -82,16 +84,18 @@ async function adminPost(action, body = {}) {
     },
     timeout: 15000
   });
-  if (!data.status) throw new Error(`Casdoor ${action} 失败: ${data.msg}`);
+  // Casdoor 语义：status==='ok' 成功，'error' 失败（status 本身 truthy 也表示失败）
+  if (data.status !== 'ok') throw new Error(`Casdoor ${action} 失败: ${data.msg || JSON.stringify(data).slice(0, 200)}`);
   return data.data;
 }
 
 // =================== OAuth2/OIDC 授权码流 ===================
 function getAuthUrl(extra = {}) {
   const redirectUri = encodeURIComponent(`${C.appUrl}/auth/callback`);
-  const scope = encodeURIComponent(
-    `profile email offline_access ${C.organization}:${C.application}`
-  );
+  // Casdoor 的 scope 必须在 d5st-app 的 scopes 字段里登记。旧代码把
+    // `${C.organization}:${C.application}`（"d5st:d5st-app"，其实是 app 自身标识）
+    // 当作 scope 拼进去，不在 allowed 列表，导致 authorize 返回 Invalid scope。
+    const scope = encodeURIComponent(`profile email offline_access`);
   const state = (extra.state || Math.random().toString(36).slice(2)) + '-' + Date.now();
   return `${C.publicEndpoint}/login/oauth/authorize` +
     `?client_id=${C.clientId}` +

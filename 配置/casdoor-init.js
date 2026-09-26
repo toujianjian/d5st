@@ -25,13 +25,10 @@ async function ensureOrganization() {
     websiteUrl: C.appUrl,
     favicon: 'https://cdn.jsdelivr.net/gh/nextgis/d5st-logo/d5st-logo.png',
     tags: ['campus', 'community'],
-    // 密码策略：至少 8 位
+    // 密码策略：留空使用 Casdoor 默认值（旧代码传 passwordOptions 对象，
+    // 但当前 casdoor:latest 镜像要求 passwordOptions 是 []string，
+    // 会让 add-organization 返回 status:'error' 被静默吞掉）
     passwordType: 'Default',
-    passwordOptions: {
-      minLength: 8,
-      complexity: 'Low',
-      strengthCheck: true
-    },
     // 验证码：默认关闭（Casdoor 本地跑时 SMTP 通常未配置）
     // 若需要邮箱验证，请配置 Email Provider 后再打开
     enableSigninSessionExpiration: true,
@@ -47,6 +44,12 @@ async function ensureOrganization() {
     LOG(`组织创建成功: ${created?.name}`);
     return created;
   } catch (err) {
+    // 容错：Duplicate entry 说明组织实际已存在（getOrganization 端点参数
+    // 可能不匹配导致没检测到）。视为成功，避免 init 中止。
+    if (/Duplicate entry/i.test(err.message)) {
+      LOG(`组织 "${C.organization}" 已存在（Duplicate，忽略）`);
+      return null;
+    }
     ERR(`创建组织失败: ${err.message}`);
     throw err;
   }
@@ -97,7 +100,10 @@ async function ensureApplication() {
     // 支持的登录方式：密码 + 手机/邮箱验证码
     grantTypes: ['authorization_code', 'refresh_token'],
     responseTypes: ['code'],
-    scopes: ['profile', 'email', 'offline_access'],
+    // Casdoor 当前镜像要求 scopes 是对象数组（ScopeItem），不是字符串数组。
+    // 旧格式 ['profile','email'] 会让 add-application 返回 status:'error' 并被
+    // 静默吞掉，导致 d5st-app 实际未创建、OAuth 报"无效的ClientId"。
+    scopes: [{ name: 'profile' }, { name: 'email' }, { name: 'offline_access' }],
     redirectUrl: C.appUrl,
     logoutUrl: `${C.appUrl}/logout`,
     tokenUrl: `${C.endpoint}/api/login/oauth/access_token`,
@@ -137,6 +143,11 @@ async function ensureApplication() {
     LOG(`应用创建成功: ${created?.name}`);
     return created;
   } catch (err) {
+    // 容错：Duplicate entry 说明应用实际已存在，视为成功
+    if (/Duplicate entry/i.test(err.message)) {
+      LOG(`应用 "${C.application}" 已存在（Duplicate，忽略）`);
+      return null;
+    }
     ERR(`创建应用失败: ${err.message}`);
     throw err;
   }
@@ -209,6 +220,13 @@ async function ensureWebhook() {
     LOG(`Webhook 创建成功: ${name} -> ${webhook.url}`);
     return created;
   } catch (err) {
+    // 容错：Duplicate entry 说明 webhook 实际已存在（通常是 getWebhook
+    // 端点参数不匹配导致没检测到，重复触发 add-webhook 撞主键）。
+    // 视为成功，避免 init 中止。
+    if (/Duplicate entry/i.test(err.message)) {
+      LOG(`Webhook "${name}" 已存在（Duplicate，忽略）`);
+      return null;
+    }
     ERR(`创建 Webhook 失败: ${err.message}`);
     throw err;
   }
