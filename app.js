@@ -99,6 +99,24 @@ const publicPaths = [
   ''
 ];
 
+// 路径重定向必须在认证中间件之前：未登录访客访问被重定向的路径时，
+// 才能跳到目标，而不是被踢到 /login。同时排除 /admin（管理后台自己）
+// 与 /api（避免 JSON 接口被意外 302 到 HTML 页面）。
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/admin')) return next();
+  if (req.path.startsWith('/api/')) return next();
+  try {
+    const [rows] = await pool.query(
+      'SELECT redirect_url FROM path_redirects WHERE path = ? AND is_active = 1',
+      [req.path]
+    );
+    if (rows.length > 0) return res.redirect(302, rows[0].redirect_url);
+  } catch (err) {
+    console.error('路径重定向查询失败:', err.message);
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   if (req.path.startsWith('/public/')) return next();
@@ -109,20 +127,6 @@ app.use((req, res, next) => {
   
   if (isPublic) return next();
   if (!req.session.user) return res.redirect('/login');
-  next();
-});
-
-app.use(async (req, res, next) => {
-  if (req.path.startsWith('/admin')) return next();
-  try {
-    const [rows] = await pool.query(
-      'SELECT redirect_url FROM path_redirects WHERE path = ? AND is_active = 1',
-      [req.path]
-    );
-    if (rows.length > 0) return res.redirect(302, rows[0].redirect_url);
-  } catch (err) {
-    console.error('路径重定向查询失败:', err.message);
-  }
   next();
 });
 

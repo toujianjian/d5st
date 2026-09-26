@@ -56,7 +56,24 @@ async function ensureApplication() {
   try {
     const existing = await casdoor.getApplication(C.organization, C.application);
     if (existing) {
-      LOG(`应用 "${C.application}" 已存在`);
+      // 同步 URL 类字段到当前 APP_URL：避免本地/线上切换后 Casdoor 库里残留
+      // 旧域名的 redirectUris 导致回调校验失败（典型表现：登录跳转到远程域名）
+      const desiredRedirect = `${C.appUrl}/auth/callback`;
+      const needSync =
+        !(existing.redirectUris || []).includes(desiredRedirect) ||
+        existing.homepageUrl !== C.appUrl ||
+        existing.logoutUrl !== `${C.appUrl}/logout` ||
+        existing.redirectUrl !== C.appUrl;
+      if (needSync) {
+        existing.redirectUris = [desiredRedirect];
+        existing.homepageUrl = C.appUrl;
+        existing.logoutUrl = `${C.appUrl}/logout`;
+        existing.redirectUrl = C.appUrl;
+        await casdoor.updateApplication(existing);
+        LOG(`应用 "${C.application}" URL 字段已同步到 ${C.appUrl}`);
+      } else {
+        LOG(`应用 "${C.application}" 已存在`);
+      }
       return existing;
     }
   } catch (e) { /* not found */ }
