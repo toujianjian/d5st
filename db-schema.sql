@@ -398,6 +398,31 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统设置';
 
+-- 违禁词词库（敏感词过滤，算法参考 https://github.com/houbb/sensitive-word 的 DFA + 忽略干扰字符思路）
+CREATE TABLE IF NOT EXISTS sensitive_words (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  word VARCHAR(128) NOT NULL COMMENT '敏感词',
+  category VARCHAR(32) NOT NULL DEFAULT 'default' COMMENT '分类（政治/辱骂/广告…）',
+  is_disabled TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1=停用（不生效）',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_word (word)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='违禁词词库';
+
+-- 敏感词命中记录（谁、在哪、命中了什么、原文）——审计留痕
+CREATE TABLE IF NOT EXISTS sensitive_word_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT DEFAULT NULL COMMENT '触发者（游客为 NULL）',
+  username VARCHAR(100) DEFAULT NULL COMMENT '触发时用户名（冗余存储，便于追溯）',
+  content_type VARCHAR(32) NOT NULL COMMENT 'post/comment/message/guestbook',
+  content_id INT DEFAULT NULL COMMENT '对应内容 ID（未落库前可能为 NULL）',
+  matched_words JSON NOT NULL COMMENT '本次命中的词列表',
+  raw_content TEXT NOT NULL COMMENT '触发时的原始内容（屏蔽前）',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user_id (user_id),
+  INDEX idx_content_type (content_type),
+  INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='敏感词命中记录';
+
 -- 初始化默认数据
 INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES
 ('site_name', 'D5ST 校园社区', '网站名称'),
@@ -412,7 +437,7 @@ INSERT IGNORE INTO home_links (title, url, icon, sort_order) VALUES
 ('赞助支持', '/sponsor', '❤️', 4);
 
 INSERT IGNORE INTO home_banners (title, image_path, link_url, sort_order) VALUES
-('欢迎来到 D5ST', '/public/images/banner1.jpg', '/', 1);
+('欢迎来到 D5ST', '/public/images/banner1.svg', '/', 1);
 
 INSERT IGNORE INTO casdoor_users (casdoor_user_id, username, real_name, is_admin) VALUES
 ('d5st_admin_seed', 'admin', '系统管理员', 1);

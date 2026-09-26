@@ -386,6 +386,80 @@ router.post('/recycle-bin/purge/:id', async (req, res) => {
   }
 });
 
+// ============ 违禁词管理（参考 houbb/sensitive-word 的 DFA 过滤思路） ============
+const sensitiveWord = require('../../配置/sensitive-word');
+
+// 词库列表
+router.get('/sensitive-words', async (req, res) => {
+  try {
+    const [words] = await pool.query('SELECT * FROM sensitive_words ORDER BY id DESC');
+    const [count] = await pool.query('SELECT COUNT(*) as cnt FROM sensitive_word_logs');
+    res.render('admin/sensitive-words', {
+      title: '违禁词管理',
+      words,
+      logCount: count[0] ? count[0].cnt : 0,
+      lastLoaded: sensitiveWord.lastLoaded
+        ? new Date(sensitiveWord.lastLoaded).toLocaleString('zh-CN')
+        : '未加载'
+    });
+  } catch (err) {
+    res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+// 新增违禁词（支持逗号/空格分隔批量）
+router.post('/sensitive-words', async (req, res) => {
+  const raw = (req.body.word || '').toString();
+  const category = (req.body.category || 'default').toString().trim() || 'default';
+  const list = raw.split(/[,，\s]+/).map(s => s.trim()).filter(Boolean);
+  if (list.length === 0) return res.redirect('/admin/sensitive-words?error=empty');
+  let added = 0;
+  for (const w of list) {
+    try {
+      await pool.query(
+        'INSERT INTO sensitive_words (word, category) VALUES (?, ?) ON DUPLICATE KEY UPDATE is_disabled = 0, category = ?',
+        [w, category, category]
+      );
+      added++;
+    } catch (e) { /* 跳过异常词 */ }
+  }
+  if (added > 0) await sensitiveWord.reload(); // 即时刷新内存词库
+  res.redirect('/admin/sensitive-words?added=' + added);
+});
+
+// 删除违禁词
+router.post('/sensitive-words/delete/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM sensitive_words WHERE id = ?', [req.params.id]);
+    await sensitiveWord.reload();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '删除失败' });
+  }
+});
+
+// 命中记录（审计日志）
+router.get('/sensitive-logs', async (req, res) => {
+  try {
+    const [logs] = await pool.query(
+      'SELECT * FROM sensitive_word_logs ORDER BY created_at DESC LIMIT 200'
+    );
+    res.render('admin/sensitive-logs', { title: '违禁词拦截记录', logs });
+  } catch (err) {
+    res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+// 清空命中记录
+router.post('/sensitive-logs/clear', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM sensitive_word_logs');
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '清空失败' });
+  }
+});
+
 router.get('/export-users', async (req, res) => {
   try {
     const [users] = await pool.query('SELECT id, username, real_name, grade, class_name, student_no, points, is_admin, created_at FROM casdoor_users ORDER BY id');

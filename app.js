@@ -301,6 +301,10 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await initDatabase();
+    // 启动后加载敏感词词库到内存（管理员在后台增删词后会即时 reload）
+    setImmediate(async () => {
+      try { await require('./配置/sensitive-word').reload(); } catch (e) { console.warn('敏感词加载失败:', e.message); }
+    });
     // Casdoor 自动初始化（组织/应用/组/Webhook），失败不阻塞
     setImmediate(async () => {
       try { await initCasdoor(); } catch (e) { console.warn('Casdoor init error:', e.message); }

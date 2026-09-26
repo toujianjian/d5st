@@ -1,0 +1,169 @@
+<style>
+  .sw-card {
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.6);
+    border-radius: 22px; box-shadow: var(--shadow-soft);
+    padding: 24px; display: flex; flex-direction: column; gap: 18px;
+  }
+  .sw-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .sw-form .field { display: flex; flex-direction: column; gap: 6px; }
+  .sw-form label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .sw-form input, .sw-form select {
+    padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(211,47,47,0.2);
+    font-size: 14px; font-family: inherit; min-width: 240px; background: #fff;
+  }
+  .sw-form input:focus, .sw-form select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(211,47,47,0.12); }
+  .sw-btn {
+    padding: 10px 22px; border-radius: 999px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff; font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 14px rgba(211,47,47,0.3); transition: all .25s;
+  }
+  .sw-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(211,47,47,0.45); }
+  .sw-hint { font-size: 12px; color: var(--text-muted); line-height: 1.7; }
+  .sw-meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--text-light); }
+  .sw-meta b { color: var(--primary); }
+  .sw-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .sw-table th, .sw-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .sw-table th { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .sw-table tr:hover td { background: rgba(211,47,47,0.04); }
+  .sw-tag { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; background: rgba(211,47,47,0.1); color: var(--primary); }
+  .sw-tag.off { background: rgba(0,0,0,0.06); color: var(--text-muted); }
+  .sw-del {
+    border: 1px solid rgba(211,47,47,0.3); background: #fff; color: var(--primary);
+    padding: 5px 12px; border-radius: 999px; cursor: pointer; font-size: 12px; transition: all .2s;
+  }
+  .sw-del:hover { background: var(--primary); color: #fff; }
+  .sw-empty { text-align: center; color: var(--text-muted); padding: 30px; }
+</style>
+
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="admin-sidebar-logo-icon"><i class="fas fa-shield-alt"></i></div>
+      <div class="admin-sidebar-logo-text">
+        <div class="admin-sidebar-title">D5ST 后台</div>
+        <div class="admin-sidebar-sub">Admin Console</div>
+      </div>
+    </div>
+    <nav class="admin-nav">
+      <div class="admin-nav-group">概览</div>
+      <a href="/admin" class="admin-nav-item"><i class="fas fa-tachometer-alt"></i> 仪表盘</a>
+
+      <div class="admin-nav-group">内容</div>
+      <a href="/admin/forum" class="admin-nav-item"><i class="fas fa-file-alt"></i> 帖子管理</a>
+      <a href="/admin/comments" class="admin-nav-item"><i class="fas fa-comments"></i> 评论管理</a>
+      <a href="/admin/reports" class="admin-nav-item"><i class="fas fa-exclamation-triangle"></i> 举报</a>
+      <a href="/admin/videos" class="admin-nav-item"><i class="fas fa-play-circle"></i> 视频管理</a>
+      <a href="/admin/boards" class="admin-nav-item"><i class="fas fa-layer-group"></i> 版块管理</a>
+
+      <div class="admin-nav-group">互动</div>
+      <a href="/admin/notifications" class="admin-nav-item"><i class="fas fa-bell"></i> 通知</a>
+      <a href="/admin/popups" class="admin-nav-item"><i class="fas fa-bullhorn"></i> 弹窗</a>
+
+      <div class="admin-nav-group">内容安全</div>
+      <a href="/admin/sensitive-words" class="admin-nav-item active"><i class="fas fa-ban"></i> 违禁词</a>
+      <a href="/admin/sensitive-logs" class="admin-nav-item"><i class="fas fa-history"></i> 拦截记录</a>
+
+      <div class="admin-nav-group">首页</div>
+      <a href="/admin/home-banners" class="admin-nav-item"><i class="fas fa-image"></i> 首页配图</a>
+      <a href="/admin/home-links" class="admin-nav-item"><i class="fas fa-link"></i> 首页链接</a>
+
+      <div class="admin-nav-group">系统</div>
+      <a href="/admin/path-redirects" class="admin-nav-item"><i class="fas fa-random"></i> 路径重定向</a>
+      <a href="/admin/export-users" class="admin-nav-item"><i class="fas fa-file-export"></i> 导出用户</a>
+      <a href="/admin/recycle-bin" class="admin-nav-item"><i class="fas fa-trash"></i> 回收站</a>
+      <a href="/admin/settings" class="admin-nav-item"><i class="fas fa-cog"></i> 设置</a>
+    </nav>
+  </aside>
+
+  <div class="admin-content">
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-ban"></i> 违禁词管理</div>
+        <div class="admin-header-sub">发帖 / 评论 / 私信 / 留言触发违禁词时自动屏蔽并记录</div>
+      </div>
+      <a href="/" class="admin-header-action"><i class="fas fa-external-link-alt"></i> 回到前台</a>
+    </div>
+
+    <% if (typeof added !== 'undefined' && added > 0) { %>
+      <div class="admin-status-card" style="border-left:4px solid #2e7d32">
+        <div class="admin-status-dot" style="background:#2e7d32"></div>
+        <div><div class="admin-status-title">已添加 <%= added %> 个词</div>
+        <div class="admin-status-text">内存词库已即时刷新，立即生效</div></div>
+      </div>
+    <% } %>
+
+    <div class="sw-card">
+      <form class="sw-form" method="POST" action="/admin/sensitive-words">
+        <div class="field">
+          <label>新增违禁词（可批量，逗号或空格分隔）</label>
+          <input type="text" name="word" placeholder="如：坏词1, 坏词2 坏词3" required />
+        </div>
+        <div class="field">
+          <label>分类</label>
+          <select name="category">
+            <option value="default">默认</option>
+            <option value="政治">政治</option>
+            <option value="辱骂">辱骂</option>
+            <option value="广告">广告</option>
+            <option value="色情">色情</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <button class="sw-btn" type="submit"><i class="fas fa-plus"></i> 添加</button>
+      </form>
+      <div class="sw-hint">
+        算法参考 <a href="https://github.com/houbb/sensitive-word" target="_blank" rel="noopener">houbb/sensitive-word</a> 的 DFA + 忽略干扰字符思路；
+        命中时词与词之间穿插空格 / 标点 / 特殊符号（如「敏*感*词」）也能识别，触发内容会被自动屏蔽并写入拦截记录。
+      </div>
+      <div class="sw-meta">
+        <span>词库数量：<b><%= words.length %></b></span>
+        <span>累计命中记录：<b><%= logCount %></b></span>
+        <span>内存词库加载于：<b><%= lastLoaded %></b></span>
+      </div>
+    </div>
+
+    <div class="sw-card">
+      <table class="sw-table">
+        <thead>
+          <tr><th>ID</th><th>违禁词</th><th>分类</th><th>状态</th><th>添加时间</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          <% if (words.length === 0) { %>
+            <tr><td colspan="6" class="sw-empty">暂无违禁词，添加后将自动生效</td></tr>
+          <% } %>
+          <% words.forEach(function(w){ %>
+            <tr>
+              <td><%= w.id %></td>
+              <td><%= w.word %></td>
+              <td><span class="sw-tag"><%= w.category %></span></td>
+              <td>
+                <% if (w.is_disabled) { %><span class="sw-tag off">已停用</span>
+                <% } else { %><span class="sw-tag">生效中</span><% } %>
+              </td>
+              <td><%= fmtDate(w.created_at) %></td>
+              <td>
+                <button class="sw-del" data-id="<%= w.id %>"><i class="fas fa-trash"></i> 删除</button>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.sw-del').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const id = btn.getAttribute('data-id');
+      if (!confirm('确定删除该违禁词？')) return;
+      const r = await fetch('/admin/sensitive-words/delete/' + id, { method: 'POST' });
+      const j = await r.json();
+      if (j.success) location.reload();
+      else alert('删除失败');
+    });
+  });
+</script>

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
+const { scan, logHit } = require('../sensitive-check');
 
 router.get('/', async (req, res) => {
   if (!req.session.user) return res.redirect('/login');
@@ -93,11 +94,28 @@ router.post('/send/:userId', async (req, res) => {
   if (!content || content.trim().length < 1) {
     return res.status(400).json({ error: '内容不能为空' });
   }
+  const raw = content.trim();
+  const { filtered, matched } = scan(raw);
   try {
-    await pool.query(
+    const [result] = await pool.query(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
-      [myId, receiverId, content.trim()]
+      [myId, receiverId, filtered]
     );
+    let msgId = result && result.insertId;
+    if (!msgId) {
+      const [r] = await pool.query('SELECT LAST_INSERT_ID() as id');
+      msgId = r[0].id;
+    }
+    if (matched.length) {
+      await logHit({
+        userId: myId,
+        username: req.session.user.username,
+        contentType: 'message',
+        contentId: msgId,
+        matched,
+        rawContent: raw
+      });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '发送失败' });
@@ -118,10 +136,27 @@ router.get('/guestbook', async (req, res) => {
 router.post('/guestbook', async (req, res) => {
   const { content, author_name } = req.body;
   if (!content || !content.trim()) return res.redirect('/messages/guestbook');
+  const raw = content.trim();
+  const { filtered, matched } = scan(raw);
   const authorId = req.session.user?.id || null;
   const name = authorId ? (req.session.user.real_name || req.session.user.username) : (author_name || '匿名用户');
   try {
-    await pool.query('INSERT INTO guestbook (author_id, author_name, content) VALUES (?, ?, ?)', [authorId, name, content.trim()]);
+    const [result] = await pool.query('INSERT INTO guestbook (author_id, author_name, content) VALUES (?, ?, ?)', [authorId, name, filtered]);
+    let gid = result && result.insertId;
+    if (!gid) {
+      const [r] = await pool.query('SELECT LAST_INSERT_ID() as id');
+      gid = r[0].id;
+    }
+    if (matched.length) {
+      await logHit({
+        userId: authorId,
+        username: name,
+        contentType: 'guestbook',
+        contentId: gid,
+        matched,
+        rawContent: raw
+      });
+    }
     res.redirect('/messages/guestbook');
   } catch (err) {
     res.redirect('/messages/guestbook');

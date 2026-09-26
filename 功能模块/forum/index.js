@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
+const { scan, logHit } = require('../sensitive-check');
 
 // 分类文案（兼容旧数据）
 const CATEGORY_LABELS = {
@@ -237,11 +238,17 @@ router.post('/', async (req, res) => {
   const typeVal = POST_TYPES[post_type] ? post_type : 'normal';
   const coverVal = (cover_image && cover_image.trim()) ? cover_image.trim() : null;
   const boardVal = board_id ? Number(board_id) : null;
+  // 敏感词：标题与正文都扫描，命中则屏蔽并留记录
+  const tScan = scan(titleVal);
+  const cScan = scan(content.trim());
+  const matched = [...new Set([...tScan.matched, ...cScan.matched])];
+  const safeTitle = tScan.filtered;
+  const safeContent = cScan.filtered;
   try {
     const [result] = await pool.query(
       `INSERT INTO forum_posts (user_id, title, content, category, tags, post_type, cover_image, board_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.session.user.id, titleVal, content.trim(), catVal, tagsVal, typeVal, coverVal, boardVal]
+      [req.session.user.id, safeTitle, safeContent, catVal, tagsVal, typeVal, coverVal, boardVal]
     );
     let postId = result && result.insertId;
     if (!postId) {
@@ -249,6 +256,17 @@ router.post('/', async (req, res) => {
       postId = r[0].id;
     }
     if (tagsVal) await syncPostTags(postId, tagsVal);
+    // 命中敏感词：留下审计记录（原文 + 命中词 + 触发者）
+    if (matched.length) {
+      await logHit({
+        userId: req.session.user.id,
+        username: req.session.user.username,
+        contentType: 'post',
+        contentId: postId,
+        matched,
+        rawContent: `标题：${titleVal}\n正文：${content.trim()}`
+      });
+    }
     // 发帖奖励积分（linfeng 积分体系）
     try {
       await pool.query(
@@ -402,11 +420,28 @@ router.post('/comment/:id', async (req, res) => {
   if (!content || content.trim().length < 1) {
     return res.status(400).json({ error: '评论内容不能为空' });
   }
+  const raw = content.trim();
+  const { filtered, matched } = scan(raw);
   try {
-    await pool.query(
+    const [result] = await pool.query(
       'INSERT INTO post_comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)',
-      [postId, req.session.user.id, content.trim(), parent_id ? Number(parent_id) : null]
+      [postId, req.session.user.id, filtered, parent_id ? Number(parent_id) : null]
     );
+    let commentId = result && result.insertId;
+    if (!commentId) {
+      const [r] = await pool.query('SELECT LAST_INSERT_ID() as id');
+      commentId = r[0].id;
+    }
+    if (matched.length) {
+      await logHit({
+        userId: req.session.user.id,
+        username: req.session.user.username,
+        contentType: 'comment',
+        contentId: commentId,
+        matched,
+        rawContent: raw
+      });
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '评论失败' });

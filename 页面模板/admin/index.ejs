@@ -242,7 +242,11 @@
       <a href="/admin/export-users" class="admin-nav-item"><i class="fas fa-file-export"></i> 导出用户</a>
       <a href="/admin/recycle-bin" class="admin-nav-item"><i class="fas fa-trash"></i> 回收站</a>
       <a href="/admin/settings" class="admin-nav-item"><i class="fas fa-cog"></i> 设置</a>
-    </nav>
+    
+      <div class="admin-nav-group">内容安全</div>
+      <a href="/admin/sensitive-words" class="admin-nav-item <%= currentPath.startsWith('/admin/sensitive-words') ? 'active' : '' %>"><i class="fas fa-ban"></i> 违禁词</a>
+      <a href="/admin/sensitive-logs" class="admin-nav-item <%= currentPath.startsWith('/admin/sensitive-logs') ? 'active' : '' %>"><i class="fas fa-history"></i> 拦截记录</a>
+</nav>
   </aside>
 
   <div class="admin-content">

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-label="D5ST 校园社区">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d32f2f"/>
+      <stop offset="55%" stop-color="#b71c1c"/>
+      <stop offset="100%" stop-color="#7f0000"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="80%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="#ff6b35" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ff6b35" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="320" fill="url(#g)"/>
+  <rect width="1200" height="320" fill="url(#glow)"/>
+  <text x="60" y="140" font-family="'Noto Serif SC', serif" font-size="72" font-weight="700" fill="#ffffff">D5ST 校园社区</text>
+  <text x="62" y="200" font-family="'Noto Serif SC', serif" font-size="30" fill="#ffe0e0">连接每一位同学 · 共享校园生活</text>
+  <text x="62" y="262" font-family="'Noto Serif SC', serif" font-size="22" fill="#ffd0c0">发帖 · 评论 · 私信 · 视频 · 保密号</text>
+</svg>
