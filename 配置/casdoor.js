@@ -190,7 +190,9 @@ async function updateOrganization(org) {
 }
 
 async function listOrganizations() {
-  return admin('list-organizations', { limit: 100 });
+  // Casdoor 的列表端点统一用 get-* 复数（org 用 get-organizations），
+  // 旧名 list-* 在当前镜像里 404
+  return admin('get-organizations', { limit: 100 });
 }
 
 async function getApplication(org, app) {
@@ -206,12 +208,13 @@ async function updateApplication(app) {
 }
 
 async function listApplications(org) {
-  return admin('list-applications', { organization: org, limit: 100 });
+  // Casdoor 列表端点：get-applications，参数 owner（不是 organization）
+  return admin('get-applications', { owner: org, limit: 100 });
 }
 
 // =================== 用户组（角色/权限映射） ===================
 // 注意：新版 Casdoor（:latest）已将用户组端点从 add-user-group / get-user-group /
-// list-user-groups 更名为 add-group / get-group / list-groups。
+// list-user-groups 更名为 add-group / get-group / get-groups。
 // GET 约定用 id 参数（格式 owner/name），而非旧的 organization + userGroup。
 async function getUserGroup(org, group) {
   return admin('get-group', { id: `${org}/${group}` });
@@ -222,7 +225,8 @@ async function createUserGroup(group) {
 }
 
 async function listUserGroups(org) {
-  return admin('list-groups', { owner: org, limit: 100 });
+  // Casdoor 用户组列表端点：get-groups（注释原写的 list-groups 在当前镜像里也 404）
+  return admin('get-groups', { owner: org, limit: 100 });
 }
 
 // =================== 权限定义 ===================
@@ -305,7 +309,7 @@ async function updateWebhook(webhook) {
 }
 
 async function listWebhooks(org) {
-  return admin('list-webhooks', { organization: org, limit: 100 });
+  return admin('get-webhooks', { owner: org, limit: 100 });
 }
 
 // =================== 认证事件 & 日志 ===================
