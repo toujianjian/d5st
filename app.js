@@ -75,6 +75,7 @@ const publicPaths = [
   '/api/check-login',
   '/api/popups',
   '/api/health',
+  '/rss.xml',
   '/public',
   '/forum',
   '/videos',

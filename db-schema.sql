@@ -283,17 +283,21 @@ CREATE TABLE IF NOT EXISTS home_links (
   url VARCHAR(255) NOT NULL,
   icon VARCHAR(50) DEFAULT NULL,
   sort_order INT NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  -- 唯一键：保证下面的 INSERT IGNORE 真正幂等，否则每次启动都会重复插入
+  UNIQUE KEY uniq_home_links_title (title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='首页链接';
 
 -- 首页横幅
 CREATE TABLE IF NOT EXISTS home_banners (
   id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(100) NOT NULL,
+  description VARCHAR(255) DEFAULT NULL,
   image_path VARCHAR(255) NOT NULL,
   link_url VARCHAR(255) DEFAULT NULL,
   sort_order INT NOT NULL DEFAULT 0,
-  is_active TINYINT(1) NOT NULL DEFAULT 1
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  UNIQUE KEY uniq_home_banners_title (title)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='首页横幅';
 
 -- 路径重定向

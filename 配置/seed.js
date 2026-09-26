@@ -19,6 +19,14 @@ const BOARDS = [
   { name: '求职实习', slug: 'job', icon: '💼', description: '实习、校招、简历经验', sort_order: 5 }
 ];
 
+// 首页横幅：图片使用静态资源里真实存在的文件，
+// 避免沿用 schema 里默认的 banner1.jpg（该文件并不存在，会 404）
+const BANNERS = [
+  { title: '校园风光', description: '记录四季变换的校园角落', image_path: '/public/images/james1.jpg', link_url: '/videos', sort_order: 1 },
+  { title: '学习交流', description: '分享知识与备考经验', image_path: '/public/images/james2.jpg', link_url: '/forum?board=study', sort_order: 2 },
+  { title: '生活日常', description: '吃喝玩乐与二手闲置', image_path: '/public/images/james3.jpg', link_url: '/forum?board=chat', sort_order: 3 }
+];
+
 const USERS = [
   { casdoor_user_id: 'seed_admin', username: 'admin', real_name: '系统管理员', is_admin: 1, points: 999 },
   { casdoor_user_id: 'seed_u1', username: 'linxiaoman', real_name: '林小满', grade: '大三', class_name: '计科2班', points: 268 },
@@ -396,6 +404,21 @@ async function seed() {
     console.log(`[Seed] 视频 ${VIDEOS.length} 个`);
   } else {
     console.log('[Seed] 已有视频数据，跳过（如需重建请加 --force）');
+  }
+
+  // 首页横幅：补齐内容，并把缺失图片的历史数据修正为真实存在的文件
+  await pool.query(`UPDATE home_banners SET image_path='/public/images/james1.jpg' WHERE image_path='/public/images/banner1.jpg'`);
+  const bannerCount = await count('SELECT COUNT(*) as cnt FROM home_banners');
+  if (FORCE || bannerCount === 0) {
+    if (FORCE) await pool.query('DELETE FROM home_banners');
+    for (const b of BANNERS) {
+      await pool.query(
+        `INSERT INTO home_banners (title, description, image_path, link_url, sort_order, is_active)
+         VALUES (?, ?, ?, ?, ?, 1)`,
+        [b.title, b.description, b.image_path, b.link_url, b.sort_order]
+      );
+    }
+    console.log(`[Seed] 首页横幅 ${BANNERS.length} 条`);
   }
 
   console.log('[Seed] ✅ 测试数据写入完成');
