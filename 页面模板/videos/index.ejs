@@ -120,7 +120,7 @@
         <% } %>
         <div class="slide-cap">
           <div class="t"><%= v.title %></div>
-          <div class="m"><i class="far fa-eye"></i> <%= v.views || 0 %> 次播放 · <%= String(v.created_at).slice(0,10) %></div>
+          <div class="m"><i class="far fa-eye"></i> <%= v.views || 0 %> 次播放 · <%= fmtDate(v.created_at, false) %></div>
         </div>
       </a>
       <% }); %>

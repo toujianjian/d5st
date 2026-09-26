@@ -6,7 +6,7 @@
     <a href="/admin/forum">帖子管理</a>
     <a href="/admin/comments">评论管理</a>
     <a href="/admin/comments" class="active">评论管理</a>
-    <a href="/admin/reports">举报管理</a>
+    <a href="/admin/reports">举报管理</a><a href="/admin/videos">视频管理</a><a href="/admin/boards">版块管理</a>
     <h3>🔔 通知与弹窗</h3>
     <a href="/admin/notifications">全局通知</a>
     <a href="/admin/popups">弹窗管理</a>
@@ -35,7 +35,7 @@
                   <a href="/forum/<%= c.post_id %>" target="_blank" style="color:var(--primary);"><%= c.post_title ? c.post_title.slice(0, 30) : '#' + c.post_id %></a>
                 <% } else { %>-<% } %>
               </td>
-              <td style="font-size:12px;"><%= (c.created_at || '').slice(0,16) %></td>
+              <td style="font-size:12px;"><%= fmtDate(c.created_at) %></td>
               <td><%= c.is_deleted ? '<span class="badge badge-danger">已删除</span>' : '<span class="badge badge-success">正常</span>' %></td>
               <td>
                 <% if (!c.is_deleted) { %>

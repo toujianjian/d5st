@@ -193,7 +193,7 @@ const COMMENTS = [
   { post: 18, user: 5, content: '能说出后悔，说明你还在乎这段关系。' },
   { post: 19, user: 3, content: '第 2 条太对了，纯理论题目写起来真的很痛苦。' },
   { post: 20, user: 4, content: '汤圆我摸过！很乖。' },
-  { post: 21, user: 1, content: '请问夜市是每周五都有吗？' }
+  { post: 20, user: 1, content: '花卷比较怕人，要多去几次它才亲近你。', parent: 0 }
 ];
 
 const VIDEOS = [
@@ -282,6 +282,13 @@ const VIDEOS = [
     url: 'https://www.w3schools.com/html/mov_bbb.mp4', user: 1
   }
 ];
+
+// ---------- 素材清理 ----------
+// 仓库自带的 james1/2/3.jpg 是他人肖像照片，作为校园社区配图不合适，
+// 这里统一去掉封面，让前端回退到渐变占位（视觉上更干净一致）。
+POSTS.forEach(p => { delete p.cover; });
+VIDEOS.forEach(v => { delete v.cover; });
+BANNERS.forEach(b => { b.image_path = ''; });
 
 // ---------- 辅助 ----------
 async function count(sql) {
@@ -406,8 +413,8 @@ async function seed() {
     console.log('[Seed] 已有视频数据，跳过（如需重建请加 --force）');
   }
 
-  // 首页横幅：补齐内容，并把缺失图片的历史数据修正为真实存在的文件
-  await pool.query(`UPDATE home_banners SET image_path='/public/images/james1.jpg' WHERE image_path='/public/images/banner1.jpg'`);
+  // 首页横幅：把指向不存在的 banner1.jpg 的历史数据清空，前端回退为渐变 + 图标
+  await pool.query(`UPDATE home_banners SET image_path='' WHERE image_path='/public/images/banner1.jpg'`);
   const bannerCount = await count('SELECT COUNT(*) as cnt FROM home_banners');
   if (FORCE || bannerCount === 0) {
     if (FORCE) await pool.query('DELETE FROM home_banners');

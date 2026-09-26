@@ -76,7 +76,7 @@
             <div class="av"><%= video.author.charAt(0) %></div>
             <span><%= video.author %></span>
             <span><i class="far fa-eye"></i> <%= video.views || 0 %> 次播放</span>
-            <span><i class="far fa-clock"></i> <%= String(video.created_at).slice(0, 10) %></span>
+            <span><i class="far fa-clock"></i> <%= fmtDate(video.created_at, false) %></span>
             <span><i class="fas fa-folder"></i> <%= video.category_label %></span>
           </div>
           <% if (video.description) { %>
@@ -99,7 +99,7 @@
         </div>
         <div class="rel-body">
           <div class="rel-name"><%= r.title %></div>
-          <div class="rel-meta"><i class="far fa-eye"></i> <%= r.views || 0 %> · <%= String(r.created_at).slice(0,10) %></div>
+          <div class="rel-meta"><i class="far fa-eye"></i> <%= r.views || 0 %> · <%= fmtDate(r.created_at, false) %></div>
         </div>
       </a>
       <% }); %>

@@ -1,0 +1,99 @@
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h3>📊 概览</h3>
+    <a href="/admin">仪表盘</a>
+    <h3>📋 内容管理</h3>
+    <a href="/admin/forum">帖子管理</a>
+    <a href="/admin/comments">评论管理</a>
+    <a href="/admin/reports">举报管理</a>
+    <a href="/admin/videos">视频管理</a>
+    <a href="/admin/boards" class="active">版块管理</a>
+    <h3>🔔 通知与弹窗</h3>
+    <a href="/admin/notifications">全局通知</a>
+    <a href="/admin/popups">弹窗管理</a>
+    <h3>🏠 首页设置</h3>
+    <a href="/admin/home-links">首页链接</a>
+    <a href="/admin/home-banners">首页横幅</a>
+    <h3>🛠️ 系统</h3>
+    <a href="/admin/path-redirects">路径重定向</a>
+    <a href="/admin/recycle-bin">回收站</a>
+    <a href="/admin/export-users">导出用户</a>
+    <a href="/admin/settings">系统设置</a>
+  </aside>
+  <div class="admin-content">
+    <div class="card">
+      <div class="card-title">➕ 新增版块</div>
+      <form method="POST" action="/admin/boards" class="board-form">
+        <input type="text" name="name" placeholder="版块名称（如：社团活动）" required />
+        <input type="text" name="slug" placeholder="标识 slug（英文，如：club）" required />
+        <input type="text" name="icon" placeholder="图标 emoji（如：🎯）" maxlength="4" />
+        <input type="text" name="description" placeholder="版块简介" />
+        <input type="number" name="sort_order" placeholder="排序" style="width:90px;" />
+        <button class="btn btn-primary" type="submit">创建</button>
+      </form>
+      <% if (typeof query !== 'undefined' && query && query.error) { %>
+        <p style="color:#d32f2f;font-size:13px;margin-top:8px;">
+          <%= query.error === 'duplicate' ? '创建失败：slug 已存在' : '请填写名称与 slug' %>
+        </p>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🗂️ 版块列表 <span style="font-size:13px;color:#999;font-weight:normal;">共 <%= boards.length %> 个</span></div>
+      <table class="table">
+        <thead><tr><th>ID</th><th>图标</th><th>名称</th><th>slug</th><th>简介</th><th>帖子数</th><th>排序</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody>
+          <% boards.forEach(function(b) { %>
+            <tr>
+              <td><%= b.id %></td>
+              <td style="font-size:18px;"><%= b.icon %></td>
+              <td><a href="/forum?board=<%= b.slug %>" target="_blank" style="color:var(--primary);text-decoration:none;"><%= b.name %></a></td>
+              <td><code><%= b.slug %></code></td>
+              <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= b.description || '-' %></td>
+              <td><%= b.post_count || 0 %></td>
+              <td><%= b.sort_order %></td>
+              <td>
+                <button class="btn btn-sm <%= b.is_active ? 'btn-ok' : 'btn-ghost' %>" onclick="toggleBoard(<%= b.id %>, this)">
+                  <%= b.is_active ? '启用中' : '已停用' %>
+                </button>
+              </td>
+              <td><button class="btn btn-danger btn-sm" onclick="deleteBoard(<%= b.id %>)">删除</button></td>
+            </tr>
+          <% }); %>
+          <% if (boards.length === 0) { %>
+            <tr><td colspan="9" style="text-align:center;color:#999;padding:30px;">还没有版块</td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<style>
+  .btn-sm { padding: 4px 12px; font-size: 12px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; }
+  .btn-ok { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+  .btn-ghost { background: transparent; color: #888; border: 1px solid #ddd; }
+  .btn-ghost:hover { color: #d32f2f; border-color: #d32f2f; }
+  .board-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .board-form input { padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 10px; font-size: 14px; min-width: 160px; }
+  .board-form input:focus { outline: none; border-color: var(--primary); }
+  .btn-primary { padding: 10px 20px; border: none; border-radius: 10px; background: var(--primary); color: #fff; cursor: pointer; font-size: 14px; }
+  .btn-primary:hover { background: var(--primary-dark); }
+</style>
+<script>
+function toggleBoard(id, btn) {
+  fetch('/admin/boards/toggle/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = data.is_active ? '启用中' : '已停用';
+        btn.className = 'btn btn-sm ' + (data.is_active ? 'btn-ok' : 'btn-ghost');
+      }
+    });
+}
+function deleteBoard(id) {
+  if (!confirm('确定删除该版块？该版块下的帖子会变为「未分类」，帖子本身不会被删除。')) return;
+  fetch('/admin/boards/delete/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => { if (data.success) location.reload(); else alert(data.error || '失败'); });
+}
+</script>

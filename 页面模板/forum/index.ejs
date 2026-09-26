@@ -182,7 +182,7 @@
             <span><i class="far fa-eye"></i> <%= p.views || 0 %></span>
             <span><i class="far fa-comment"></i> <%= p.comments_count %></span>
             <span><i class="far fa-heart"></i> <%= p.likes %></span>
-            <span><i class="far fa-clock"></i> <%= String(p.created_at).slice(0, 16) %></span>
+            <span><i class="far fa-clock"></i> <%= fmtDate(p.created_at) %></span>
             <% if (p.board_name) { %><span class="badge badge-cat"><%= p.board_name %></span><% } %>
           </div>
           <% if (p.tags) { %>

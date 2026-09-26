@@ -36,8 +36,23 @@ app.use(
   })
 );
 
+// 统一的日期格式化：MySQL 返回的是 Date 对象，直接 String() 会得到
+// 「Sat Sep 26 2026 11:32:00 GMT+0800」这种英文长串，页面很难看。
+// 这里统一成 2026-09-26 11:32，供所有模板使用。
+function fmtDate(value, withTime = true) {
+  if (!value) return '';
+  const d = (value instanceof Date) ? value : new Date(value);
+  if (isNaN(d.getTime())) return String(value).slice(0, withTime ? 16 : 10);
+  const p = n => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return withTime ? `${date} ${p(d.getHours())}:${p(d.getMinutes())}` : date;
+}
+
 app.use(async (req, res, next) => {
-  res.locals.siteTitle = '暂停营业代码出错';
+  res.locals.siteTitle = 'D5ST 校园社区';
+  res.locals.fmtDate = fmtDate;
+  res.locals.currentPath = req.path;
+
   res.locals.currentUser = req.session.user || null;
   res.locals.currentAdmin = req.session.admin || null;
   res.locals.casdoorEndpoint = CASDOOR_CONFIG.endpoint;

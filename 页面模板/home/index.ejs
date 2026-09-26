@@ -55,9 +55,22 @@
     display: flex; align-items: center; justify-content: center;
   }
   .carousel-slide.active { opacity: 1; }
-  .carousel-slide.slide-1 { background: linear-gradient(rgba(0,0,0,.32), rgba(0,0,0,.62)), url('/public/images/james1.jpg') center 25% / cover no-repeat; }
-  .carousel-slide.slide-2 { background: linear-gradient(rgba(0,0,0,.32), rgba(0,0,0,.62)), url('/public/images/james2.jpg') center 25% / cover no-repeat; }
-  .carousel-slide.slide-3 { background: linear-gradient(rgba(0,0,0,.32), rgba(0,0,0,.62)), url('/public/images/james3.jpg') center 25% / cover no-repeat; }
+  /* Hero 背景：用渐变色块代替不合适的照片素材，更贴合校园社区调性 */
+  .carousel-slide.slide-1 {
+    background:
+      radial-gradient(1200px 420px at 18% 18%, rgba(255,255,255,.20), transparent 62%),
+      linear-gradient(135deg, #b71c1c 0%, #d32f2f 45%, #ff6b35 100%);
+  }
+  .carousel-slide.slide-2 {
+    background:
+      radial-gradient(900px 400px at 82% 22%, rgba(255,255,255,.18), transparent 62%),
+      linear-gradient(135deg, #7b1fa2 0%, #c2185b 55%, #d32f2f 100%);
+  }
+  .carousel-slide.slide-3 {
+    background:
+      radial-gradient(900px 400px at 28% 82%, rgba(255,255,255,.18), transparent 62%),
+      linear-gradient(135deg, #0d47a1 0%, #1565c0 42%, #d32f2f 100%);
+  }
   .carousel-content { text-align: center; color: #fff; z-index: 2; position: relative; padding: 40px; }
   /* eyebrow 徽章 */
   .eyebrow {

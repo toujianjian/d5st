@@ -176,7 +176,8 @@
     .stat-num { font-size: 18px; font-weight: 700; color: white; }
     .stat-label { font-size: 12px; color: rgba(255, 255, 255, 0.8); }
     .doc-btn {
-      position: fixed; top: 20px; right: 20px; z-index: 200;
+      /* 原来固定在右上角，会压住各页面的标题与操作按钮，移到左下角 */
+      position: fixed; bottom: 20px; left: 20px; z-index: 200;
       display: flex; align-items: center; gap: 8px;
       padding: 10px 20px;
       background: var(--glass-bg);
@@ -334,13 +335,17 @@
     .mobile-nav-link i { font-size: 12px; }
     .mobile-nav-title { color: white; font-size: 16px; font-weight: 600; }
     body.page-body { overflow: auto; }
+    /* 后台页面自带侧边栏，隐藏全局用户侧栏并收起左边距，避免出现两个侧栏 */
+    body.admin-mode .user-sidebar { display: none; }
+    body.admin-mode .main-wrapper { margin-left: 0; }
+    body.admin-mode .notification-ball { display: none; }
   </style>
   <script src="/public/js/main.js" defer></script>
   <% if (typeof pageScript !== 'undefined' && pageScript) { %>
   <script src="<%= pageScript %>" defer></script>
   <% } %>
 </head>
-<body class="page-body" id="page-body">
+<body class="page-body<%= (typeof currentPath !== 'undefined' && currentPath.indexOf('/admin') === 0) ? ' admin-mode' : '' %>" id="page-body">
   <nav class="mobile-nav">
     <a href="/" class="mobile-nav-btn" title="首页"><i class="fas fa-home"></i></a>
     <div class="mobile-nav-menu">
@@ -362,7 +367,10 @@
     </div>
   </nav>
 
+  <%# 后台有自己的「回到前台」按钮，这里不再显示浮动按钮，避免压住侧边栏 %>
+  <% if (typeof currentPath === 'undefined' || currentPath.indexOf('/admin') !== 0) { %>
   <a href="/" class="doc-btn"><i class="fas fa-home"></i> 首页</a>
+  <% } %>
 
   <div class="bg-animation">
     <div class="bg-shape bg-shape-1"></div>

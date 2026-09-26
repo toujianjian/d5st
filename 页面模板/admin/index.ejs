@@ -144,6 +144,7 @@
   .admin-stat-icon.users { background: linear-gradient(135deg, #ff6b35, #d32f2f); }
   .admin-stat-icon.comments { background: linear-gradient(135deg, #ff5252, #d32f2f); }
   .admin-stat-icon.reports { background: linear-gradient(135deg, #b71c1c, #7f0000); }
+  .admin-stat-icon.videos { background: linear-gradient(135deg, #c2185b, #7b1fa2); }
   .admin-stat-trend {
     font-size: 11px; color: var(--text-muted);
     display: flex; align-items: center; gap: 3px;
@@ -205,6 +206,7 @@
 <% const numPosts = (s.posts || 0) | 0; %>
 <% const numUsers = (s.users || 0) | 0; %>
 <% const numComments = (s.comments || 0) | 0; %>
+<% const numVideos = (s.videos || 0) | 0; %>
 <% const numReports = (s.pendingReports || s.reports || 0) | 0; %>
 
 <div class="admin-layout">
@@ -224,6 +226,8 @@
       <a href="/admin/forum" class="admin-nav-item"><i class="fas fa-file-alt"></i> 帖子管理</a>
       <a href="/admin/comments" class="admin-nav-item"><i class="fas fa-comments"></i> 评论管理</a>
       <a href="/admin/reports" class="admin-nav-item"><i class="fas fa-exclamation-triangle"></i> 举报</a>
+      <a href="/admin/videos" class="admin-nav-item"><i class="fas fa-play-circle"></i> 视频管理</a>
+      <a href="/admin/boards" class="admin-nav-item"><i class="fas fa-layer-group"></i> 版块管理</a>
 
       <div class="admin-nav-group">互动</div>
       <a href="/admin/notifications" class="admin-nav-item"><i class="fas fa-bell"></i> 通知</a>
@@ -271,6 +275,13 @@
         </div>
         <div class="admin-stat-value"><%= numComments %></div>
         <div class="admin-stat-label">评论数</div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-top">
+          <div class="admin-stat-icon videos"><i class="fas fa-play-circle"></i></div>
+        </div>
+        <div class="admin-stat-value"><%= numVideos %></div>
+        <div class="admin-stat-label">视频数</div>
       </div>
       <div class="admin-stat-card">
         <div class="admin-stat-top">

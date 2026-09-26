@@ -101,7 +101,7 @@
     <div class="post-info">
       <div class="av"><%= post.author.charAt(0) %></div>
       <span><%= post.author %></span>
-      <span><i class="far fa-clock"></i> <%= String(post.created_at).slice(0, 16) %></span>
+      <span><i class="far fa-clock"></i> <%= fmtDate(post.created_at) %></span>
       <span><i class="far fa-eye"></i> <%= post.views || 0 %> 浏览</span>
       <span><i class="far fa-comment"></i> <%= (post.comments || []).length %> 评论</span>
     </div>
@@ -140,7 +140,7 @@
       <div class="comment-body">
         <div class="comment-meta">
           <span class="nm"><%= c.author %></span>
-          <span><%= String(c.created_at).slice(0, 16) %></span>
+          <span><%= fmtDate(c.created_at) %></span>
         </div>
         <div class="comment-text"><%= c.content %></div>
         <% if (typeof currentUser !== 'undefined' && currentUser) { %>
@@ -154,7 +154,7 @@
             <div class="comment-body">
               <div class="comment-meta">
                 <span class="nm"><%= r.author %></span>
-                <span><%= String(r.created_at).slice(0, 16) %></span>
+                <span><%= fmtDate(r.created_at) %></span>
               </div>
               <div class="comment-text"><%= r.content %></div>
             </div>

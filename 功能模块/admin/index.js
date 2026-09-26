@@ -16,11 +16,16 @@ router.get('/', async (req, res) => {
     const [postCount] = await pool.query('SELECT COUNT(*) as cnt FROM forum_posts WHERE is_deleted = 0');
     const [reportCount] = await pool.query("SELECT COUNT(*) as cnt FROM reports WHERE status = 'pending'");
     const [messageCount] = await pool.query('SELECT COUNT(*) as cnt FROM messages');
+    // 评论数此前误取私信表(messages)，导致仪表盘「评论数」恒为 0，这里改为统计真实评论
+    const [commentCount] = await pool.query('SELECT COUNT(*) as cnt FROM post_comments WHERE is_deleted = 0');
+    const [videoCount] = await pool.query('SELECT COUNT(*) as cnt FROM video_posts WHERE is_deleted = 0');
     res.render('admin/index', { 
       title: '管理后台', 
       stats: {
         users: userCount[0].cnt,
         posts: postCount[0].cnt,
+        comments: commentCount[0].cnt,
+        videos: videoCount[0].cnt,
         pendingReports: reportCount[0].cnt,
         messages: messageCount[0].cnt
       }
@@ -123,6 +128,92 @@ router.post('/reports/:id/handle', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '处理失败' });
+  }
+});
+
+// ============ 视频管理（融合「校园风采」视频站） ============
+router.get('/videos', async (req, res) => {
+  try {
+    const [videos] = await pool.query(
+      `SELECT vp.*, cu.username, cu.real_name FROM video_posts vp
+       LEFT JOIN casdoor_users cu ON vp.user_id = cu.id
+       ORDER BY vp.created_at DESC LIMIT 200`
+    );
+    res.render('admin/videos', { title: '视频管理', videos });
+  } catch (err) {
+    res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+router.post('/videos/delete/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE video_posts SET is_deleted = 1 WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '操作失败' });
+  }
+});
+
+router.post('/videos/toggle-recommend/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT is_recommended FROM video_posts WHERE id = ?', [req.params.id]);
+    if (!rows || rows.length === 0) return res.status(404).json({ error: '视频不存在' });
+    const next = rows[0].is_recommended ? 0 : 1;
+    await pool.query('UPDATE video_posts SET is_recommended = ? WHERE id = ?', [next, req.params.id]);
+    res.json({ success: true, is_recommended: next });
+  } catch (err) {
+    res.status(500).json({ error: '操作失败' });
+  }
+});
+
+// ============ 版块管理（融合论坛「圈子/版块」） ============
+router.get('/boards', async (req, res) => {
+  try {
+    const [boards] = await pool.query(
+      `SELECT b.*,
+        (SELECT COUNT(*) FROM forum_posts p WHERE p.board_id = b.id AND p.is_deleted = 0) as post_count
+       FROM forum_boards b ORDER BY b.sort_order ASC, b.id ASC`
+    );
+    res.render('admin/boards', { title: '版块管理', boards });
+  } catch (err) {
+    res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+router.post('/boards', async (req, res) => {
+  const { name, slug, icon, description, sort_order } = req.body;
+  if (!name || !slug) return res.redirect('/admin/boards?error=missing');
+  try {
+    await pool.query(
+      `INSERT INTO forum_boards (name, slug, icon, description, sort_order) VALUES (?, ?, ?, ?, ?)`,
+      [name.trim(), slug.trim(), (icon || '💬').trim(), (description || '').trim(), parseInt(sort_order, 10) || 0]
+    );
+    res.redirect('/admin/boards');
+  } catch (err) {
+    res.redirect('/admin/boards?error=duplicate');
+  }
+});
+
+router.post('/boards/toggle/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT is_active FROM forum_boards WHERE id = ?', [req.params.id]);
+    if (!rows || rows.length === 0) return res.status(404).json({ error: '版块不存在' });
+    const next = rows[0].is_active ? 0 : 1;
+    await pool.query('UPDATE forum_boards SET is_active = ? WHERE id = ?', [next, req.params.id]);
+    res.json({ success: true, is_active: next });
+  } catch (err) {
+    res.status(500).json({ error: '操作失败' });
+  }
+});
+
+router.post('/boards/delete/:id', async (req, res) => {
+  try {
+    // 先解绑该版块下的帖子，再删除版块，避免帖子变成孤儿数据
+    await pool.query('UPDATE forum_posts SET board_id = NULL WHERE board_id = ?', [req.params.id]);
+    await pool.query('DELETE FROM forum_boards WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '操作失败' });
   }
 });
 

@@ -87,7 +87,7 @@
               <% if (p.category) { %><span style="font-size:10px;padding:2px 8px;border-radius:8px;background:rgba(33,150,243,0.12);color:#1976d2;font-weight:500;"><%= p.category %></span><% } %>
             </div>
             <div style="display:flex;gap:16px;font-size:12px;color:var(--text-muted);align-items:center;">
-              <span><i class="fas fa-clock"></i> <%= (p.created_at || '').slice(0,16) %></span>
+              <span><i class="fas fa-clock"></i> <%= fmtDate(p.created_at) %></span>
               <span><i class="fas fa-eye"></i> <%= p.views || 0 %></span>
               <% if (p.tags) { %><span style="color:var(--primary);"><i class="fas fa-tags"></i> <%= String(p.tags).split(/[,，\s]+/).filter(Boolean).slice(0,3).join(', ') %></span><% } %>
             </div>
