@@ -17,7 +17,7 @@
       <form method="POST" action="/admin/path-redirects">
         <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:12px;">
           <input type="text" name="path" class="form-input" placeholder="原路径 如 /forum" required>
-          <input type="url" name="redirect_url" class="form-input" placeholder="跳转目标 URL" required>
+          <input type="text" name="redirect_url" class="form-input" placeholder="跳转目标 URL（可填 /forum 等站内相对路径，或 https://...）" required>
           <input type="text" name="path_desc" class="form-input" placeholder="说明">
         </div>
         <button type="submit" class="btn btn-primary" style="margin-top:12px;">添加</button>

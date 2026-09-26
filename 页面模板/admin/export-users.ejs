@@ -13,7 +13,9 @@
 </aside>
   <div class="admin-content">
     <div class="card">
-      <div class="card-title">📥 用户数据（<%= users.length %> 人）</div>
+      <div class="card-title">📥 用户数据（<%= users.length %> 人）
+        <a href="/admin/export-users?format=csv" class="btn btn-primary" style="float:right;">⬇️ 导出 CSV</a>
+      </div>
       <table class="table">
         <thead><tr><th>ID</th><th>用户名</th><th>真实姓名</th><th>年级</th><th>班级</th><th>积分</th><th>管理员</th><th>注册时间</th></tr></thead>
         <tbody>

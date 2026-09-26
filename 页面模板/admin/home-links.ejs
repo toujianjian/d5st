@@ -17,7 +17,7 @@
       <form method="POST" action="/admin/home-links">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 80px;gap:12px;">
           <input type="text" name="title" class="form-input" placeholder="标题" required>
-          <input type="url" name="url" class="form-input" placeholder="链接" required>
+          <input type="text" name="url" class="form-input" placeholder="链接（可填 /forum 等站内相对路径，或 https://...）" required>
           <input type="text" name="icon" class="form-input" placeholder="Emoji 图标">
           <input type="number" name="sort_order" class="form-input" placeholder="排序">
         </div>
