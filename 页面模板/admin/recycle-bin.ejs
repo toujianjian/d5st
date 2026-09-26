@@ -12,10 +12,19 @@
       <div class="card-title">🗑️ 回收站</div>
       <% if (items && items.length > 0) { %>
         <table class="table">
-          <thead><tr><th>ID</th><th>类型</th><th>项目 ID</th><th>删除时间</th></tr></thead>
+          <thead><tr><th>ID</th><th>类型</th><th>项目 ID</th><th>删除时间</th><th>操作</th></tr></thead>
           <tbody>
             <% items.forEach(function(i) { %>
-              <tr><td><%= i.id %></td><td><%= i.item_type %></td><td><%= i.item_id %></td><td><%= new Date(i.deleted_at).toLocaleString('zh-CN') %></td></tr>
+              <tr>
+                <td><%= i.id %></td>
+                <td><%= i.item_type %></td>
+                <td><%= i.item_id %></td>
+                <td><%= new Date(i.deleted_at).toLocaleString('zh-CN') %></td>
+                <td>
+                  <button class="btn btn-sm btn-primary" onclick="restoreItem(<%= i.id %>, this)">恢复</button>
+                  <button class="btn btn-sm btn-danger" onclick="purgeItem(<%= i.id %>, this)">永久删除</button>
+                </td>
+              </tr>
             <% }); %>
           </tbody>
         </table>
@@ -25,3 +34,17 @@
     </div>
   </div>
 </div>
+<script>
+function restoreItem(id, btn) {
+  if (!confirm('确定要恢复这条记录吗？')) return;
+  fetch('/admin/recycle-bin/restore/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => { if (d.success) { btn.closest('tr').remove(); } else alert(d.error || '失败'); });
+}
+function purgeItem(id, btn) {
+  if (!confirm('永久删除将不可恢复，确定吗？')) return;
+  fetch('/admin/recycle-bin/purge/' + id, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => { if (d.success) { btn.closest('tr').remove(); } else alert(d.error || '失败'); });
+}
+</script>

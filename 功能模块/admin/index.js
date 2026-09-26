@@ -355,9 +355,57 @@ router.get('/recycle-bin', async (req, res) => {
   }
 });
 
+// 回收站：恢复已删除的帖子/视频/评论
+router.post('/recycle-bin/restore/:id', async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM deleted_items WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: '记录不存在' });
+    const item = rows[0];
+    const map = {
+      post: ['forum_posts', 'is_deleted = 0'],
+      video: ['video_posts', 'is_deleted = 0'],
+      comment: ['post_comments', 'is_deleted = 0']
+    };
+    const target = map[item.item_type];
+    if (!target) return res.status(400).json({ error: '不支持的恢复类型' });
+    await pool.query(`UPDATE \`${target[0]}\` SET ${target[1]} WHERE id = ?`, [item.item_id]);
+    await pool.query('UPDATE deleted_items SET is_restored = 1 WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '恢复失败' });
+  }
+});
+
+// 回收站：永久删除（直接从 deleted_items 表移除，原始数据不可恢复）
+router.post('/recycle-bin/purge/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM deleted_items WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: '操作失败' });
+  }
+});
+
 router.get('/export-users', async (req, res) => {
   try {
     const [users] = await pool.query('SELECT id, username, real_name, grade, class_name, student_no, points, is_admin, created_at FROM casdoor_users ORDER BY id');
+    // ?format=csv 时直接返回 CSV 文件下载（带 Excel 友好的 BOM，避免中文乱码）
+    if ((req.query.format || '').toLowerCase() === 'csv') {
+      const headers = ['ID', '用户名', '真实姓名', '年级', '班级', '学号', '积分', '管理员', '注册时间'];
+      const escape = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+      const lines = [headers.join(',')];
+      for (const u of users) {
+        lines.push([
+          u.id, u.username, u.real_name, u.grade, u.class_name, u.student_no,
+          u.points || 0, u.is_admin ? '是' : '否',
+          new Date(u.created_at).toLocaleString('zh-CN')
+        ].map(escape).join(','));
+      }
+      const csv = '\uFEFF' + lines.join('\r\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="d5st-users-' + new Date().toISOString().slice(0, 10) + '.csv"');
+      return res.send(csv);
+    }
     res.render('admin/export-users', { title: '导出用户数据', users });
   } catch (err) {
     res.status(500).render('errors/500', { title: '加载失败' });
