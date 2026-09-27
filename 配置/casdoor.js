@@ -266,24 +266,29 @@ async function createPermission(p) {
 }
 
 // =================== 用户 CRUD ===================
+// 注意：新版 Casdoor（:latest）里 get-user 必须用 id 参数（格式 owner/name），
+// 传 organization + user 会返回 status=ok 但 data=null，导致「用户明明存在却读不到」。
 async function getUser(org, name) {
-  return admin('get-user', { organization: org, user: name });
+  return admin('get-user', { id: `${org}/${name}` });
 }
 
 async function createUser(user) {
   return adminPost('add-user', user);
 }
 
+// 同 get-user：更新也必须显式带 id=owner/name，否则报 Unauthorized operation。
+// 注意不能用 user.id —— 那是 UUID 主键，Casdoor 的 GetOwnerAndNameFromId 解析不了。
 async function updateUser(user) {
-  return adminPost('update-user', user);
+  return adminPost('update-user', user, { id: `${user.owner}/${user.name}` });
 }
 
 async function deleteUser(org, name) {
   return adminPost('delete-user', { organization: org, user: name });
 }
 
+// 同上：端点已由 list-users 更名为 get-users，参数用 owner 而非 organization
 async function listUsers(org, limit = 100, offset = 0) {
-  return admin('list-users', { organization: org, limit, offset });
+  return admin('get-users', { owner: org, limit, offset });
 }
 
 async function setPassword(org, name, password, oldPassword = '') {

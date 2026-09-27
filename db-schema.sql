@@ -439,5 +439,7 @@ INSERT IGNORE INTO home_links (title, url, icon, sort_order) VALUES
 INSERT IGNORE INTO home_banners (title, image_path, link_url, sort_order) VALUES
 ('欢迎来到 D5ST', '/public/images/banner1.svg', '/', 1);
 
+-- 默认管理员：用户名需与 casdoor-init.js 里 DEFAULT_ADMIN_USER 一致，
+-- 首次 Casdoor OAuth 登录时 findOrCreateCasdoorUser 会按 username 命中本行并回填真实 id。
 INSERT IGNORE INTO casdoor_users (casdoor_user_id, username, real_name, is_admin) VALUES
-('d5st_admin_seed', 'admin', '系统管理员', 1);
+('d5st_admin_seed', 'd5stadmin', '系统管理员', 1);

@@ -217,7 +217,7 @@
         <i class="fas fa-flask"></i>
         <span>演示登录（开发模式）</span>
       </a>
-      <a href="/auth/dev-login?username=admin&admin=1" class="login-btn-dev admin">
+      <a href="/auth/dev-login?username=<%= (typeof defaultAdminUser !== 'undefined' && defaultAdminUser) ? defaultAdminUser : 'd5stadmin' %>&admin=1" class="login-btn-dev admin">
         <i class="fas fa-user-shield"></i>
         <span>演示管理员登录</span>
       </a>

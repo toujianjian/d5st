@@ -55,7 +55,8 @@ router.get('/login', (req, res) => {
     authUrl,
     error: req.query.error,
     endpoint: casdoor.C.endpoint,
-    nextUrl: req.session.nextUrl
+    nextUrl: req.session.nextUrl,
+    defaultAdminUser: process.env.DEFAULT_ADMIN_USER || 'd5stadmin'
   });
 });
 
@@ -122,7 +123,8 @@ router.get('/auth/login', async (req, res) => {
       casdoorUnavailable: true,
       allowDevLogin,
       error: null,
-      nextUrl: req.session.nextUrl
+      nextUrl: req.session.nextUrl,
+      defaultAdminUser: process.env.DEFAULT_ADMIN_USER || 'd5stadmin'
     });
   }
 

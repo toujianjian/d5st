@@ -74,16 +74,18 @@ const SIGNUP_ITEMS = [
 
 async function ensureApplication() {
   // 探测已有应用：先 get-application，失败则回退 list-applications
-  // （get-application 在容器启动初期或并发场景会偶发返回 null/throw，
-  //  list-applications 经我们修复后端点稳定）
+  // 注意：该镜像里 application 行的 owner 固定为 'admin'（与 organization 一致，
+  // 见下方 update 分支的说明）。若这里传 C.organization（'d5st'）会永远查不到，
+  // 导致每次启动都重复「创建」应用、且后续读取恒为空。
   let existing = null;
   try {
-    existing = await casdoor.getApplication(C.organization, C.application);
+    existing = await casdoor.getApplication('admin', C.application);
   } catch (e) { /* ignore */ }
   if (!existing) {
     try {
-      const apps = await casdoor.listApplications(C.organization);
-      existing = apps.find(a => a.name === C.application) || null;
+      // list-applications 需按 owner 过滤，同样用 'admin'
+      const apps = await casdoor.listApplications('admin');
+      existing = (apps || []).find(a => a.name === C.application) || null;
     } catch (e) { /* ignore */ }
   }
   if (existing) {
@@ -279,62 +281,129 @@ async function ensureWebhook() {
   }
 }
 
-// 管理员用户：在 d5st 组织下创建 admin（密码 123）
+// 默认管理员账号/密码：在 d5st 组织下创建本地管理员。
 // 没有 d5st 组织用户时，d5st-app 的登录页（默认登 d5st 组织）输入 built-in 的
-// admin/123 会因为查无此人而静默失败——这是之前 OAuth 登录卡住的真正原因。
-async function ensureAdminUser() {
-  const name = 'admin';
-  let existing = null;
+// admin 会因为查无此人而静默失败——这是之前 OAuth 登录卡住的真正原因。
+//
+// 账号密码可用环境变量覆盖（DEFAULT_ADMIN_USER / DEFAULT_ADMIN_PASSWORD），
+// 未配置时用下列默认值。生产环境请务必改掉默认密码。
+const ADMIN_NAME = process.env.DEFAULT_ADMIN_USER || 'd5stadmin';
+const ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'd5stpassword';
+// 必须加入该组，本站 user-service 才认其为管理员（isAdminFromCasdoor）
+const ADMIN_GROUP = 'd5st-admin';
+
+// get-user 端点在本镜像里不稳定（新建用户后立刻查询常返回 null），
+// 统一走这里：先 get-user，取不到再用 list-users 兜底。
+async function findUser(org, name) {
   try {
-    existing = await casdoor.getUser(C.organization, name);
-  } catch (e) { /* get-user 端点可能不稳定，回退 list-users */ }
-  if (!existing) {
-    try {
-      const users = await casdoor.listUsers(C.organization);
-      existing = (users || []).find(u => u.name === name) || null;
-    } catch (e) { /* ignore */ }
+    const u = await casdoor.getUser(org, name);
+    if (u) return u;
+  } catch (e) { /* 回退 list-users */ }
+  try {
+    const users = await casdoor.listUsers(org);
+    return (users || []).find(u => u.name === name) || null;
+  } catch (e) {
+    return null;
   }
+}
+
+async function ensureAdminUser() {
+  const name = ADMIN_NAME;
+  const existing = await findUser(C.organization, name);
+
   if (existing) {
-    LOG(`用户 "${C.organization}/${name}" 已存在`);
-    return existing;
+    LOG(`用户 "${C.organization}/${name}" 已存在，同步密码与管理员组`);
+  } else {
+    try {
+      await casdoor.createUser({
+        owner: C.organization,
+        name,
+        displayName: '系统管理员',
+        type: 'normal-user',
+        password: ADMIN_PASSWORD,
+        email: `${name}@d5st.local`,
+        signupApplication: C.application,
+        isForbidden: false,
+        isDeleted: false
+      });
+      LOG(`用户 "${C.organization}/${name}" 创建成功`);
+    } catch (err) {
+      if (!/Duplicate entry|already exists/i.test(err.message)) {
+        ERR(`创建用户失败: ${err.message}`);
+        throw err;
+      }
+      LOG(`用户 "${C.organization}/${name}" 已存在（Duplicate，忽略）`);
+    }
   }
 
-  try {
-    await casdoor.createUser({
-      owner: C.organization,
-      name,
-      displayName: '系统管理员',
-      type: 'normal-user',
-      password: '123',
-      email: 'admin@d5st.local',
-      signupApplication: C.application,
-      isForbidden: false,
-      isDeleted: false
-    });
-    LOG(`用户 "${C.organization}/${name}" 创建成功（密码 123）`);
-  } catch (err) {
-    if (/Duplicate entry|already exists/i.test(err.message)) {
-      LOG(`用户 "${C.organization}/${name}" 已存在（Duplicate，忽略）`);
-    } else {
-      ERR(`创建用户失败: ${err.message}`);
-      throw err;
-    }
-  }
   // add-user 会把 password 字段原样入库（不哈希），这里用 bcrypt 预哈希后
-  // 再 update，保证登录校验（bcrypt 比对）可以通过
+  // 再 update，保证登录校验（bcrypt 比对）可以通过。
   try {
     const bcrypt = require('bcryptjs');
-    const hashed = bcrypt.hashSync('123', 10);
-    const user = await casdoor.getUser(C.organization, name);
-    if (user) {
-      user.password = hashed;
+    // 刚创建的用户可能尚未可读，重试几次再放弃
+    let user = null;
+    for (let i = 0; i < 5 && !user; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      user = await findUser(C.organization, name);
+      if (!user) await new Promise(r => setTimeout(r, 500));
+    }
+    if (!user) {
+      ERR(`用户 "${C.organization}/${name}" 读取失败，无法写入密码`);
+    } else {
+      user.password = bcrypt.hashSync(ADMIN_PASSWORD, 10);
       await casdoor.updateUser(user);
-      LOG(`用户 "${C.organization}/${name}" 密码哈希已写入`);
+      LOG(`用户 "${C.organization}/${name}" 密码已写入`);
     }
   } catch (e) {
-    ERR(`写入密码哈希失败: ${e.message}`);
+    ERR(`写入密码失败: ${e.message}`);
   }
-  return null;
+
+  // 组关系不走 API：当前 Casdoor 版本里 update-user 改 groups 会返回
+  // "Unauthorized operation"（字段级权限校验拦掉了，只改 password 却可以）。
+  // 直接更新 casdoor.user.groups 是可行的——写库后 Casdoor 的 get-user / userinfo
+  // 都能正确回读该组，本站据此授予管理员权限。
+  try {
+    const pool = require('./db');
+    await pool.query(
+      'UPDATE casdoor.user SET `groups` = ? WHERE owner = ? AND name = ?',
+      [JSON.stringify([ADMIN_GROUP]), C.organization, name]
+    );
+    LOG(`用户 "${C.organization}/${name}" 已加入组 "${ADMIN_GROUP}"`);
+  } catch (e) {
+    ERR(`写入管理员组失败: ${e.message}`);
+  }
+
+  const finalUser = await findUser(C.organization, name);
+
+  // 历史遗留：早期版本在此组织下创建过 username='admin' 的账号，
+  // 与新的默认管理员并存会造成困惑，这里做一次性清理。
+  // 注意 built-in 组织的 admin 是 Casdoor 自身管理员，绝不能动。
+  try {
+    const pool = require('./db');
+    if (name !== 'admin') {
+      const [delMap] = await pool.query(
+        "DELETE FROM casdoor_users WHERE username = 'admin'"
+      );
+      if (delMap.affectedRows > 0) LOG(`已清理本站映射表中的旧账号 "admin"`);
+      await casdoor.deleteUser(C.organization, 'admin').catch(() => {});
+      const [delCas] = await pool.query(
+        'DELETE FROM casdoor.user WHERE owner = ? AND name = ?',
+        [C.organization, 'admin']
+      );
+      if (delCas.affectedRows > 0) LOG(`已清理 Casdoor 中的旧账号 "${C.organization}/admin"`);
+    }
+    // 把映射表的占位 id 换成真实 Casdoor id，便于后续按 id 精确匹配
+    if (finalUser) {
+      await pool.query(
+        'UPDATE casdoor_users SET casdoor_user_id = ? WHERE username = ? AND casdoor_user_id = ?',
+        [String(finalUser.id), name, 'd5st_admin_seed']
+      );
+    }
+  } catch (e) {
+    ERR(`清理旧账号失败: ${e.message}`);
+  }
+
+  return finalUser;
 }
 
 // 主入口：按顺序执行初始化
