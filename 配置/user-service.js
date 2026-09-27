@@ -46,6 +46,42 @@ async function findOrCreateCasdoorUser(casdoorUser) {
   }
 
   const isAdmin = isAdminFromCasdoor(casdoorUser);
+
+  // 账号关联：本地可能已有同名用户（如 dev-login/种子数据创建的账号），
+  // casdoor_users.username 有唯一键，直接 INSERT 会撞 uniq_username。
+  // 此时把既有账号的 casdoor_user_id 绑定为本次 OAuth 身份，视为同一账号。
+  const [existingByName] = await pool.query(
+    'SELECT * FROM casdoor_users WHERE username = ? LIMIT 1',
+    [casdoorUser.name]
+  );
+  if (existingByName.length > 0) {
+    await pool.query(
+      `UPDATE casdoor_users
+       SET casdoor_user_id = ?,
+           real_name = COALESCE(?, real_name),
+           avatar = COALESCE(?, avatar),
+           email = COALESCE(?, email),
+           phone = COALESCE(?, phone),
+           is_admin = GREATEST(is_admin, ?),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        casdoorUserId,
+        casdoorUser.displayName || casdoorUser.friendlyName || null,
+        casdoorUser.avatar || null,
+        casdoorUser.email || null,
+        casdoorUser.phone || null,
+        isAdmin,
+        existingByName[0].id
+      ]
+    );
+    const [linked] = await pool.query(
+      'SELECT * FROM casdoor_users WHERE id = ?',
+      [existingByName[0].id]
+    );
+    return linked[0];
+  }
+
   const [result] = await pool.query(
     `INSERT INTO casdoor_users 
      (casdoor_user_id, username, real_name, avatar, email, phone, is_admin, created_at, updated_at)

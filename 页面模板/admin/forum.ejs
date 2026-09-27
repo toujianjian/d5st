@@ -53,7 +53,7 @@
                 <% } else { %>-<% } %>
               </td>
               <td style="font-size:12px;"><%= fmtDate(p.created_at) %></td>
-              <td><%= p.is_deleted ? '<span class="badge badge-danger">已删除</span>' : '<span class="badge badge-success">正常</span>' %></td>
+              <td><%- p.is_deleted ? '<span class="badge badge-danger">已删除</span>' : '<span class="badge badge-success">正常</span>' %></td>
               <td>
                 <% if (!p.is_deleted) { %>
                   <button class="btn btn-danger btn-sm" onclick="deletePost(<%= p.id %>)">删除</button>

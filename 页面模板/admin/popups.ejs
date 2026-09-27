@@ -66,7 +66,7 @@
               <td><%= p.id %></td>
               <td><%= p.title %></td>
               <td><%= p.target_pages %></td>
-              <td><%= p.is_active ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-default">停用</span>' %></td>
+              <td><%- p.is_active ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-default">停用</span>' %></td>
               <td><%= p.sort_order %></td>
               <td><a href="/admin/popups/edit/<%= p.id %>" class="btn btn-ghost btn-sm">编辑</a></td>
             </tr>

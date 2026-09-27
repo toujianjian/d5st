@@ -24,7 +24,7 @@
               <td><%= u.id %></td><td><%= u.username %></td><td><%= u.real_name || '-' %></td>
               <td><%= u.grade || '-' %></td><td><%= u.class_name || '-' %></td>
               <td><%= u.points %></td>
-              <td><%= u.is_admin ? '<span class="badge badge-warning">是</span>' : '-' %></td>
+              <td><%- u.is_admin ? '<span class="badge badge-warning">是</span>' : '-' %></td>
               <td><%= new Date(u.created_at).toLocaleDateString('zh-CN') %></td>
             </tr>
           <% }); %>

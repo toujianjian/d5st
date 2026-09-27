@@ -19,7 +19,10 @@ async function ensureOrganization() {
 
   LOG(`创建组织 "${C.organization}" ...`);
   const org = {
-    owner: 'built-in',
+    // 注意：此镜像版本的 Casdoor 里 organization 行的 owner 固定为 'admin'
+    // （built-in 组织也是 owner=admin）。写 'built-in' 会导致 add-user 等
+    // API 校验 getOrganization('admin', owner) 时报 "organization does not exist"
+    owner: 'admin',
     name: C.organization,
     displayName: 'D5ST 校园社区',
     websiteUrl: C.appUrl,
@@ -28,7 +31,12 @@ async function ensureOrganization() {
     // 密码策略：留空使用 Casdoor 默认值（旧代码传 passwordOptions 对象，
     // 但当前 casdoor:latest 镜像要求 passwordOptions 是 []string，
     // 会让 add-organization 返回 status:'error' 被静默吞掉）
-    passwordType: 'Default',
+    // 注意：Casdoor 新版本把 passwordType 字段重命名为 passwordObfuscatorType，
+    // 旧字段名会被静默忽略，导致前端 React 包加载时校验失败
+    // （错误："passwordObfuscatorType should not be undefined"）
+    // 登录校验只支持具体算法名，'Default' 会报 "unsupported password type"
+    passwordType: 'bcrypt',
+    passwordObfuscatorType: 'Plain',
     // 验证码：默认关闭（Casdoor 本地跑时 SMTP 通常未配置）
     // 若需要邮箱验证，请配置 Email Provider 后再打开
     enableSigninSessionExpiration: true,
@@ -104,8 +112,8 @@ async function ensureApplication() {
           (i.name === 'Email' || i.name === 'Display name') ? { ...i, required: false } : i
         );
         // Casdoor update-application 端点要从 id 解析 owner/name，
-        // listApplications 返回的对象 id 可能为空，显式补上
-        existing.id = `${C.organization}/${C.application}`;
+        // owner 固定 'admin'（见上方 create 分支说明）
+        existing.id = `admin/${C.application}`;
         await casdoor.updateApplication(existing);
         LOG(`应用 "${C.application}" URL + signupItems 已同步到当前配置`);
       } else {
@@ -116,7 +124,9 @@ async function ensureApplication() {
 
   LOG(`创建应用 "${C.application}" ...`);
   const app = {
-    owner: C.organization,
+    // 此镜像版本约定：application 是全局资源，owner 固定 'admin'，
+    // 通过 organization 字段关联组织（同 app-built-in 的存储方式）
+    owner: 'admin',
     name: C.application,
     displayName: 'D5ST 校园社区',
     logo: 'https://cdn.jsdelivr.net/gh/nextgis/d5st-logo/d5st-logo.png',
@@ -128,8 +138,10 @@ async function ensureApplication() {
     clientId: C.clientId,
     clientSecret: C.clientSecret,
     tokenFormat: 'JWT',
-    tokenExpireInHours: 24,
-    refreshTokenExpireInHours: 720,
+    // 字段名必须是 expireInHours / refreshExpireInHours：
+    // 旧写法 tokenExpireInHours 不被当前镜像识别，会存成 NULL → token 立即过期
+    expireInHours: 24,
+    refreshExpireInHours: 168,
     // 支持的登录方式：密码 + 手机/邮箱验证码
     grantTypes: ['authorization_code', 'refresh_token'],
     responseTypes: ['code'],
@@ -267,6 +279,64 @@ async function ensureWebhook() {
   }
 }
 
+// 管理员用户：在 d5st 组织下创建 admin（密码 123）
+// 没有 d5st 组织用户时，d5st-app 的登录页（默认登 d5st 组织）输入 built-in 的
+// admin/123 会因为查无此人而静默失败——这是之前 OAuth 登录卡住的真正原因。
+async function ensureAdminUser() {
+  const name = 'admin';
+  let existing = null;
+  try {
+    existing = await casdoor.getUser(C.organization, name);
+  } catch (e) { /* get-user 端点可能不稳定，回退 list-users */ }
+  if (!existing) {
+    try {
+      const users = await casdoor.listUsers(C.organization);
+      existing = (users || []).find(u => u.name === name) || null;
+    } catch (e) { /* ignore */ }
+  }
+  if (existing) {
+    LOG(`用户 "${C.organization}/${name}" 已存在`);
+    return existing;
+  }
+
+  try {
+    await casdoor.createUser({
+      owner: C.organization,
+      name,
+      displayName: '系统管理员',
+      type: 'normal-user',
+      password: '123',
+      email: 'admin@d5st.local',
+      signupApplication: C.application,
+      isForbidden: false,
+      isDeleted: false
+    });
+    LOG(`用户 "${C.organization}/${name}" 创建成功（密码 123）`);
+  } catch (err) {
+    if (/Duplicate entry|already exists/i.test(err.message)) {
+      LOG(`用户 "${C.organization}/${name}" 已存在（Duplicate，忽略）`);
+    } else {
+      ERR(`创建用户失败: ${err.message}`);
+      throw err;
+    }
+  }
+  // add-user 会把 password 字段原样入库（不哈希），这里用 bcrypt 预哈希后
+  // 再 update，保证登录校验（bcrypt 比对）可以通过
+  try {
+    const bcrypt = require('bcryptjs');
+    const hashed = bcrypt.hashSync('123', 10);
+    const user = await casdoor.getUser(C.organization, name);
+    if (user) {
+      user.password = hashed;
+      await casdoor.updateUser(user);
+      LOG(`用户 "${C.organization}/${name}" 密码哈希已写入`);
+    }
+  } catch (e) {
+    ERR(`写入密码哈希失败: ${e.message}`);
+  }
+  return null;
+}
+
 // 主入口：按顺序执行初始化
 // 返回值：{ ok, org, app, appClientId, appClientSecret, warnings: [] }
 async function initCasdoor() {
@@ -307,6 +377,7 @@ async function initCasdoor() {
     await ensureUserGroup('d5st-moderator', 'D5ST 版主', '论坛内容审核');
     await ensureUserGroup('d5st-user', 'D5ST 普通用户', '社区普通用户');
     await ensureWebhook();
+    await ensureAdminUser();
     result.ok = true;
     LOG('Casdoor 初始化全部完成');
     if (result.appClientId && result.appClientId !== C.clientId) {

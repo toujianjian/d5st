@@ -98,7 +98,10 @@ function getAuthUrl(extra = {}) {
     // `${C.organization}:${C.application}`（"d5st:d5st-app"，其实是 app 自身标识）
     // 当作 scope 拼进去，不在 allowed 列表，导致 authorize 返回 Invalid scope。
     const scope = encodeURIComponent(`profile email offline_access`);
-  const state = (extra.state || Math.random().toString(36).slice(2)) + '-' + Date.now();
+  // state 必须原样使用：调用方（/auth/login 等）已把它存入 session 做 CSRF 校验，
+  // 若在这里追加 '-时间戳'，回调拿到的 state 与 session 不一致，必然报 csrf_failed
+  // （此前真实 OAuth 登录一直失败的根因）
+  const state = extra.state || Math.random().toString(36).slice(2);
   return `${C.publicEndpoint}/login/oauth/authorize` +
     `?client_id=${C.clientId}` +
     `&response_type=code` +
@@ -108,17 +111,21 @@ function getAuthUrl(extra = {}) {
     `&prompt=${extra.prompt || 'consent'}`;
 }
 
+// token 端点用 beego 的 Input().Get() 取参，只解析 query 和 form-urlencoded
+// body，不解析 JSON —— 用 JSON 会被当成空参数而报 400
+const FORM = { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 10000 };
+
 async function getToken(code, redirectUri) {
   const { data } = await axios.post(
     `${C.endpoint}/api/login/oauth/access_token`,
-    {
+    new URLSearchParams({
       grant_type: 'authorization_code',
       code,
       client_id: C.clientId,
       client_secret: C.clientSecret,
       redirect_uri: redirectUri || `${C.appUrl}/auth/callback`
-    },
-    { timeout: 10000 }
+    }),
+    FORM
   );
   return data;
 }
@@ -126,14 +133,14 @@ async function getToken(code, redirectUri) {
 async function refreshToken(refreshTokenValue) {
   const { data } = await axios.post(
     `${C.endpoint}/api/login/oauth/access_token`,
-    {
+    new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshTokenValue,
       client_id: C.clientId,
       client_secret: C.clientSecret,
       redirect_uri: `${C.appUrl}/auth/callback`
-    },
-    { timeout: 10000 }
+    }),
+    FORM
   );
   return data;
 }
@@ -143,6 +150,11 @@ async function getUserInfo(accessToken) {
     headers: { 'Authorization': `Bearer ${accessToken}` },
     timeout: 10000
   });
+  // /api/get-account 返回包装结构 {status, sub, name, data: <user>}，
+  // 真正的用户对象（含 id/name/displayName 等）在 data.data 里
+  if (data && data.data && typeof data.data === 'object' && data.data.id) {
+    return data.data;
+  }
   return data;
 }
 

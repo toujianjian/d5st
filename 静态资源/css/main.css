@@ -2410,6 +2410,50 @@ body.page-body.night-mode {
   color: #e0e6ed;
 }
 
+/* 玻璃拟态变量在夜间必须换成深色底。
+   否则 --glass-bg: rgba(255,255,255,.25) 会在深色背景上呈现一层灰白雾，
+   .glass-header / .link-card / .doc-btn / .user-sidebar 全部会「发灰看不清」。 */
+body.page-body.night-mode {
+  --glass-bg: rgba(26, 31, 53, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --text-dark: #e0e6ed;
+  --text-light: rgba(224, 230, 237, 0.75);
+}
+
+/* 左下角「首页」悬浮按钮：深色玻璃 + 浅色文字 */
+body.page-body.night-mode .doc-btn {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  color: #e0e6ed;
+}
+
+body.page-body.night-mode .doc-btn:hover {
+  background: #00ff88;
+  border-color: #00ff88;
+  color: #0a0e17;
+}
+
+/* 用户侧栏：默认是红色渐变，夜间换成深色玻璃保持一致 */
+body.page-body.night-mode .user-sidebar {
+  background: linear-gradient(180deg,
+      rgba(26, 31, 53, 0.95) 0%,
+      rgba(10, 14, 23, 0.98) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 通用玻璃卡片（首页快捷链接、引导卡等） */
+body.page-body.night-mode .link-card {
+  background: var(--glass-bg);
+  border-color: var(--glass-border);
+  color: #e0e6ed;
+}
+
+body.page-body.night-mode .link-card:hover {
+  background: rgba(26, 31, 53, 0.95);
+  border-color: rgba(0, 255, 136, 0.45);
+}
+
 body.page-body.night-mode::before {
   background-image:
     radial-gradient(ellipse 50% 40% at 10% 20%, rgba(0, 255, 136, 0.1) 0%, transparent 60%),
@@ -2431,16 +2475,39 @@ body.page-body.night-mode .card {
   border-color: rgba(0, 255, 136, 0.15);
 }
 
-body.page-body.night-mode .site-header {
-  background: rgba(10, 14, 23, 0.95);
+/* 顶部导航：实际结构用的是 .glass-header（.site-header 是遗留类名，
+   只写后者会导致夜间模式下导航文字仍是深灰、几乎不可读）。 */
+body.page-body.night-mode .site-header,
+body.page-body.night-mode .glass-header {
+  background: rgba(10, 14, 23, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-body.page-body.night-mode .site-header a {
+body.page-body.night-mode .site-header a,
+body.page-body.night-mode .glass-header a {
   color: #e0e6ed;
 }
 
-body.page-body.night-mode .site-header a:hover {
+body.page-body.night-mode .site-header a:hover,
+body.page-body.night-mode .glass-header a:hover {
   color: #00ff88;
+}
+
+/* 当前页高亮：夜间模式下红色在深底上偏暗，提亮一档 */
+body.page-body.night-mode .glass-header a.active {
+  color: #ff5252;
+  background: rgba(255, 82, 82, 0.14);
+}
+
+/* 登录/注册按钮保持实心红，白字在深色底上对比度足够 */
+body.page-body.night-mode .glass-header a.nav-login {
+  color: #ffffff;
+}
+
+/* 底部版本条：胶囊底在深色下用深色玻璃，避免白底方块压在暗背景上 */
+body.page-body.night-mode .footer-version {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(224, 230, 237, 0.75);
 }
 
 body.page-body.night-mode .btn.primary {
@@ -3584,11 +3651,13 @@ body.page-body.night-mode .note-content {
 }
 
 /* 隐藏成就墙 */
+/* 注意：原来 bottom:20px 居中，与 .site-footer(bottom:10px 居中) 位置重叠，
+   两个 fixed 元素会互相压字。这里上移到底部版本条之上，靠右下角摆放。 */
 .hidden-achievements {
   position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: 56px;
+  right: 20px;
+  z-index: 190;
 }
 
 .hidden-achievements-trigger {
@@ -3610,8 +3679,8 @@ body.page-body.night-mode .note-content {
 .hidden-achievements-panel {
   position: absolute;
   bottom: 50px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* 触发器已改为右下角定位，面板与之右对齐展开，避免超出视口 */
+  right: 0;
   background: #fff;
   border-radius: 16px;
   padding: 20px;
@@ -3626,8 +3695,8 @@ body.page-body.night-mode .note-content {
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .hidden-achievements-panel h3 {

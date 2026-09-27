@@ -50,12 +50,28 @@ router.get('/forum', async (req, res) => {
 
 router.post('/forum/delete/:id', async (req, res) => {
   try {
+    const [rows] = await pool.query('SELECT * FROM forum_posts WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: '帖子不存在' });
     await pool.query('UPDATE forum_posts SET is_deleted = 1 WHERE id = ?', [req.params.id]);
+    await moveToRecycleBin('post', req.params.id, rows[0], req);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '删除失败' });
   }
 });
+
+// 写入回收站：软删内容同时快照原数据到 deleted_items，
+// 使 /admin/recycle-bin 的恢复/彻底删除真正可用（此前该表从不被写入，回收站永远为空）
+async function moveToRecycleBin(itemType, itemId, rowData, req) {
+  await pool.query(
+    'DELETE FROM deleted_items WHERE item_type = ? AND item_id = ? AND is_restored = 0',
+    [itemType, itemId]
+  );
+  await pool.query(
+    'INSERT INTO deleted_items (item_type, item_id, deleted_by, data) VALUES (?, ?, ?, ?)',
+    [itemType, itemId, req.session?.user?.id || null, JSON.stringify(rowData)]
+  );
+}
 
 // 评论管理
 router.get('/comments', async (req, res) => {
@@ -75,7 +91,10 @@ router.get('/comments', async (req, res) => {
 
 router.post('/comments/delete/:id', async (req, res) => {
   try {
+    const [rows] = await pool.query('SELECT * FROM post_comments WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: '评论不存在' });
     await pool.query('UPDATE post_comments SET is_deleted = 1 WHERE id = ?', [req.params.id]);
+    await moveToRecycleBin('comment', req.params.id, rows[0], req);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '删除失败' });
@@ -147,7 +166,10 @@ router.get('/videos', async (req, res) => {
 
 router.post('/videos/delete/:id', async (req, res) => {
   try {
+    const [rows] = await pool.query('SELECT * FROM video_posts WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: '视频不存在' });
     await pool.query('UPDATE video_posts SET is_deleted = 1 WHERE id = ?', [req.params.id]);
+    await moveToRecycleBin('video', req.params.id, rows[0], req);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '操作失败' });

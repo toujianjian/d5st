@@ -3,12 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <title><%= title && title !== siteTitle ? (title + ' - ' + siteTitle) : siteTitle %></title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="D5ST 校园社区 - 连接每一位同学，共享校园生活" />
   <!-- 字体：优先使用本地已装的思源宋体/站酷小薇，未安装时回退系统衬线体，避免外部 CDN 拖慢首屏 -->
   <link rel="stylesheet" href="/public/font-awesome/all.min.css" />
   <link rel="stylesheet" href="/public/css/main.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+  <script>
+    /* 夜间模式偏好：在样式表解析前同步恢复，避免刷新时先闪一下浅色再变深 */
+    (function () {
+      try {
+        if (localStorage.getItem('d5st-theme') === 'night') {
+          document.documentElement.classList.add('dark-pref');
+          document.addEventListener('DOMContentLoaded', function () {
+            document.body.classList.add('night-mode');
+          });
+        }
+      } catch (e) { /* 隐私模式下 localStorage 不可用，忽略 */ }
+    })();
+  </script>
   <style>
     :root {
       --primary: #d32f2f;
@@ -30,16 +43,29 @@
       font-family: 'Noto Serif SC', serif;
       background: linear-gradient(135deg, #fff5f5 0%, #ffe4e4 50%, #fff0f0 100%);
       min-height: 100vh;
+      min-height: 100dvh;
       color: var(--text-dark);
-      overflow: hidden;
+      /* 桌面端滚动交给 .main-wrapper 内部，锁住 body 避免出现双滚动条；
+         但只锁纵向，横向溢出仍要裁掉（滑入动画会溢出）。 */
+      overflow-x: hidden;
+      overflow-y: hidden;
+    }
+    /* 移动端放开纵向滚动：地址栏收缩会改变视口高度，
+       body 锁死纵向时会出现「滚到底仍有内容被裁」的问题。 */
+    @media (max-width: 1024px) {
+      body { overflow-y: auto; }
     }
     .main-wrapper {
       display: flex;
       flex: 1;
       min-width: 0;
       margin-left: 260px;
+      /* 100vh 在移动端会包含地址栏高度，地址栏收缩/展开时底部内容被裁。
+         100dvh 是动态视口高度，两端一致；旧浏览器回退 100vh。 */
       height: 100vh;
+      height: 100dvh;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       animation: slideInRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
     @keyframes slideInRight {
@@ -192,13 +218,17 @@
     .doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); transform: translateY(-2px); }
     .doc-btn i { font-size: 16px; }
     .notification-ball { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; align-items: center; }
+    /* 页脚随内容滚动，位于页面最底部（不再是 fixed 悬浮层，避免盖住内容） */
     .site-footer {
-      position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
       display: flex; gap: 16px;
+      align-items: center; justify-content: center;
+      padding: 24px 0 20px;
       font-size: 12px; color: rgba(150, 150, 150, 0.6);
-      z-index: 100; pointer-events: none;
     }
     .footer-version { background: rgba(100, 100, 100, 0.1); padding: 4px 10px; border-radius: 10px; }
+    /* 首屏防闪烁：在 CSS 加载前就按已保存的偏好决定是否夜间，避免闪一下白。
+       色值需与 main.css 的 night-mode 底色保持一致（#0a0e17）。 */
+    html.dark-pref body { background: #0a0e17; }
     .footer-lv {
       background: linear-gradient(135deg, #ffd700, #ff6b35);
       -webkit-background-clip: text; background-clip: text;
@@ -283,13 +313,18 @@
     }
     .popup-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
     @media (max-width: 1024px) {
-      .main-wrapper { margin-left: 0; margin-top: 50px; }
+      /* 移动端顶栏是 fixed 的 50px 高。若仍用 height:100dvh，元素顶部下移 50px 后
+         总高会超出视口 50px，底部内容永远滚不到。这里改为「视口高 - 顶栏高」。 */
+      .main-wrapper {
+        margin-left: 0;
+        margin-top: 50px;
+        height: calc(100vh - 50px);
+        height: calc(100dvh - 50px);
+        animation: none; /* 移动端横向滑入动画会带来横向溢出，关掉 */
+      }
       .user-sidebar { display: none; }
       .doc-btn { display: none; }
       .glass-header { display: none; }
-    }
-    @media (max-width: 768px) {
-      .site-footer { display: none; }
     }
     .mobile-nav {
       display: none;
@@ -306,11 +341,14 @@
     }
     .mobile-nav-btn {
       color: white; text-decoration: none; font-size: 14px;
-      display: flex; align-items: center; gap: 5px;
-      padding: 8px 12px;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      /* 触控目标最小 44px（WCAG 建议值），原来仅约 34px，手指易点偏 */
+      min-width: 44px; min-height: 44px;
+      padding: 0 12px;
       background: rgba(255,255,255,0.2);
       border-radius: 20px;
       flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
     }
     .mobile-nav-menu {
       display: flex; align-items: center; gap: 8px;
@@ -321,20 +359,37 @@
     .mobile-nav-menu::-webkit-scrollbar { display: none; }
     .mobile-nav-link {
       color: white; text-decoration: none; font-size: 13px;
-      display: flex; align-items: center; gap: 5px;
-      padding: 7px 12px;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      /* 同顶栏首页按钮：撑到 44px 高，保证手指可稳定点击 */
+      min-height: 44px;
+      padding: 0 14px;
       background: rgba(255,255,255,0.15);
       border: 1px solid rgba(255,255,255,0.18);
       border-radius: 20px;
       white-space: nowrap; flex-shrink: 0;
       transition: all 0.25s ease;
+      -webkit-tap-highlight-color: transparent;
     }
     .mobile-nav-link:hover, .mobile-nav-link.active {
       background: rgba(255,255,255,0.32);
     }
     .mobile-nav-link i { font-size: 12px; }
     .mobile-nav-title { color: white; font-size: 16px; font-weight: 600; }
-    body.page-body { overflow: auto; }
+    /* 横屏手机：视口高度很小（约 375～430px），顶栏会吃掉大量竖向空间，
+       这里把顶栏压扁到 44px，并同步收紧内容区上边距与内边距。 */
+    @media (max-width: 1024px) and (max-height: 480px) and (orientation: landscape) {
+      .mobile-nav { height: 44px; }
+      .mobile-nav-btn, .mobile-nav-link { min-height: 36px; }
+      .main-wrapper {
+        margin-top: 44px;
+        height: calc(100vh - 44px);
+        height: calc(100dvh - 44px);
+      }
+    }
+    /* iPhone 刘海屏：底部横条区域让出安全距离，避免页脚被手势条遮挡 */
+    @supports (padding: env(safe-area-inset-bottom)) {
+      .site-footer { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+    }
     /* 后台页面自带侧边栏，隐藏全局用户侧栏并收起左边距，避免出现两个侧栏 */
     body.admin-mode .user-sidebar { display: none; }
     body.admin-mode .main-wrapper { margin-left: 0; }
@@ -424,6 +479,12 @@
 
   <div class="main-wrapper" id="mainWrapper">
     <%- body %>
+    <div class="site-footer">
+      <span class="footer-version">D5ST v1.0</span>
+      <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+      <span class="footer-lv">LV.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+      <% } %>
+    </div>
   </div>
 
   <script>
@@ -504,9 +565,34 @@
       } catch (e) { /* ignore */ }
     }
 
-    document.querySelector('.mode-toggle')?.addEventListener('click', function() {
-      document.body.classList.toggle('night-mode');
-    });
+    /* 夜间模式切换：写入 localStorage 持久化，并同步按钮图标 */
+    (function () {
+      var toggles = document.querySelectorAll('.mode-toggle');
+      if (!toggles.length) return;
+
+      function syncIcons() {
+        var isNight = document.body.classList.contains('night-mode');
+        toggles.forEach(function (btn) {
+          var icon = btn.querySelector('i');
+          if (icon) {
+            icon.className = isNight ? 'fas fa-sun' : 'fas fa-moon';
+          }
+          btn.setAttribute('title', isNight ? '切换日间模式' : '切换夜间模式');
+        });
+      }
+
+      toggles.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var isNight = document.body.classList.toggle('night-mode');
+          try {
+            localStorage.setItem('d5st-theme', isNight ? 'night' : 'day');
+          } catch (e) { /* ignore */ }
+          syncIcons();
+        });
+      });
+
+      syncIcons();
+    })();
   </script>
 
   <% if (typeof currentUser !== 'undefined' && currentUser) { %>
@@ -521,11 +607,5 @@
   </div>
   <% } %>
 
-  <div class="site-footer">
-    <span class="footer-version">D5ST v1.0</span>
-    <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-    <span class="footer-lv">LV.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
-    <% } %>
-  </div>
 </body>
 </html>

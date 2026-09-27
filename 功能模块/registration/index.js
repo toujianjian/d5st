@@ -195,6 +195,7 @@ router.get('/auth/callback', async (req, res) => {
   try {
     const tokenData = await casdoor.getToken(code);
     if (!tokenData || !tokenData.access_token) {
+      ERR(`token 交换未返回 access_token: ${JSON.stringify(tokenData).slice(0, 300)}`);
       return res.redirect('/login?error=auth_failed');
     }
 
@@ -205,6 +206,7 @@ router.get('/auth/callback', async (req, res) => {
     // 换取用户信息
     const casdoorUser = await casdoor.getUserInfo(access_token);
     if (!casdoorUser || !casdoorUser.id) {
+      ERR(`getUserInfo 未返回用户对象: ${JSON.stringify(casdoorUser).slice(0, 300)}`);
       return res.redirect('/login?error=auth_failed');
     }
 

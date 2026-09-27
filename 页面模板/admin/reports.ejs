@@ -34,7 +34,7 @@
               <td><%= r.reporter_name %></td>
               <td><%= r.reason %></td>
               <td><%= new Date(r.created_at).toLocaleString('zh-CN') %></td>
-              <td><%= r.status === 'pending' ? '<span class="badge badge-warning">待处理</span>' : '<span class="badge badge-success">已处理</span>' %></td>
+              <td><%- r.status === 'pending' ? '<span class="badge badge-warning">待处理</span>' : '<span class="badge badge-success">已处理</span>' %></td>
               <td>
                 <% if (r.status === 'pending') { %>
                   <form method="POST" action="/admin/reports/<%= r.id %>/handle" style="display:inline;">
