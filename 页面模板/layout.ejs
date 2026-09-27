@@ -191,6 +191,21 @@
       box-shadow: 0 4px 15px rgba(211, 47, 47, 0.3);
     }
     .user-name { text-align: center; font-size: 20px; font-weight: 700; color: white; margin-bottom: 8px; }
+    /* 未登录态：头像转成虚线轮廓的占位，弱化视觉重量 */
+    .guest-avatar {
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px dashed rgba(255, 255, 255, 0.45);
+      box-shadow: none;
+      font-size: 32px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+    .guest-hint {
+      text-align: center; font-size: 12px; line-height: 1.6;
+      color: rgba(255, 255, 255, 0.7);
+      padding: 0 8px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      margin-bottom: 4px;
+    }
     .user-stats {
       display: flex; justify-content: space-around;
       padding: 16px 0;
@@ -202,7 +217,8 @@
     .stat-num { font-size: 18px; font-weight: 700; color: white; }
     .stat-label { font-size: 12px; color: rgba(255, 255, 255, 0.8); }
     .doc-btn {
-      /* 原来固定在右上角，会压住各页面的标题与操作按钮，移到左下角 */
+      /* 原来固定在右上角，会压住各页面的标题与操作按钮，移到左下角。
+         位置由 JS 接管：拖动后写入 left/top，并用 localStorage 记住。 */
       position: fixed; bottom: 20px; left: 20px; z-index: 200;
       display: flex; align-items: center; gap: 8px;
       padding: 10px 20px;
@@ -213,28 +229,21 @@
       color: var(--text-dark); text-decoration: none;
       font-size: 14px; font-weight: 500;
       box-shadow: var(--shadow-soft);
-      transition: all 0.3s ease;
+      transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+      cursor: grab;
+      /* 触屏上禁止浏览器接管手势，否则拖动会变成滚动页面 */
+      touch-action: none;
+      user-select: none; -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); transform: translateY(-2px); }
+    /* 拖动中：禁止过渡动画，否则会跟手迟滞；并提示抓取状态 */
+    .doc-btn.dragging { transition: none; cursor: grabbing; }
+    .doc-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
     .doc-btn i { font-size: 16px; }
     .notification-ball { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; align-items: center; }
-    /* 页脚随内容滚动，位于页面最底部（不再是 fixed 悬浮层，避免盖住内容） */
-    .site-footer {
-      display: flex; gap: 16px;
-      align-items: center; justify-content: center;
-      padding: 24px 0 20px;
-      font-size: 12px; color: rgba(150, 150, 150, 0.6);
-    }
-    .footer-version { background: rgba(100, 100, 100, 0.1); padding: 4px 10px; border-radius: 10px; }
     /* 首屏防闪烁：在 CSS 加载前就按已保存的偏好决定是否夜间，避免闪一下白。
        色值需与 main.css 的 night-mode 底色保持一致（#0a0e17）。 */
     html.dark-pref body { background: #0a0e17; }
-    .footer-lv {
-      background: linear-gradient(135deg, #ffd700, #ff6b35);
-      -webkit-background-clip: text; background-clip: text;
-      -webkit-text-fill-color: transparent;
-      font-weight: 600;
-    }
     .notification-btn {
       width: 56px; height: 56px; border-radius: 50%;
       background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -386,10 +395,6 @@
         height: calc(100dvh - 44px);
       }
     }
-    /* iPhone 刘海屏：底部横条区域让出安全距离，避免页脚被手势条遮挡 */
-    @supports (padding: env(safe-area-inset-bottom)) {
-      .site-footer { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
-    }
     /* 后台页面自带侧边栏，隐藏全局用户侧栏并收起左边距，避免出现两个侧栏 */
     body.admin-mode .user-sidebar { display: none; }
     body.admin-mode .main-wrapper { margin-left: 0; }
@@ -441,9 +446,10 @@
     </div>
   </div>
 
-  <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+  <% var isLoggedIn = (typeof currentUser !== 'undefined' && currentUser); %>
   <aside class="user-sidebar" id="userSidebar">
     <div class="sidebar-content">
+      <% if (isLoggedIn) { %>
       <div class="user-avatar"><%= currentUser.real_name ? currentUser.real_name.charAt(0) : (currentUser.username || 'U').charAt(0) %></div>
       <div class="user-name"><%= currentUser.real_name || currentUser.username || '用户' %></div>
       <div class="user-stats">
@@ -473,18 +479,26 @@
         <% } %>
         <a href="/logout" class="quick-action-btn"><i class="fas fa-sign-out-alt"></i> 退出</a>
       </div>
+      <% } else { %>
+      <%# 未登录：侧栏保留（导航入口仍在），仅把用户区替换为「未登录」提示 %>
+      <div class="user-avatar guest-avatar"><i class="fas fa-user"></i></div>
+      <div class="user-name">未登录</div>
+      <div class="guest-hint">登录后可查看帖子、私信与个人数据</div>
+      <div class="quick-actions">
+        <a href="/" class="quick-action-btn"><i class="fas fa-home"></i> 首页</a>
+        <a href="/forum" class="quick-action-btn"><i class="fas fa-comment-dots"></i> 贴吧</a>
+        <a href="/secret" class="quick-action-btn"><i class="fas fa-key"></i> 保密号</a>
+        <a href="/sponsor" class="quick-action-btn"><i class="fas fa-heart"></i> 赞助</a>
+        <a href="/messages/guestbook" class="quick-action-btn"><i class="fas fa-book"></i> 留言板</a>
+        <a href="/search" class="quick-action-btn"><i class="fas fa-search"></i> 搜索</a>
+        <a href="/login" class="quick-action-btn"><i class="fas fa-sign-in-alt"></i> 登录 / 注册</a>
+      </div>
+      <% } %>
     </div>
   </aside>
-  <% } %>
 
   <div class="main-wrapper" id="mainWrapper">
     <%- body %>
-    <div class="site-footer">
-      <span class="footer-version">D5ST v1.0</span>
-      <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-      <span class="footer-lv">LV.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
-      <% } %>
-    </div>
   </div>
 
   <script>
@@ -592,6 +606,127 @@
       });
 
       syncIcons();
+    })();
+
+    /* 首页悬浮按钮：支持鼠标/触屏拖动，位置记入 localStorage。
+       关键点：
+       1. 拖动与点击要区分——位移超过阈值(5px)才判定为拖动，并阻止随后的 click 跳转；
+       2. 位置用 left/top 绝对像素，写入前夹紧在视口内，避免被拖出屏幕后找不回来；
+       3. 窗口尺寸变化时重新夹紧，防止缩小窗口后按钮跑到可视区外。 */
+    (function () {
+      var btn = document.querySelector('.doc-btn');
+      if (!btn) return;
+
+      var STORAGE_KEY = 'd5st-docbtn-pos';
+      var DRAG_THRESHOLD = 5;   // 判定为拖动的位移阈值(px)
+      var MARGIN = 8;           // 距视口边缘的最小间距
+
+      var dragging = false;
+      var moved = false;
+      var startX = 0, startY = 0;
+      var startLeft = 0, startTop = 0;
+
+      function clamp(val, max) {
+        if (max < MARGIN) return MARGIN; // 视口过窄时的兜底
+        return Math.min(Math.max(val, MARGIN), max - MARGIN);
+      }
+
+      /* 用 left/top 定位，同时清掉原有的 bottom，避免两套定位互相打架 */
+      function place(left, top) {
+        var maxLeft = window.innerWidth - btn.offsetWidth;
+        var maxTop = window.innerHeight - btn.offsetHeight;
+        var l = clamp(left, maxLeft);
+        var t = clamp(top, maxTop);
+        btn.style.left = l + 'px';
+        btn.style.top = t + 'px';
+        btn.style.bottom = 'auto';
+      }
+
+      function save() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            left: btn.style.left,
+            top: btn.style.top
+          }));
+        } catch (e) { /* 隐私模式忽略 */ }
+      }
+
+      /* 还原上次拖动的位置；数据损坏或越界时回落到默认左下角 */
+      (function restore() {
+        var saved = null;
+        try {
+          saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        } catch (e) { /* 忽略损坏数据 */ }
+        if (saved && saved.left && saved.top) {
+          btn.style.left = saved.left;
+          btn.style.top = saved.top;
+          btn.style.bottom = 'auto';
+          place(parseFloat(saved.left), parseFloat(saved.top));
+        }
+      })();
+
+      function onDown(e) {
+        // 只响应鼠标左键；触屏事件无 button 字段
+        if (e.type === 'mousedown' && e.button !== 0) return;
+        var point = e.touches ? e.touches[0] : e;
+        var rect = btn.getBoundingClientRect();
+
+        dragging = true;
+        moved = false;
+        startX = point.clientX;
+        startY = point.clientY;
+        startLeft = rect.left;
+        startTop = rect.top;
+
+        btn.classList.add('dragging');
+        // 触屏拖动时阻止页面滚动
+        if (e.cancelable) e.preventDefault();
+      }
+
+      function onMove(e) {
+        if (!dragging) return;
+        var point = e.touches ? e.touches[0] : e;
+        var dx = point.clientX - startX;
+        var dy = point.clientY - startY;
+
+        if (!moved && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
+          moved = true;
+        }
+        if (!moved) return;
+
+        place(startLeft + dx, startTop + dy);
+        if (e.cancelable) e.preventDefault();
+      }
+
+      function onUp() {
+        if (!dragging) return;
+        dragging = false;
+        btn.classList.remove('dragging');
+        if (moved) save();
+      }
+
+      btn.addEventListener('mousedown', onDown);
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      btn.addEventListener('touchstart', onDown, { passive: false });
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onUp);
+
+      /* 拖动过就不能再触发点击跳转——否则松手瞬间会跳回首页 */
+      btn.addEventListener('click', function (e) {
+        if (moved) {
+          e.preventDefault();
+          e.stopPropagation();
+          moved = false;
+        }
+      });
+
+      window.addEventListener('resize', function () {
+        if (btn.style.left && btn.style.top) {
+          place(parseFloat(btn.style.left), parseFloat(btn.style.top));
+          save();
+        }
+      });
     })();
   </script>
 
