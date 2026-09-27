@@ -332,8 +332,13 @@
         animation: none; /* 移动端横向滑入动画会带来横向溢出，关掉 */
       }
       .user-sidebar { display: none; }
-      .doc-btn { display: none; }
       .glass-header { display: none; }
+      /* 移动端保留首页按钮并支持拖动。
+         默认位置抬高到底部安全区之上，避开 iOS 手势条与右下角通知球。 */
+      .doc-btn {
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        left: 16px;
+      }
     }
     .mobile-nav {
       display: none;
@@ -394,6 +399,8 @@
         height: calc(100vh - 44px);
         height: calc(100dvh - 44px);
       }
+      /* 横屏竖向空间紧张，首页按钮收成圆形小尺寸，减少对内容的遮挡 */
+      .doc-btn { padding: 8px 12px; font-size: 13px; bottom: 12px; left: 12px; }
     }
     /* 后台页面自带侧边栏，隐藏全局用户侧栏并收起左边距，避免出现两个侧栏 */
     body.admin-mode .user-sidebar { display: none; }
@@ -612,12 +619,15 @@
        关键点：
        1. 拖动与点击要区分——位移超过阈值(5px)才判定为拖动，并阻止随后的 click 跳转；
        2. 位置用 left/top 绝对像素，写入前夹紧在视口内，避免被拖出屏幕后找不回来；
-       3. 窗口尺寸变化时重新夹紧，防止缩小窗口后按钮跑到可视区外。 */
+       3. 窗口尺寸变化时重新夹紧，防止缩小窗口后按钮跑到可视区外；
+       4. 桌面端与移动端分开存储：两边视口尺寸差异大，共用一份位置会互相挤到角落。 */
     (function () {
       var btn = document.querySelector('.doc-btn');
       if (!btn) return;
 
-      var STORAGE_KEY = 'd5st-docbtn-pos';
+      // 按指针类型区分存储位置（触屏设备 vs 鼠标），避免两端互相污染
+      var IS_TOUCH = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      var STORAGE_KEY = IS_TOUCH ? 'd5st-docbtn-pos-touch' : 'd5st-docbtn-pos';
       var DRAG_THRESHOLD = 5;   // 判定为拖动的位移阈值(px)
       var MARGIN = 8;           // 距视口边缘的最小间距
 
