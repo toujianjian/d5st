@@ -22,6 +22,8 @@ refs
 # 本地 Casdoor 数据与 docker 辅助目录（沿用原有规则）
 casdoor-data
 .docker
+# Casdoor 前端补丁脚本(patch/inspect/verify)需进镜像，仅排除导出的大体积前端副本
+docker/casdoor-basepath/.tmp-web/
 
 # 测试与文档（不进生产镜像）
 测试

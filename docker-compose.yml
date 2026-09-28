@@ -29,7 +29,10 @@ services:
       start_period: 20s
 
   casdoor:
-    image: casbin/casdoor:latest
+    # 自定义镜像：基于官方镜像，给自带前端打 /casdoor 子路径补丁（见 docker/casdoor/Dockerfile）
+    build:
+      context: .
+      dockerfile: docker/casdoor/Dockerfile
     container_name: d5st-casdoor
     restart: unless-stopped
     # 镜像无 wget/curl 做 healthcheck；MySQL 偶尔比 casdoor 慢一拍，
@@ -42,8 +45,7 @@ services:
       dbName: casdoor
       GIN_MODE: release
       TZ: Asia/Shanghai
-    ports:
-      - "${CASDOOR_PORT:-8000}:8000"
+    # 不再直连对外：统一由 Caddy 在 /casdoor 子路径暴露
     volumes:
       - casdoor_data:/data
     depends_on:
@@ -78,7 +80,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-d5st}
       CASDOOR_ENDPOINT: ${CASDOOR_ENDPOINT:-http://d5st-casdoor:8000}
       # 用户浏览器实际跳转的 Casdoor 公网地址；本地开发填 http://localhost:8000
-      CASDOOR_PUBLIC_ENDPOINT: ${CASDOOR_PUBLIC_ENDPOINT:-http://localhost:8000}
+      # 用户浏览器实际跳转的 Casdoor 公网地址；经 Caddy 统一入口的 /casdoor 子路径
+      CASDOOR_PUBLIC_ENDPOINT: ${CASDOOR_PUBLIC_ENDPOINT:-http://localhost:8080/casdoor}
       CASDOOR_CLIENT_ID: ${CASDOOR_CLIENT_ID:-d5st_client}
       CASDOOR_CLIENT_SECRET: ${CASDOOR_CLIENT_SECRET:-d5st_client_secret_2026}
       CASDOOR_ORGANIZATION: ${CASDOOR_ORGANIZATION:-d5st}
@@ -92,13 +95,12 @@ services:
       # 本站默认管理员（d5st 组织下的普通用户，自动加入 d5st-admin 组）
       DEFAULT_ADMIN_USER: ${DEFAULT_ADMIN_USER:-d5stadmin}
       DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-d5stpassword}
-      # 本站对外地址（用于拼接 OAuth 回调）；本地开发填 http://localhost:35555
-      APP_URL: ${APP_URL:-http://localhost:35555}
+      # 本站对外地址（用于拼接 OAuth 回调）；经 Caddy 统一入口
+      APP_URL: ${APP_URL:-http://localhost:8080}
       SESSION_SECRET: ${SESSION_SECRET:-d5st_session_secret_change_in_production}
       ENABLE_DEV_LOGIN: ${ENABLE_DEV_LOGIN:-0}
       TZ: Asia/Shanghai
-    ports:
-      - "${APP_PORT:-35555}:35555"
+    # 不再直连对外：统一由 Caddy 在根路径暴露
     depends_on:
       mysql:
         condition: service_healthy
@@ -114,6 +116,30 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: d5st-caddy
+    restart: unless-stopped
+    # 统一入口：浏览器只访问本端口，按路径分流
+    #   /casdoor/* -> 剥离前缀转发到 Casdoor(后端根路径服务)
+    #   /          -> d5st 应用
+    ports:
+      - "${EXTERNAL_PORT:-8080}:8080"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      app:
+        condition: service_healthy
+      casdoor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - d5st-network
 
 volumes:
   mysql_data:

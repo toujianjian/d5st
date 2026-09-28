@@ -1,0 +1,26 @@
+{
+	admin off
+}
+
+# 统一入口：浏览器只访问本端口，由 Caddy 按路径分流
+:8080 {
+	encode gzip
+
+	# Casdoor 部署在 /casdoor 子路径：
+	# 请求剥离 /casdoor 前缀后转发给后端（后端仍以根路径服务静态资源与 API）。
+	handle_path /casdoor* {
+		reverse_proxy casdoor:8000 {
+			header_up Host {host}
+			# 后端返回的相对路径重定向（如 Location: /login）需补回 /casdoor 前缀，
+			# 否则浏览器会跳到根路径而非 /casdoor。绝对 URL 形式的重定向极少出现，
+			# 若遇到需在此追加 replace 规则。
+			@reloc header Location ^/
+			header_down @reloc Location "/casdoor{http.response.header.Location}"
+		}
+	}
+
+	# 其余流量转发给 d5st 应用（根路径）
+	handle {
+		reverse_proxy app:35555
+	}
+}

@@ -3,7 +3,8 @@ node_modules/
 .env.local
 *.log
 casdoor-data/
-docker/casdoor-basepath/
+# 仅排除从 Casdoor 容器导出的大体积前端副本；补丁脚本(patch/inspect/peek/verify)需进版本库供 Dockerfile 使用
+docker/casdoor-basepath/.tmp-web/
 npm-debug.log*
 .DS_Store
 
