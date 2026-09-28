@@ -5,7 +5,7 @@ const expressLayouts = require('express-ejs-layouts');
 const pool = require('./配置/db');
 const initDatabase = require('./配置/init-db');
 const casdoor = require('./配置/casdoor');
-const { initCasdoor } = require('./配置/casdoor-init');
+const { initCasdoorWithRetry } = require('./配置/casdoor-init');
 const CASDOOR_CONFIG = casdoor.C;
 
 const app = express();
@@ -309,9 +309,10 @@ async function startServer() {
     setImmediate(async () => {
       try { await require('./配置/sensitive-word').reload(); } catch (e) { console.warn('敏感词加载失败:', e.message); }
     });
-    // Casdoor 自动初始化（组织/应用/组/Webhook），失败不阻塞
+    // Casdoor 自动初始化（组织/应用/组/Webhook），失败不阻塞。
+    // 使用带重试的版本，避免 Casdoor 容器先启动、内部尚未就绪时一次性失败后再不重试。
     setImmediate(async () => {
-      try { await initCasdoor(); } catch (e) { console.warn('Casdoor init error:', e.message); }
+      try { await initCasdoorWithRetry(); } catch (e) { console.warn('Casdoor init error:', e.message); }
     });
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`D5ST 服务运行中: http://localhost:${PORT}`);

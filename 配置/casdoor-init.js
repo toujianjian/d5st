@@ -462,4 +462,36 @@ async function initCasdoor() {
   }
 }
 
-module.exports = { initCasdoor };
+// 带指数退避重试的初始化：应对 Casdoor 容器虽已启动、但内部尚未就绪
+// （DB 迁移 / 首次初始化）的情况。只有 result.ok 为 true 才算成功，
+// 否则等待后重试，直到成功或达到最大尝试次数。
+async function initCasdoorWithRetry({
+  maxAttempts = 12,
+  initialDelayMs = 3000,
+  maxDelayMs = 30000,
+} = {}) {
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    attempt++;
+    let result;
+    try {
+      result = await initCasdoor();
+    } catch (err) {
+      result = { ok: false, warnings: [`exception: ${err.message}`] };
+    }
+    if (result && result.ok) {
+      if (attempt > 1) LOG(`Casdoor 初始化成功（第 ${attempt} 次尝试）`);
+      return result;
+    }
+    if (attempt >= maxAttempts) {
+      ERR(`达到最大重试次数 ${maxAttempts}，Casdoor 初始化放弃（应用仍正常运行，请检查 Casdoor 状态后重启本服务）`);
+      return result;
+    }
+    const delay = Math.min(initialDelayMs * 2 ** (attempt - 1), maxDelayMs);
+    ERR(`第 ${attempt} 次初始化未成功（${((result && result.warnings) || []).join('; ') || '未知原因'}），${Math.round(delay / 1000)}s 后重试…`);
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
+module.exports = { initCasdoor, initCasdoorWithRetry };

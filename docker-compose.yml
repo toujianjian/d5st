@@ -49,6 +49,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+    # Casdoor 镜像无 wget/curl，用 sh 内置的 /dev/tcp 探测 8000 端口是否就绪；
+    # 配合 app 的 service_healthy 依赖，避免 app 抢跑时 Casdoor 尚未监听。
+    healthcheck:
+      test: ["CMD", "sh", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
     networks:
       - d5st-network
 
@@ -95,7 +103,7 @@ services:
       mysql:
         condition: service_healthy
       casdoor:
-        condition: service_started
+        condition: service_healthy
     # 不挂载宿主目录：代码全部烘焙进镜像，
     # 避免宿主/容器之间的路径与换行符差异带来的迁移兼容问题
     networks:
