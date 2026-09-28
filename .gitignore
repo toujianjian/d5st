@@ -3,6 +3,7 @@ node_modules/
 .env.local
 *.log
 casdoor-data/
+docker/casdoor-basepath/
 npm-debug.log*
 .DS_Store
 
