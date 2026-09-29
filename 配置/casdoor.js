@@ -16,7 +16,28 @@ const C = {
   appUrl: (process.env.APP_URL || 'http://localhost:35555').replace(/\/$/, ''),
   adminUser: process.env.CASDOOR_ADMIN_USER || 'admin',
   adminPassword: process.env.CASDOOR_ADMIN_PASSWORD || '123',
-  webhookSecret: process.env.CASDOOR_WEBHOOK_SECRET || 'd5st_webhook_secret_2026'
+  webhookSecret: process.env.CASDOOR_WEBHOOK_SECRET || 'd5st_webhook_secret_2026',
+  // 验证码流程类型。Casdoor 只认 signup / login / magicLink 等几种，
+  // 传 reset_password 会被判为 "Wrong parameter: method."
+  verifyMethod: process.env.CASDOOR_VERIFY_METHOD || 'login',
+  // 邮件 Provider（找回密码发验证码用）。未配 host 时初始化会跳过创建，
+  // 此时 Casdoor 侧没有 Email Provider，发码会失败。
+  smtp: {
+    host: process.env.CASDOOR_SMTP_HOST || '',
+    port: parseInt(process.env.CASDOOR_SMTP_PORT || '587', 10),
+    user: process.env.CASDOOR_SMTP_USER || '',
+    password: process.env.CASDOOR_SMTP_PASSWORD || '',
+    from: process.env.CASDOOR_SMTP_FROM || '',
+    fromName: process.env.CASDOOR_SMTP_FROM_NAME || 'D5ST 校园社区',
+    // 验证码邮件正文模板。Casdoor 把 Provider 的 content 字段当正文模板，
+    // 且只用 %s 作为验证码占位符（%code%、{{code}} 等都不生效）；
+    // 留空会发出一封没有任何验证码的空邮件。
+    codeTemplate: process.env.CASDOOR_SMTP_CODE_TEMPLATE
+      || '您正在重置 D5ST 校园社区账号密码，验证码是：%s（5 分钟内有效）。如非本人操作请忽略本邮件。',
+    providerName: process.env.CASDOOR_SMTP_PROVIDER_NAME || 'provider_email_smtp',
+    // 本地 MailHog 是明文 SMTP，必须禁用 SSL；接真实邮件服务时设为 false
+    disableSsl: (process.env.CASDOOR_SMTP_DISABLE_SSL || 'true') === 'true'
+  }
 };
 
 // =================== 基础：管理员会话 ===================
@@ -323,28 +344,55 @@ async function setPassword(org, name, password, oldPassword = '') {
   });
 }
 
-// 触发密码重置邮件/短信 —— 官方接口 /api/send-verification-code
-// type: reset_password | signup | login | verify_email | verify_phone
-async function sendVerificationCode(org, type, email, name) {
+// 触发验证码邮件/短信 —— 官方接口 /api/send-verification-code
+//
+// 该端点用 beego 的 Input().Get() 读参数（只读表单/查询串，传 JSON 会丢参数），
+// 且参数语义与直觉相反，实测（对照 Casdoor 前端 bundle 的调用签名）如下：
+//   method        流程类型：signup | login | magicLink。传 reset_password 等
+//                 其它值会直接报 "Wrong parameter: method."；找回密码应走 login，
+//                 Casdoor 会校验该用户是否已存在
+//   type          发送渠道：email | phone。传其它值报 "Wrong parameter: type."
+//   dest          目标地址（邮箱/手机号），字段名不是 email
+//   applicationId 必须是 owner/name 形式，只传 application 名字会报
+//                 "Wrong parameter: applicationId."
+//   captchaType   服务端以管理员会话发起，无前端验证码，显式声明跳过
+// 另外：应用（application）的 providers 列表里必须有一个 Email Provider，
+// 否则报 "please add an Email provider to the \"Providers\" list ..."，
+// 由 casdoor-init.js 的 ensureEmailProvider() 负责创建并挂载。
+async function sendVerificationCode({ org, method, type, dest, name } = {}) {
+  const channel = type === 'phone' ? 'phone' : 'email';
   const body = {
-    type,
-    organization: org,
-    application: C.application
+    captchaType: 'none',
+    captchaToken: '',
+    clientSecret: C.clientSecret,
+    countryCode: '',
+    method: method || C.verifyMethod,
+    dest: dest || '',
+    type: channel,
+    applicationId: `admin/${C.application}`,
+    checkUser: '',
+    signinPath: ''
   };
-  if (email) body.email = email;
-  if (name) body.name = name;
-  // 以下字段是该端点（beego Input().Get() 读取）的硬性要求，缺一项都会报错：
-  //   dest          目标地址（邮箱/手机号），字段名不是 email
-  //   applicationId 应用标识，必须是 owner/name 形式，只传 application 名字会报
-  //                 "Wrong parameter: applicationId."
-  //   captchaType   服务端以管理员会话发起，没有前端验证码，显式声明跳过
-  //   method        发送渠道（email/phone），需对应 Casdoor 已配置的 Provider
-  body.dest = email || name || '';
-  body.applicationId = `admin/${C.application}`;
-  body.captchaType = 'none';
-  body.method = 'email';
-  // 该端点用 Input().Get() 读参数，必须用表单编码（JSON 会丢参数）
   return adminPostForm('send-verification-code', body);
+}
+
+// ============ Provider（邮件/短信/验证码等） ============
+async function addProvider(provider) {
+  return adminPost('add-provider', provider);
+}
+
+async function getProvider(owner, name) {
+  return admin('get-provider', { id: `${owner}/${name}` });
+}
+
+async function listProviders(owner) {
+  return admin('get-providers', { owner });
+}
+
+async function updateProvider(provider) {
+  // 与 update-application 一样，端点要求 URL 带 id=owner/name
+  if (provider.id) return adminPost('update-provider', provider, { id: provider.id });
+  return adminPost('update-provider', provider);
 }
 
 // 用管理员权限直接重置密码（跳过旧密码校验）
@@ -434,6 +482,8 @@ module.exports = {
   // 用户
   getUser, createUser, updateUser, deleteUser, listUsers,
   setPassword, sendVerificationCode, adminResetPassword,
+  // Provider
+  addProvider, getProvider, listProviders, updateProvider,
   // Webhook
   getWebhook, createWebhook, updateWebhook, listWebhooks,
   verifyWebhookSignature,

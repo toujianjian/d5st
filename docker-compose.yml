@@ -99,6 +99,17 @@ services:
       APP_URL: ${APP_URL:-http://localhost:8080}
       SESSION_SECRET: ${SESSION_SECRET:-d5st_session_secret_change_in_production}
       ENABLE_DEV_LOGIN: ${ENABLE_DEV_LOGIN:-0}
+      # 找回密码验证码邮件（本地默认走 mailhog 服务，不外发真实邮件）
+      CASDOOR_SMTP_HOST: ${CASDOOR_SMTP_HOST:-}
+      CASDOOR_SMTP_PORT: ${CASDOOR_SMTP_PORT:-587}
+      CASDOOR_SMTP_USER: ${CASDOOR_SMTP_USER:-}
+      CASDOOR_SMTP_PASSWORD: ${CASDOOR_SMTP_PASSWORD:-}
+      CASDOOR_SMTP_FROM: ${CASDOOR_SMTP_FROM:-}
+      CASDOOR_SMTP_FROM_NAME: ${CASDOOR_SMTP_FROM_NAME:-}
+      CASDOOR_SMTP_CODE_TEMPLATE: ${CASDOOR_SMTP_CODE_TEMPLATE:-}
+      CASDOOR_SMTP_PROVIDER_NAME: ${CASDOOR_SMTP_PROVIDER_NAME:-provider_email_smtp}
+      CASDOOR_SMTP_DISABLE_SSL: ${CASDOOR_SMTP_DISABLE_SSL:-true}
+      CASDOOR_VERIFY_METHOD: ${CASDOOR_VERIFY_METHOD:-login}
       TZ: Asia/Shanghai
     # 不再直连对外：统一由 Caddy 在根路径暴露
     depends_on:
@@ -138,6 +149,20 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - d5st-network
+
+  # 开发环境邮件接收端：Casdoor 用它发「找回密码」验证码，本地不会真的外发邮件。
+  # 网页 http://localhost:8025 可查看收到的邮件与验证码。
+  # 特意不用 MailHog：它会宣告 SMTP AUTH，而 Casdoor 用的 gomail 拒绝在
+  # 未加密连接上认证，会直接报 "unencrypted connection"。
+  # 生产环境请删除本服务并改用真实 SMTP。
+  mail:
+    build: ./docker/smtp-sink
+    container_name: d5st-mail
+    restart: unless-stopped
+    ports:
+      - "${MAIL_UI_PORT:-8025}:8025"
     networks:
       - d5st-network
 

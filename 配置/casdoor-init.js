@@ -307,6 +307,109 @@ async function findUser(org, name) {
   }
 }
 
+// 邮件 Provider（找回密码发验证码）。
+// Casdoor 的 send-verification-code 要求「应用」的 providers 列表里挂着
+// 一个 Email Provider，否则会报
+// "please add an Email provider to the \"Providers\" list for the application: xxx"。
+// 这里只在配置了 SMTP 环境变量时才创建/挂载；没配就跳过，找回密码功能保持不可用
+// （调用时会返回 Casdoor 的原话提示，便于定位）。
+async function ensureEmailProvider() {
+  const smtp = C.smtp || {};
+  if (!smtp.host) {
+    LOG('未提供 CASDOOR_SMTP_HOST，跳过邮件 Provider 配置（找回密码功能不可用）');
+    return null;
+  }
+
+  const owner = 'admin'; // 与 organization/application 一致：此镜像全局资源 owner 固定 admin
+  const name = smtp.providerName || 'provider_email_smtp';
+
+  try {
+    const existing = await casdoor.getProvider(owner, name).catch(() => null);
+    if (existing) {
+      // 与 ensureApplication 同理：切换到另一套 SMTP 后要把新配置同步进 Casdoor，
+      // 否则库里会残留旧主机，发信一直失败
+      const desired = {
+        host: smtp.host,
+        port: smtp.port || 587,
+        disableSsl: smtp.disableSsl !== false,
+        clientId: smtp.user || smtp.from || '',
+        clientSecret: smtp.password,
+        title: smtp.fromName || 'D5ST 校园社区',
+        content: smtp.codeTemplate || ''
+      };
+      const needSync = Object.keys(desired).some(k => String(existing[k] ?? '') !== String(desired[k] ?? ''));
+      if (needSync) {
+        existing.id = `${owner}/${name}`;
+        Object.assign(existing, desired);
+        await casdoor.updateProvider(existing);
+        LOG(`邮件 Provider "${name}" SMTP 配置已同步`);
+      } else {
+        LOG(`邮件 Provider "${name}" 已存在`);
+      }
+    } else {
+      await casdoor.addProvider({
+        owner,
+        name,
+        displayName: 'Email (SMTP)',
+        category: 'Email',
+        type: 'SMTP',
+        host: smtp.host,
+        port: smtp.port || 587,
+        disableSsl: smtp.disableSsl !== false,
+        // Casdoor 的 SMTP Provider 用 clientId/clientSecret 存账号密码，
+        // title 存发件人显示名。
+        // 注意：发件地址取自 clientId（无认证时它会直接当 From 用），
+        // 所以未配账号时回退到 CASDOOR_SMTP_FROM，否则 gomail 会因空地址报错。
+        clientId: smtp.user || smtp.from || '',
+        clientSecret: smtp.password,
+        title: smtp.fromName || 'D5ST 校园社区',
+        // 正文模板：Casdoor 只用 %s 作验证码占位符，留空会发出无验证码的空邮件
+        content: smtp.codeTemplate || ''
+      });
+      LOG(`邮件 Provider "${name}" 创建成功`);
+    }
+  } catch (err) {
+    // Duplicate entry 说明实际已存在，视为成功
+    if (!/Duplicate entry/i.test(err.message)) {
+      ERR(`邮件 Provider 创建失败: ${err.message}`);
+      return null;
+    }
+    LOG(`邮件 Provider "${name}" 已存在（Duplicate，忽略）`);
+  }
+
+  // 挂到应用的 providers 列表
+  try {
+    const app = await casdoor.getApplication(owner, C.application);
+    if (!app) {
+      ERR('未找到应用，无法挂载邮件 Provider');
+      return null;
+    }
+    app.id = `${owner}/${C.application}`;
+    const providers = app.providers || [];
+    if (providers.some(p => p.name === name)) {
+      LOG(`应用 "${C.application}" 已挂载邮件 Provider "${name}"`);
+      return name;
+    }
+    providers.push({
+      owner,
+      name,
+      canSignUp: false,
+      canSignIn: false,
+      canUnlink: false,
+      prompted: false,
+      signupGroup: '',
+      rule: ''
+    });
+    app.providers = providers;
+    await casdoor.updateApplication(app);
+    LOG(`应用 "${C.application}" 已挂载邮件 Provider "${name}"`);
+    return name;
+  } catch (err) {
+    ERR(`挂载邮件 Provider 失败: ${err.message}`);
+    return null;
+  }
+}
+
 async function ensureAdminUser() {
   const name = ADMIN_NAME;
   const existing = await findUser(C.organization, name);
@@ -446,6 +549,7 @@ async function initCasdoor() {
     await ensureUserGroup('d5st-moderator', 'D5ST 版主', '论坛内容审核');
     await ensureUserGroup('d5st-user', 'D5ST 普通用户', '社区普通用户');
     await ensureWebhook();
+    await ensureEmailProvider();
     await ensureAdminUser();
     result.ok = true;
     LOG('Casdoor 初始化全部完成');

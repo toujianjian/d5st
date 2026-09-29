@@ -88,16 +88,18 @@ router.get('/forgot-password', (req, res) => {
 // 请求密码重置验证码（走 Casdoor send-verification-code）
 router.post('/forgot-password/request', async (req, res) => {
   const { email, name } = req.body || {};
-  if (!email && !name) {
-    return res.status(400).json({ success: false, msg: '请提供邮箱或用户名' });
+  if (!email) {
+    return res.status(400).json({ success: false, msg: '请填写注册邮箱，验证码将发送到该邮箱' });
   }
   try {
-    await casdoor.sendVerificationCode(
-      casdoor.C.organization,
-      'reset_password',
-      email,
+    await casdoor.sendVerificationCode({
+      org: casdoor.C.organization,
+      // 找回密码：Casdoor 走 login 流程，会校验该邮箱对应用户是否已存在
+      method: 'login',
+      type: 'email',
+      dest: email,
       name
-    );
+    });
     await logAuthEvent('Send verification code', name || email, '发送密码重置验证码', req);
     res.json({ success: true, msg: '验证码已发送，请查收邮件/短信' });
   } catch (err) {
