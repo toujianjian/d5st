@@ -1,0 +1,120 @@
+<style>
+  .follows-tabs {
+    display: flex; gap: 10px; margin-bottom: 18px;
+  }
+  .follows-tab {
+    padding: 9px 20px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--glass-border); background: var(--glass-bg);
+    color: var(--text-light); font-size: 13px; font-weight: 500;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    transition: all 0.25s ease;
+  }
+  .follows-tab.active {
+    background: var(--primary); border-color: var(--primary); color: #fff;
+  }
+  .follows-panel { display: none; }
+  .follows-panel.active { display: block; }
+  .follows-empty {
+    text-align: center; padding: 50px 20px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border); border-radius: 20px;
+    color: var(--text-muted);
+  }
+  .follows-empty i { font-size: 40px; display: block; margin-bottom: 10px; opacity: 0.4; }
+  .follows-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 18px; margin-bottom: 10px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border); border-radius: 16px;
+    box-shadow: var(--shadow-soft);
+    text-decoration: none; color: inherit;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .follows-item:hover { transform: translateY(-2px); border-color: rgba(211,47,47,0.35); }
+  .follows-avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 18px;
+  }
+  .follows-name { font-size: 15px; font-weight: 600; color: var(--text-dark); }
+  .follows-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+</style>
+
+<div class="page-container">
+  <h3 style="font-family:'Noto Serif SC',serif;margin-bottom:16px;color:var(--text-dark);display:flex;align-items:center;gap:8px;">
+    <i class="fas fa-user-friends" style="color:var(--primary);"></i> 我的关注
+  </h3>
+
+  <div class="follows-tabs">
+    <div class="follows-tab active" data-panel="following">
+      <i class="fas fa-user-plus"></i> 关注 <%= (typeof following !== 'undefined' ? following.length : 0) %>
+    </div>
+    <div class="follows-tab" data-panel="followers">
+      <i class="fas fa-users"></i> 粉丝 <%= (typeof followers !== 'undefined' ? followers.length : 0) %>
+    </div>
+  </div>
+
+  <div class="follows-panel active" id="panel-following">
+    <% if (typeof following !== 'undefined' && following && following.length > 0) { %>
+      <% following.forEach(function(u) { %>
+        <a class="follows-item" href="/user/<%= u.id %>">
+          <div class="follows-avatar"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+          <div>
+            <div class="follows-name"><%= u.real_name || u.username %></div>
+            <div class="follows-meta">
+              @<%= u.username %>
+              <% if (u.grade) { %> · <%= u.grade %><% } %>
+              <% if (u.class_name) { %> · <%= u.class_name %><% } %>
+            </div>
+          </div>
+        </a>
+      <% }); %>
+    <% } else { %>
+      <div class="follows-empty">
+        <i class="fas fa-user-plus"></i>
+        还没有关注任何人
+      </div>
+    <% } %>
+  </div>
+
+  <div class="follows-panel" id="panel-followers">
+    <% if (typeof followers !== 'undefined' && followers && followers.length > 0) { %>
+      <% followers.forEach(function(u) { %>
+        <a class="follows-item" href="/user/<%= u.id %>">
+          <div class="follows-avatar"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+          <div>
+            <div class="follows-name"><%= u.real_name || u.username %></div>
+            <div class="follows-meta">
+              @<%= u.username %>
+              <% if (u.grade) { %> · <%= u.grade %><% } %>
+              <% if (u.class_name) { %> · <%= u.class_name %><% } %>
+            </div>
+          </div>
+        </a>
+      <% }); %>
+    <% } else { %>
+      <div class="follows-empty">
+        <i class="fas fa-users"></i>
+        还没有粉丝
+      </div>
+    <% } %>
+  </div>
+
+  <script>
+  (function() {
+    var tabs = document.querySelectorAll('.follows-tab');
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        document.querySelectorAll('.follows-panel').forEach(function(p) { p.classList.remove('active'); });
+        tab.classList.add('active');
+        var panel = document.getElementById('panel-' + tab.dataset.panel);
+        if (panel) panel.classList.add('active');
+      });
+    });
+  })();
+  </script>
+</div>

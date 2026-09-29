@@ -40,10 +40,13 @@ router.get('/', requireLogin, async (req, res) => {
 });
 
 // 查看他人主页
-router.get('/:id', async (req, res) => {
+// 注意：/edit、/achievements 等更具体的路由定义在本路由之后，若这里把非数字 id
+// 直接判成 404，那些页面就会被 /:id 抢先匹配成「用户不存在」而无法访问。
+// 因此非数字时交给后面的路由继续匹配。
+router.get('/:id', async (req, res, next) => {
   try {
     const targetId = parseInt(req.params.id, 10);
-    if (isNaN(targetId)) return res.status(404).render('errors/404', { title: '用户不存在' });
+    if (isNaN(targetId)) return next();
 
     const [users] = await pool.query('SELECT id, username, real_name, avatar, grade, class_name, points FROM casdoor_users WHERE id = ?', [targetId]);
     if (!users || users.length === 0) return res.status(404).render('errors/404', { title: '用户不存在' });

@@ -27,9 +27,16 @@ router.post('/generate', async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   try {
     const code = generateSecretCode();
-    await pool.query('INSERT INTO user_secrets (user_id, secret_code) VALUES (?, ?)', [req.session.user.id, code]);
+    // 表上有 UNIQUE KEY (user_id)，一个用户只允许一个保密号。
+    // 用 upsert 让「重新生成」幂等，避免第二次生成撞唯一键后直接 500。
+    await pool.query(
+      `INSERT INTO user_secrets (user_id, secret_code) VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE secret_code = VALUES(secret_code), created_at = CURRENT_TIMESTAMP`,
+      [req.session.user.id, code]
+    );
     res.json({ success: true, code });
   } catch (err) {
+    console.error('生成保密号失败:', err);
     res.status(500).json({ error: '生成失败' });
   }
 });

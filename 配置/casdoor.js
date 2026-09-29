@@ -91,6 +91,27 @@ async function adminPost(action, body = {}, query = {}) {
   return data.data;
 }
 
+// 部分 Casdoor 端点（如 send-verification-code）内部用 beego 的 Input().Get()
+// 读取参数，只会解析表单/查询串，传 JSON body 会取不到值并报
+// "Missing parameter: type."。这里单独提供表单编码的 POST。
+async function adminPostForm(action, body = {}) {
+  const cookie = await getAdminCookie();
+  const url = `${C.endpoint}/api/${action}`;
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(body)) {
+    if (v !== undefined && v !== null) params.append(k, String(v));
+  }
+  const { data } = await axios.post(url, params.toString(), {
+    headers: {
+      'Cookie': cookie,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    timeout: 15000
+  });
+  if (data.status !== 'ok') throw new Error(`Casdoor ${action} 失败: ${data.msg || JSON.stringify(data).slice(0, 200)}`);
+  return data.data;
+}
+
 // =================== OAuth2/OIDC 授权码流 ===================
 function getAuthUrl(extra = {}) {
   const redirectUri = encodeURIComponent(`${C.appUrl}/auth/callback`);
@@ -312,7 +333,18 @@ async function sendVerificationCode(org, type, email, name) {
   };
   if (email) body.email = email;
   if (name) body.name = name;
-  return adminPost('send-verification-code', body);
+  // 以下字段是该端点（beego Input().Get() 读取）的硬性要求，缺一项都会报错：
+  //   dest          目标地址（邮箱/手机号），字段名不是 email
+  //   applicationId 应用标识，必须是 owner/name 形式，只传 application 名字会报
+  //                 "Wrong parameter: applicationId."
+  //   captchaType   服务端以管理员会话发起，没有前端验证码，显式声明跳过
+  //   method        发送渠道（email/phone），需对应 Casdoor 已配置的 Provider
+  body.dest = email || name || '';
+  body.applicationId = `admin/${C.application}`;
+  body.captchaType = 'none';
+  body.method = 'email';
+  // 该端点用 Input().Get() 读参数，必须用表单编码（JSON 会丢参数）
+  return adminPostForm('send-verification-code', body);
 }
 
 // 用管理员权限直接重置密码（跳过旧密码校验）
