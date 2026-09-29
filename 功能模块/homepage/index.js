@@ -52,6 +52,7 @@ router.get('/', async (req, res) => {
     };
 
     res.render('home/index', {
+      layout: 'layout-home',
       title: siteSettings.site_name || 'D5ST 校园社区',
       banners,
       links,

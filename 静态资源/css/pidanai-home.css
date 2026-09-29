@@ -1,0 +1,230 @@
+/* ============================================================================
+   D5ST 首页补充样式 —— 在 pidanai 真实 CSS 之上适配 d5st 内容区
+   目标：对齐 pidanai 主页体验（玻璃质感、等宽标签、强烈视觉），不另起炉灶。
+   - 还原原生光标（pidanai 默认隐藏光标，但本站需可点可读，遵循"鼠标碰到不隐藏"）
+   - 放开文本选择（内容站可读）
+   - 用 pidanai 同一套玻璃公式（--pdaim-glass-* / --control-glass-shade）渲染 d5st 卡片
+   ========================================================================== */
+
+/* —— 原生光标 / 选择 —— */
+body {
+  cursor: auto;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* —— 首屏：Hero 略收，让下方内容「露出」一角，明确滚动暗示 ——
+   pidanai 原版 Hero 固定 100vh，首屏下方全空容易让人以为"没有内容"。
+   这里把 Hero 视口高度收一点（仍保留视觉中心），使统计条在首屏底部可见。 */
+.hero.route-page {
+  min-height: auto;
+  padding: 116px 24px 64px;
+}
+.hero.route-page .hero-stage {
+  min-height: auto;
+  padding: 0;
+}
+/* 揭示层（光标聚光）内的 hero 保持原版满屏，不受上述收缩影响 */
+.cursor-reveal .hero-stage-reveal {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+}
+
+/* —— 内容首块在首屏即可见：与 Hero 拉开合理间距 —— */
+.d5st-content { padding-top: 0; }
+.d5st-stats { margin-top: 0; }
+
+/* 首屏已能直接看到内容，原版的"向下滚动"提示在此处反而夹在副标题与统计条之间，
+   位置突兀且语义重复，故隐藏。 */
+.hero.route-page .scroll-hint { display: none; }
+
+a, button, .nav-pill, .auth-button, .theme-toggle-float, .d5st-card { cursor: pointer; }
+
+/* —— 内容容器 —— */
+.d5st-content {
+  position: relative;
+  z-index: 2;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px 96px;
+}
+
+/* —— 统计条 —— */
+.d5st-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 6px 0 8px;
+}
+.d5st-stat {
+  position: relative;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg) 54%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.16);
+  backdrop-filter: blur(18px) saturate(1.16);
+  border: 1px solid color-mix(in srgb, var(--fg) 11%, transparent);
+  border-radius: 22px;
+  padding: 22px 18px;
+  text-align: center;
+  box-shadow: 0 14px 46px color-mix(in srgb, var(--pdaim-glass-shadow) 28%, transparent);
+  transition: transform .45s cubic-bezier(0.34, 1.56, 0.64, 1), border-color .35s ease, box-shadow .45s ease;
+}
+.d5st-stat:hover {
+  transform: translateY(-6px);
+  border-color: color-mix(in srgb, var(--fg) 22%, transparent);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--pdaim-glass-shadow) 40%, transparent);
+}
+.d5st-stat .num {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.1;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--fg) 92%, transparent), color-mix(in srgb, var(--fg) 60%, transparent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.d5st-stat .lbl {
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* —— 区块 —— */
+.d5st-block { padding: 64px 0 4px; }
+.d5st-head { margin-bottom: 28px; }
+.d5st-head .section-kicker { display: inline-block; }
+.d5st-head h2 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-size: clamp(26px, 3.4vw, 40px);
+  color: var(--fg);
+  line-height: 1.12;
+}
+.d5st-head p { color: var(--muted); margin-top: 10px; font-size: 15px; }
+
+/* —— 卡片网格 —— */
+.d5st-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.d5st-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.d5st-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+.d5st-card {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: color-mix(in srgb, var(--bg) 54%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.16);
+  backdrop-filter: blur(18px) saturate(1.16);
+  border: 1px solid color-mix(in srgb, var(--fg) 11%, transparent);
+  border-radius: 22px;
+  padding: 22px;
+  box-shadow: 0 14px 46px color-mix(in srgb, var(--pdaim-glass-shadow) 28%, transparent);
+  transition: transform .45s cubic-bezier(0.34, 1.56, 0.64, 1), border-color .35s ease, box-shadow .45s ease;
+  will-change: transform;
+}
+.d5st-card::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--pdaim-glass-highlight) 18%, transparent), transparent 36%, transparent 76%),
+    linear-gradient(315deg, color-mix(in srgb, var(--pdaim-glass-edge-shade) 5%, transparent), transparent 44%);
+  opacity: .42;
+  pointer-events: none;
+}
+.d5st-card > * { position: relative; z-index: 1; }
+.d5st-card:hover {
+  transform: translateY(-7px);
+  border-color: color-mix(in srgb, var(--fg) 22%, transparent);
+  box-shadow: 0 26px 64px color-mix(in srgb, var(--pdaim-glass-shadow) 40%, transparent);
+}
+
+.d5st-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.d5st-pill {
+  font-family: ui-monospace, monospace;
+  font-size: 10px; padding: 3px 10px; border-radius: 999px;
+  font-weight: 700; letter-spacing: .06em;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  color: var(--fg);
+}
+.d5st-pill.top { background: linear-gradient(135deg, #ffd700, #ff9800); color: #6b4e00; }
+.d5st-pill.hot { background: linear-gradient(135deg, #ff6cb8, #ff3d7f); color: #fff; }
+
+.d5st-title {
+  font-size: 16px; font-weight: 700; color: var(--fg); margin-bottom: 8px;
+  line-height: 1.45; transition: color .3s ease;
+}
+.d5st-card:hover .d5st-title { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.d5st-excerpt {
+  font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 14px;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.d5st-meta {
+  display: flex; gap: 14px; font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); flex-wrap: wrap;
+}
+.d5st-meta span { display: flex; align-items: center; gap: 5px; }
+
+.d5st-thumb {
+  position: relative; width: 100%; height: 140px; border-radius: 14px; overflow: hidden;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--fg) 12%, transparent), color-mix(in srgb, var(--fg) 4%, transparent));
+  display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--muted);
+}
+.d5st-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform .7s ease; }
+.d5st-card:hover .d5st-thumb img { transform: scale(1.07); }
+.d5st-dur {
+  position: absolute; right: 8px; bottom: 8px; padding: 3px 8px; border-radius: 7px;
+  background: rgba(0, 0, 0, .72); color: #fff; font-family: ui-monospace, monospace; font-size: 11px; z-index: 2;
+}
+
+.d5st-link { text-align: center; padding: 26px 16px; }
+.d5st-link .d5st-link-icon {
+  width: 54px; height: 54px; margin: 0 auto 14px; border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--fg) 16%, transparent), color-mix(in srgb, var(--fg) 6%, transparent));
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  display: flex; align-items: center; justify-content: center; color: var(--fg); font-size: 20px;
+  transition: transform .5s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .4s ease;
+}
+.d5st-card:hover .d5st-link-icon {
+  transform: translateY(-3px) rotate(-6deg) scale(1.06);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--pdaim-glass-shadow) 40%, transparent);
+}
+.d5st-link h3 { font-size: 14px; color: var(--fg); font-weight: 600; }
+
+.d5st-empty {
+  grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--muted); font-size: 14px;
+  border: 1px dashed color-mix(in srgb, var(--fg) 14%, transparent); border-radius: 22px;
+}
+
+/* —— 滚动渐显（pidanai 已定义 .reveal-on-scroll / .is-visible，这里兜底确保一致） —— */
+.reveal-on-scroll { opacity: 0; transform: translateY(28px); transition: opacity .7s ease, transform .7s ease; }
+.reveal-on-scroll.is-visible { opacity: 1; transform: none; }
+
+/* —— 响应式 —— */
+@media (max-width: 1024px) {
+  .d5st-stats { grid-template-columns: repeat(2, 1fr); }
+  .d5st-grid, .d5st-grid.cols-4, .d5st-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+  .d5st-block { padding: 50px 0 4px; }
+}
+@media (max-width: 640px) {
+  .d5st-content { padding: 0 18px 72px; }
+  .d5st-grid, .d5st-grid.cols-4, .d5st-grid.cols-2 { grid-template-columns: 1fr; }
+  .d5st-head h2 { font-size: 28px; }
+}
+
+/* —— 无障碍：尊重 reduce-motion —— */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .reveal-on-scroll { opacity: 1; transform: none; }
+}

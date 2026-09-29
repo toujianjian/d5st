@@ -1,383 +1,189 @@
-<style>
-  /* ============ AstroWind 风格皮肤（借鉴 arthelokyo/astrowind 的设计语言）============
-     - eyebrow 徽章 + 渐变大标题 + 副标题 + 双 CTA 的 Hero
-     - 数据统计条
-     - 圆角卡片网格、hover 抬升、柔和描边
-     在 d5st 既有红色主题上落地，保持整体一致
-     ============================================================================ */
-  .page-container { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 20px 32px 0 32px; }
+<canvas class="pdaim-line-field" id="pdaimLineField" aria-hidden="true"></canvas>
+<div class="page-shell">
+  <span class="site-header-shadow" aria-hidden="true"></span>
 
-  .glass-header {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--glass-border);
-    border-radius: 20px;
-    margin: 0 0 24px 0; padding: 14px 28px; padding-right: 120px;
-    display: flex; justify-content: space-between; align-items: center;
-    box-shadow: var(--shadow-soft);
-  }
-  .logo {
-    font-size: 26px; font-weight: 800; letter-spacing: 1px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .main-nav { display: flex; gap: 6px; align-items: center; }
-  .main-nav a {
-    text-decoration: none; color: var(--text-dark);
-    padding: 9px 16px; border-radius: 12px; font-weight: 500; font-size: 14px;
-    transition: all .3s cubic-bezier(.4,0,.2,1);
-  }
-  .main-nav a:hover { color: var(--primary); background: rgba(211,47,47,.08); }
-  .main-nav a.active { color: var(--primary); background: rgba(211,47,47,.12); font-weight: 600; }
-  .main-nav .nav-login {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff !important; box-shadow: 0 4px 14px rgba(211,47,47,.28);
-  }
-  .main-nav .nav-login:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-  .mode-toggle {
-    background: var(--glass-bg); border: 1px solid var(--glass-border);
-    width: 40px; height: 40px; border-radius: 12px; font-size: 16px; cursor: pointer;
-    transition: all .3s ease; margin-left: 6px; color: var(--text-light);
-  }
-  .mode-toggle:hover { transform: scale(1.08); box-shadow: var(--shadow-soft); }
+  <button class="icon-button theme-toggle-float" type="button" id="themeToggle" data-liquid-glass aria-label="切换深浅色模式">
+    <canvas class="liquid-glass-canvas" aria-hidden="true"></canvas>
+    <span class="theme-switch-thumb" data-liquid-glass data-glass-blur="24" data-glass-alpha="1.08" aria-hidden="true">
+      <canvas class="liquid-glass-canvas" aria-hidden="true"></canvas>
+    </span>
+    <span class="sun" aria-hidden="true"></span>
+    <span class="moon" aria-hidden="true"></span>
+  </button>
 
-  /* Hero（走马灯保留，外层换成 AstroWind 排版） */
-  .hero { position: relative; }
-  .carousel-container {
-    position: relative; height: 420px; border-radius: 28px; overflow: hidden;
-    box-shadow: var(--shadow-hover);
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-  }
-  .carousel-slide {
-    position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease-in-out;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .carousel-slide.active { opacity: 1; }
-  /* Hero 背景：用渐变色块代替不合适的照片素材，更贴合校园社区调性 */
-  .carousel-slide.slide-1 {
-    background:
-      radial-gradient(1200px 420px at 18% 18%, rgba(255,255,255,.20), transparent 62%),
-      linear-gradient(135deg, #b71c1c 0%, #d32f2f 45%, #ff6b35 100%);
-  }
-  .carousel-slide.slide-2 {
-    background:
-      radial-gradient(900px 400px at 82% 22%, rgba(255,255,255,.18), transparent 62%),
-      linear-gradient(135deg, #7b1fa2 0%, #c2185b 55%, #d32f2f 100%);
-  }
-  .carousel-slide.slide-3 {
-    background:
-      radial-gradient(900px 400px at 28% 82%, rgba(255,255,255,.18), transparent 62%),
-      linear-gradient(135deg, #0d47a1 0%, #1565c0 42%, #d32f2f 100%);
-  }
-  .carousel-content { text-align: center; color: #fff; z-index: 2; position: relative; padding: 40px; }
-  /* eyebrow 徽章 */
-  .eyebrow {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600;
-    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3);
-    backdrop-filter: blur(8px); margin-bottom: 18px; letter-spacing: .5px;
-  }
-  .carousel-content h2 {
-    font-size: 52px; font-weight: 800; line-height: 1.15; margin-bottom: 16px;
-    text-shadow: 0 4px 24px rgba(0,0,0,.35); letter-spacing: -1px;
-  }
-  .carousel-content p { font-size: 18px; opacity: .95; max-width: 620px; margin: 0 auto 30px; line-height: 1.6; }
-  .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-  .carousel-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 13px 28px; border-radius: 999px; text-decoration: none;
-    font-weight: 600; font-size: 15px; transition: all .35s cubic-bezier(.34,1.56,.64,1);
-    background: #fff; color: var(--primary); box-shadow: 0 8px 24px rgba(0,0,0,.22);
-  }
-  .carousel-btn:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,.3); }
-  .carousel-btn.transparent {
-    background: rgba(255,255,255,.16); color: #fff;
-    border: 1px solid rgba(255,255,255,.45); backdrop-filter: blur(10px); box-shadow: none;
-  }
-  .carousel-btn.transparent:hover { background: #fff; color: var(--primary); }
-  .carousel-indicators { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 3; }
-  .carousel-indicator { width: 10px; height: 10px; border-radius: 999px; background: rgba(255,255,255,.5); cursor: pointer; transition: all .3s ease; }
-  .carousel-indicator.active { background: #fff; width: 28px; }
-  .carousel-controls { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; display: flex; justify-content: space-between; padding: 0 18px; z-index: 3; }
-  .carousel-control {
-    width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.2);
-    backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.3); color: #fff;
-    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .3s ease;
-  }
-  .carousel-control:hover { background: rgba(255,255,255,.92); color: var(--primary); transform: scale(1.08); }
+  <header class="site-header" data-liquid-glass aria-label="Primary navigation">
+    <canvas class="liquid-glass-canvas" aria-hidden="true"></canvas>
+    <span class="liquid-blob" aria-hidden="true"></span>
+    <a class="logo" href="/" aria-label="D5ST home">D5ST</a>
 
-  /* 数据统计条 */
-  .stats-bar {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 24px 0 8px;
-  }
-  .stat-box {
-    background: var(--glass-bg); border: 1px solid var(--glass-border);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border-radius: 18px; padding: 18px; text-align: center; box-shadow: var(--shadow-soft);
-    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-  }
-  .stat-box:hover { transform: translateY(-3px); }
-  .stat-num {
-    font-size: 28px; font-weight: 800; line-height: 1.2;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-  }
-  .stat-lbl { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-  /* 通用区块 */
-  .section { padding: 44px 0 8px; }
-  .section-head { text-align: center; margin-bottom: 28px; }
-  .section-title { font-size: 30px; font-weight: 800; color: var(--text-dark); letter-spacing: -.5px; }
-  .section-subtitle { color: var(--text-light); margin-top: 8px; font-size: 15px; }
-
-  .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  .card-grid.grid-4 { grid-template-columns: repeat(4, 1fr); }
-  .soft-card {
-    background: var(--glass-bg); border: 1px solid var(--glass-border);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border-radius: 20px; padding: 20px; box-shadow: var(--shadow-soft);
-    text-decoration: none; color: inherit; display: block;
-    transition: all .35s cubic-bezier(.34,1.56,.64,1);
-  }
-  .soft-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); border-color: var(--primary-light); }
-
-  /* 帖子卡 */
-  .post-head-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-  .pill { font-size: 11px; padding: 2px 9px; border-radius: 999px; font-weight: 600; }
-  .pill-top { background: linear-gradient(135deg,#ff6b35,#d32f2f); color: #fff; }
-  .pill-hot { background: linear-gradient(135deg,#ffd700,#ff9800); color: #6b4e00; }
-  .pill-cat { background: rgba(211,47,47,.1); color: var(--primary); }
-  .post-title { font-size: 16px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; line-height: 1.4; }
-  .post-excerpt {
-    font-size: 13px; color: var(--text-light); line-height: 1.65; margin-bottom: 12px;
-    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .card-meta { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
-  .card-meta span { display: flex; align-items: center; gap: 4px; }
-
-  /* 视频卡 */
-  .v-thumb {
-    position: relative; width: 100%; height: 132px; border-radius: 14px; overflow: hidden; margin-bottom: 12px;
-    background: linear-gradient(135deg,#ffe4e4,#ffd0d0);
-    display: flex; align-items: center; justify-content: center; font-size: 30px;
-  }
-  .v-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .v-dur { position: absolute; right: 8px; bottom: 8px; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.7); color: #fff; font-size: 11px; }
-
-  /* 常用链接 */
-  .link-card { text-align: center; padding: 24px 16px; }
-  .link-icon {
-    width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 15px;
-    background: linear-gradient(135deg, var(--primary), var(--accent));
-    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px;
-  }
-  .link-card h3 { font-size: 14px; color: var(--text-dark); font-weight: 600; }
-
-  .empty-note { text-align: center; padding: 34px; color: var(--text-muted); font-size: 14px; grid-column: 1/-1; }
-
-  @media (max-width: 1024px) {
-    .card-grid, .card-grid.grid-4 { grid-template-columns: repeat(2, 1fr); }
-    .stats-bar { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 768px) {
-    .page-container { padding: 0 18px; }
-    .glass-header { flex-direction: column; gap: 12px; padding: 16px; border-radius: 16px; }
-    .main-nav { flex-wrap: wrap; justify-content: center; }
-    .carousel-content h2 { font-size: 32px; }
-    .carousel-container { height: 340px; }
-    .card-grid, .card-grid.grid-4 { grid-template-columns: 1fr; }
-  }
-</style>
-
-<div class="page-container">
-  <header class="glass-header">
-    <div class="logo">D5ST</div>
-    <nav class="main-nav">
-      <a href="/" class="active">首页</a>
-      <a href="/forum">贴吧</a>
-      <a href="/videos">风采</a>
-      <a href="/secret">保密号</a>
-      <a href="/sponsor">赞助</a>
-      <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-        <a href="/messages">私信</a>
-        <a href="/user">个人中心</a>
-        <% if (currentUser.is_admin === 1) { %><a href="/admin">管理</a><% } %>
-      <% } else { %>
-        <a href="/login" class="nav-login">登录 / 注册</a>
-      <% } %>
-      <button class="mode-toggle" title="切换夜间模式"><i class="fas fa-moon"></i></button>
+    <nav class="nav-pills" id="primaryNav" aria-label="Sections">
+      <a class="nav-pill is-active" data-liquid-glass href="/"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>首页</span></a>
+      <a class="nav-pill" data-liquid-glass href="/forum"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>贴吧</span></a>
+      <a class="nav-pill" data-liquid-glass href="/videos"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>风采</span></a>
+      <a class="nav-pill" data-liquid-glass href="/secret"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>保密号</span></a>
+      <a class="nav-pill" data-liquid-glass href="/sponsor"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>赞助</span></a>
     </nav>
+
+    <div class="header-actions">
+      <div class="auth-actions" aria-label="账户操作">
+        <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+          <a class="auth-button auth-login" data-liquid-glass href="/user"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span><%= currentUser.real_name || currentUser.username %></span></a>
+          <a class="auth-button auth-register" data-liquid-glass href="/logout"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>退出</span></a>
+        <% } else { %>
+          <a class="auth-button auth-login" data-liquid-glass href="/login"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>登录</span></a>
+          <a class="auth-button auth-register" data-liquid-glass href="/register"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>注册</span></a>
+        <% } %>
+      </div>
+      <span class="pdaim-fps" id="pdaimFps" aria-hidden="true">-- FPS</span>
+      <button class="mobile-menu-toggle" type="button" id="mobileMenuToggle" aria-controls="primaryNav" aria-expanded="false" aria-label="展开导航菜单">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </header>
 
-  <main>
-    <!-- Hero -->
-    <section class="hero">
-      <div class="carousel-container">
-        <div class="carousel-slide slide-1 active">
-          <div class="carousel-content">
-            <div class="eyebrow"><i class="fas fa-bolt"></i> 校园社区</div>
-            <h2>连接每一位同学</h2>
-            <p>发帖讨论、记录生活、分享视频——这里是属于我们的校园角落</p>
-            <div class="cta-row">
-              <a href="/forum" class="carousel-btn"><i class="fas fa-comments"></i> 进入贴吧</a>
-              <a href="/videos" class="carousel-btn transparent"><i class="fas fa-play"></i> 校园风采</a>
-            </div>
-          </div>
+  <div class="pdaim-route-root" data-pdaim-route-root>
+    <main class="hero route-page" data-route-page="overview" data-route-index="0" id="about">
+      <section class="hero-stage" aria-labelledby="heroTitle">
+        <div class="hero-copy hero-copy-base js-tilt">
+          <p class="eyebrow">校园社区 · 实时连接 · 极致体验</p>
+          <h1 id="heroTitle">
+            <span class="title-strong">D5ST</span>
+            <span class="title-light">校园社区，因你而燃</span>
+          </h1>
+          <p class="subtitle">发帖讨论 · 记录生活 · 分享视频，让每一次表达都成为精准的直觉。</p>
         </div>
-        <div class="carousel-slide slide-2">
-          <div class="carousel-content">
-            <div class="eyebrow"><i class="fas fa-shield-alt"></i> 隐私保护</div>
-            <h2>匿名保密号</h2>
-            <p>随机生成专属保密号，保护你的隐私安全</p>
-            <div class="cta-row">
-              <a href="/secret" class="carousel-btn"><i class="fas fa-key"></i> 立即生成</a>
-            </div>
-          </div>
-        </div>
-        <div class="carousel-slide slide-3">
-          <div class="carousel-content">
-            <div class="eyebrow"><i class="fas fa-heart"></i> 共建社区</div>
-            <h2>赞助支持</h2>
-            <p>感谢每一位支持我们的同学和朋友</p>
-            <div class="cta-row">
-              <a href="/sponsor" class="carousel-btn"><i class="fas fa-heart"></i> 成为赞助者</a>
-            </div>
-          </div>
-        </div>
-        <div class="carousel-controls">
-          <button class="carousel-control" onclick="prevSlide()"><i class="fas fa-chevron-left"></i></button>
-          <button class="carousel-control" onclick="nextSlide()"><i class="fas fa-chevron-right"></i></button>
-        </div>
-        <div class="carousel-indicators">
-          <div class="carousel-indicator active" onclick="goToSlide(0)"></div>
-          <div class="carousel-indicator" onclick="goToSlide(1)"></div>
-          <div class="carousel-indicator" onclick="goToSlide(2)"></div>
-        </div>
-      </div>
-    </section>
+      </section>
+      <p class="scroll-hint">探索极致的响应速度 · 向下滚动解锁更多</p>
+    </main>
 
-    <!-- 数据统计条 -->
-    <div class="stats-bar">
-      <div class="stat-box"><div class="stat-num"><%= (typeof stats !== 'undefined' && stats) ? stats.posts : 0 %></div><div class="stat-lbl">帖子</div></div>
-      <div class="stat-box"><div class="stat-num"><%= (typeof stats !== 'undefined' && stats) ? stats.videos : 0 %></div><div class="stat-lbl">视频</div></div>
-      <div class="stat-box"><div class="stat-num"><%= (typeof stats !== 'undefined' && stats) ? stats.users : 0 %></div><div class="stat-lbl">同学</div></div>
-      <div class="stat-box"><div class="stat-num"><%= (typeof stats !== 'undefined' && stats) ? stats.comments : 0 %></div><div class="stat-lbl">评论</div></div>
+    <div class="d5st-content">
+      <!-- 数据统计条（首屏常显，避免首屏下方空白造成"没有内容"的错觉） -->
+      <section class="d5st-stats">
+        <div class="d5st-stat"><span class="num" data-count="<%= (typeof stats !== 'undefined' && stats) ? stats.posts : 0 %>">0</span><span class="lbl">帖子</span></div>
+        <div class="d5st-stat"><span class="num" data-count="<%= (typeof stats !== 'undefined' && stats) ? stats.videos : 0 %>">0</span><span class="lbl">视频</span></div>
+        <div class="d5st-stat"><span class="num" data-count="<%= (typeof stats !== 'undefined' && stats) ? stats.users : 0 %>">0</span><span class="lbl">同学</span></div>
+        <div class="d5st-stat"><span class="num" data-count="<%= (typeof stats !== 'undefined' && stats) ? stats.comments : 0 %>">0</span><span class="lbl">评论</span></div>
+      </section>
+
+      <!-- 最新动态 -->
+      <section class="d5st-block">
+        <div class="d5st-head reveal-on-scroll" data-reveal>
+          <p class="section-kicker">Latest</p>
+          <h2>最新动态</h2>
+          <p>看看大家最近在聊什么</p>
+        </div>
+        <div class="d5st-grid">
+          <% if (typeof posts !== 'undefined' && posts && posts.length) { %>
+            <% posts.forEach(function (p) { %>
+              <a class="d5st-card reveal-on-scroll" data-reveal href="/forum/<%= p.id %>">
+                <div class="d5st-pills">
+                  <% if (p.is_top) { %><span class="d5st-pill top">置顶</span><% } %>
+                  <% if (p.is_hot) { %><span class="d5st-pill hot">精华</span><% } %>
+                  <span class="d5st-pill"><%= p.category || '综合' %></span>
+                </div>
+                <h3 class="d5st-title"><%= p.title %></h3>
+                <p class="d5st-excerpt"><%= p.content %></p>
+                <div class="d5st-meta">
+                  <span><i class="fas fa-user"></i> <%= p.author %></span>
+                  <span><i class="far fa-comment"></i> <%= p.comments_count %></span>
+                  <span><i class="far fa-eye"></i> <%= p.views || 0 %></span>
+                </div>
+              </a>
+            <% }); %>
+          <% } else { %>
+            <div class="d5st-empty">还没有帖子，去贴吧发第一篇吧</div>
+          <% } %>
+        </div>
+      </section>
+
+      <!-- 校园风采（视频） -->
+      <section class="d5st-block">
+        <div class="d5st-head reveal-on-scroll" data-reveal>
+          <p class="section-kicker">Videos</p>
+          <h2>校园风采</h2>
+          <p>记录校园里的每一份精彩</p>
+        </div>
+        <div class="d5st-grid cols-4">
+          <% if (typeof videos !== 'undefined' && videos && videos.length) { %>
+            <% videos.forEach(function (v) { %>
+              <a class="d5st-card reveal-on-scroll" data-reveal href="/videos/<%= v.id %>">
+                <div class="d5st-thumb">
+                  <% if (v.cover_url) { %><img src="<%= v.cover_url %>" alt="" onerror="this.style.display='none'" /><% } else { %>🎬<% } %>
+                  <% if (v.duration) { %><span class="d5st-dur"><%= Math.floor(v.duration / 60) %>:<%= String(v.duration % 60).padStart(2, '0') %></span><% } %>
+                </div>
+                <h3 class="d5st-title" style="font-size:14px;"><%= v.title %></h3>
+                <div class="d5st-meta"><span><i class="far fa-eye"></i> <%= v.views || 0 %> 次播放</span></div>
+              </a>
+            <% }); %>
+          <% } else { %>
+            <div class="d5st-empty">还没有视频</div>
+          <% } %>
+        </div>
+      </section>
+
+      <!-- 精彩推荐（后台横幅） -->
+      <% if (typeof banners !== 'undefined' && banners && banners.length) { %>
+      <section class="d5st-block">
+        <div class="d5st-head reveal-on-scroll" data-reveal>
+          <p class="section-kicker">Featured</p>
+          <h2>精彩推荐</h2>
+          <p>了解更多学校精彩内容</p>
+        </div>
+        <div class="d5st-grid">
+          <% banners.forEach(function (b) { %>
+            <a class="d5st-card reveal-on-scroll" data-reveal href="<%= b.link_url || '#' %>" <% if (b.link_url) { %>target="_blank"<% } %>>
+              <div class="d5st-thumb" style="height:150px;">
+                <% if (b.image_path) { %><img src="<%= b.image_path %>" alt="" onerror="this.style.display='none'" /><% } else { %><i class="fas fa-image"></i><% } %>
+              </div>
+              <h3 class="d5st-title" style="font-size:15px;"><%= b.title %></h3>
+              <p class="d5st-excerpt"><%= b.description || b.title %></p>
+            </a>
+          <% }); %>
+        </div>
+      </section>
+      <% } %>
+
+      <!-- 常用链接 -->
+      <section class="d5st-block" style="padding-bottom: 20px;">
+        <div class="d5st-head reveal-on-scroll" data-reveal>
+          <p class="section-kicker">Shortcuts</p>
+          <h2>常用链接</h2>
+          <p>便捷入口，一键直达</p>
+        </div>
+        <div class="d5st-grid cols-4">
+          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/secret"><div class="d5st-link-icon"><i class="fas fa-key"></i></div><h3>保密号</h3></a>
+          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/forum"><div class="d5st-link-icon"><i class="fas fa-comments"></i></div><h3>贴吧论坛</h3></a>
+          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/videos"><div class="d5st-link-icon"><i class="fas fa-play"></i></div><h3>校园风采</h3></a>
+          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/sponsor"><div class="d5st-link-icon"><i class="fas fa-heart"></i></div><h3>赞助支持</h3></a>
+          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/messages/guestbook"><div class="d5st-link-icon"><i class="fas fa-sticky-note"></i></div><h3>留言板</h3></a>
+          <% if (typeof links !== 'undefined' && links && links.length) { %>
+            <% links.forEach(function (l) { %>
+              <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="<%= l.url %>" target="_blank"><div class="d5st-link-icon"><i class="fas fa-link"></i></div><h3><%= l.title %></h3></a>
+            <% }); %>
+          <% } %>
+        </div>
+      </section>
     </div>
+  </div>
 
-    <!-- 最新帖子 -->
-    <section class="section">
-      <div class="section-head">
-        <h2 class="section-title">💬 最新动态</h2>
-        <p class="section-subtitle">看看大家最近在聊什么</p>
-      </div>
-      <div class="card-grid">
-        <% if (typeof posts !== 'undefined' && posts && posts.length) { %>
-          <% posts.forEach(function(p) { %>
-          <a href="/forum/<%= p.id %>" class="soft-card">
-            <div class="post-head-row">
-              <% if (p.is_top) { %><span class="pill pill-top">置顶</span><% } %>
-              <% if (p.is_hot) { %><span class="pill pill-hot">精华</span><% } %>
-              <span class="pill pill-cat"><%= p.category || '综合' %></span>
-            </div>
-            <div class="post-title"><%= p.title %></div>
-            <div class="post-excerpt"><%= p.content %></div>
-            <div class="card-meta">
-              <span><i class="fas fa-user"></i> <%= p.author %></span>
-              <span><i class="far fa-comment"></i> <%= p.comments_count %></span>
-              <span><i class="far fa-eye"></i> <%= p.views || 0 %></span>
-            </div>
-          </a>
-          <% }); %>
-        <% } else { %>
-          <div class="empty-note">还没有帖子，去贴吧发第一篇吧</div>
-        <% } %>
-      </div>
-    </section>
+  <div class="cursor-orb" aria-hidden="true"></div>
+  <div class="cursor-pop" aria-hidden="true">
+    <span class="pop-dot pop-dot-a"></span>
+    <span class="pop-dot pop-dot-b"></span>
+    <span class="pop-dot pop-dot-c"></span>
+    <span class="pop-dot pop-dot-d"></span>
+  </div>
 
-    <!-- 校园风采（视频） -->
-    <section class="section">
-      <div class="section-head">
-        <h2 class="section-title">🎬 校园风采</h2>
-        <p class="section-subtitle">记录校园里的每一份精彩</p>
+  <div class="cursor-reveal" aria-hidden="true">
+    <div class="hero-stage hero-stage-reveal">
+      <div class="hero-copy hero-copy-reveal js-tilt">
+        <p class="eyebrow">校园社区 · 实时连接 · 极致体验</p>
+        <h2>
+          <span class="title-strong">你好</span><span class="title-comma">，</span>
+          <span class="title-light">这里是 D5ST</span>
+        </h2>
+        <p class="subtitle">让每一次表达，都成为精准的直觉。</p>
       </div>
-      <div class="card-grid grid-4">
-        <% if (typeof videos !== 'undefined' && videos && videos.length) { %>
-          <% videos.forEach(function(v) { %>
-          <a href="/videos/<%= v.id %>" class="soft-card">
-            <div class="v-thumb">
-              <% if (v.cover_url) { %><img src="<%= v.cover_url %>" alt="" onerror="this.style.display='none'" /><% } else { %>🎬<% } %>
-              <% if (v.duration) { %><span class="v-dur"><%= Math.floor(v.duration/60) %>:<%= String(v.duration%60).padStart(2,'0') %></span><% } %>
-            </div>
-            <div class="post-title" style="font-size:14px;"><%= v.title %></div>
-            <div class="card-meta"><span><i class="far fa-eye"></i> <%= v.views || 0 %> 次播放</span></div>
-          </a>
-          <% }); %>
-        <% } else { %>
-          <div class="empty-note">还没有视频</div>
-        <% } %>
-      </div>
-    </section>
-
-    <!-- 校园风采（后台横幅） -->
-    <% if (typeof banners !== 'undefined' && banners && banners.length) { %>
-    <section class="section">
-      <div class="section-head">
-        <h2 class="section-title">📸 精彩推荐</h2>
-        <p class="section-subtitle">了解更多学校精彩内容</p>
-      </div>
-      <div class="card-grid">
-        <% banners.forEach(function(b) { %>
-        <a href="<%= b.link_url || '#' %>" class="soft-card" <% if (b.link_url) { %>target="_blank"<% } %>>
-          <div class="v-thumb" style="height:150px;">
-            <% if (b.image_path) { %>
-              <img src="<%= b.image_path %>" alt="" onerror="this.style.display='none'" />
-            <% } else { %>
-              <i class="fas fa-image" style="font-size:40px;color:#fff;"></i>
-            <% } %>
-          </div>
-          <div class="post-title" style="font-size:15px;"><%= b.title %></div>
-          <div class="post-excerpt"><%= b.description || b.title %></div>
-        </a>
-        <% }); %>
-      </div>
-    </section>
-    <% } %>
-
-    <!-- 常用链接 -->
-    <section class="section" style="padding-bottom:60px;">
-      <div class="section-head">
-        <h2 class="section-title">🔗 常用链接</h2>
-        <p class="section-subtitle">便捷入口，一键直达</p>
-      </div>
-      <div class="card-grid grid-4">
-        <a href="/secret" class="soft-card link-card"><div class="link-icon"><i class="fas fa-key"></i></div><h3>保密号</h3></a>
-        <a href="/forum" class="soft-card link-card"><div class="link-icon"><i class="fas fa-comments"></i></div><h3>贴吧论坛</h3></a>
-        <a href="/videos" class="soft-card link-card"><div class="link-icon"><i class="fas fa-play"></i></div><h3>校园风采</h3></a>
-        <a href="/sponsor" class="soft-card link-card"><div class="link-icon"><i class="fas fa-heart"></i></div><h3>赞助支持</h3></a>
-        <a href="/messages/guestbook" class="soft-card link-card"><div class="link-icon"><i class="fas fa-sticky-note"></i></div><h3>留言板</h3></a>
-        <% if (typeof links !== 'undefined' && links && links.length) { %>
-          <% links.forEach(function(l) { %>
-          <a href="<%= l.url %>" target="_blank" class="soft-card link-card"><div class="link-icon"><i class="fas fa-link"></i></div><h3><%= l.title %></h3></a>
-          <% }); %>
-        <% } %>
-      </div>
-    </section>
-  </main>
+    </div>
+  </div>
 </div>
-
-<script>
-  var currentSlide = 0;
-  var slides = document.querySelectorAll('.carousel-slide');
-  var indicators = document.querySelectorAll('.carousel-indicator');
-  function showSlide(index) {
-    slides.forEach(function (s, i) { s.classList.toggle('active', i === index); });
-    indicators.forEach(function (d, i) { d.classList.toggle('active', i === index); });
-    currentSlide = index;
-  }
-  function nextSlide() { showSlide((currentSlide + 1) % slides.length); }
-  function prevSlide() { showSlide((currentSlide - 1 + slides.length) % slides.length); }
-  function goToSlide(index) { showSlide(index); }
-  setInterval(nextSlide, 5000);
-</script>

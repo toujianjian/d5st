@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title><%= typeof title !== 'undefined' && title ? title : 'D5ST 校园社区' %><% if (typeof siteTitle !== 'undefined' && title && title !== siteTitle) { %> - <%= siteTitle %><% } %></title>
+    <meta name="description" content="D5ST 校园社区 - 连接每一位同学，共享校园生活" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>" />
+    <link rel="stylesheet" href="/public/font-awesome/all.min.css" />
+    <link rel="stylesheet" href="/public/css/pidanai-theme.css" />
+    <link rel="stylesheet" href="/public/css/pidanai.css" />
+    <link rel="stylesheet" href="/public/css/pidanai-home.css" />
+    <script>
+      /* 在样式表解析前同步设定主题，避免刷新先闪一下浅色再变深 */
+      (function () {
+        try {
+          var t = localStorage.getItem("leo-theme");
+          if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      html:not(.pdaim-cursor-ready) .cursor-reveal,
+      html:not(.pdaim-cursor-ready) .cursor-pop {
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+      .pdaim-fps {
+        min-width: 58px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg) 12%, transparent);
+        color: color-mix(in srgb, var(--fg) 74%, transparent);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        text-align: center;
+        pointer-events: none;
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, var(--fg) 7%, transparent),
+          0 4px 12px color-mix(in srgb, var(--pdaim-glass-shadow) 10%, transparent);
+      }
+      @media (max-width: 720px), (pointer: coarse) {
+        .pdaim-fps { display: none !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <%- body %>
+    <script src="/public/js/pidanai-liquid.js" defer></script>
+    <script src="/public/js/home-shell.js" defer></script>
+  </body>
+</html>
