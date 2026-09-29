@@ -194,11 +194,59 @@ function jsRules() {
     },
 
     // ---- SPA router basename ----
-    // react-router 的 createBrowserRouter({basename:"/"})
+    // 该版本 Casdoor 未在 createBrowserRouter 里显式传入 basename，而是沿用
+    // react-router Router 组件内部的默认值 `basename:t="/"`（见 minified 的
+    // function ix(e){let{basename:t="/",...}）。把它改成 PREFIX，使 SPA 在子路径
+    // 下正确解析路由、保留 OAuth 授权参数（否则客户端重定向到 /login 会丢参数）。
     {
-      name: 'js:router-basename',
-      re: /basename:"\/"/g,
-      to: `basename:${P}`,
+      name: 'js:router-basename-ix',
+      re: /(function ix\(e\)\{let\{basename:t=)"\/"/g,
+      to: (_m, p1) => `${p1}${P}`,
+    },
+
+    // ---- signinUrl 回跳地址：去掉 basename 前缀，避免 navigate 二次叠加 ----
+    // 症状：登录成功后落到 /casdoor/apps 而非回到 OAuth authorize。
+    // 根因：pL() 用 window.location.pathname（子路径下含 /casdoor 前缀）写入
+    //   sessionStorage.signinUrl，而登录后回跳走 react-router 的 navigate()
+    //   （basename 已设为 PREFIX），于是 URL 变成 /casdoor/casdoor/...，
+    //   路由不匹配 → 落到默认 /apps。
+    // 修复：把回跳地址里的 PREFIX 前缀剥掉，使其成为「路由路径」（不含 basename），
+    //   这样 navigate() 叠加 basename 后得到正确的 /casdoor/... 地址。
+    // 注：LoginPage 的 useEffect 用 useLocation().pathname（本就不含 basename），
+    //   写入的 localStorage.signinUrl 无需处理；此处只修 window.location.pathname
+    //   这种「读当前完整路径」的写法。
+    {
+      name: 'js:signinUrl-strip-prefix',
+      re: /sessionStorage\.setItem\("signinUrl",window\.location\.pathname\+window\.location\.search\)/g,
+      to: `sessionStorage.setItem("signinUrl",window.location.pathname.replace(new RegExp("^"+${JSON.stringify(PREFIX)}),"")+window.location.search)`,
+    },
+
+    // ---- 修复 OAuth 登录后落到 /apps：保留 code 登录类型 ----
+    // 症状：在 /login/oauth/authorize 页面用密码登录成功后，SPA 直接跳到 /casdoor/apps，
+    //   而不是带着 code 回跳 d5st 的 /auth/callback。
+    // 根因：SigninPage 的预处理函数 Se() 里有一句
+    //   e.type!=="device" && Nt(t?.redirectUri) && (e.type="login")
+    //   当 URL 带 redirect_uri（OAuth 授权场景）时，会把登录结果类型 e.type 从 "code"
+    //   强行改成 "login"；随后 se() 按 a==="login" 走 u(Lt())（应用列表 /apps），
+    //   于是 OAuth 完成分支 An() 永远到不了。
+    //   这正是子路径部署下暴露出来的问题：Nt(redirect_uri) 对 http://localhost:8080/auth/callback
+    //   判定为"不合法"，从而回退成普通登录。
+    // 修复：禁用“同源 redirect_uri 强制改 login”的覆盖。
+    // 根因（已在容器 bundle 中确认）：Nt (=index 里的 eO) 实现为
+    //   function eO(e){ if(!e) return !1; try{ return new URL(e).origin===e2() }catch{ return !1 } }
+    // 即“redirect_uri 与 casdoor 同源时才算合法/内部跳转”。子路径部署下，
+    // d5st 的回调 http://localhost:8080/auth/callback 与 casdoor 同处 localhost:8080（同源），
+    // 于是 Nt(redirect_uri) 为真，Se() 把登录结果类型 e.type 从 "code" 强行改成 "login"，
+    // 导致 se() 走 a==="login" 分支 u(Lt()) 跳到 /casdoor/apps，OAuth 完成分支 An() 到不了。
+    // 正常（非子路径）部署下 casdoor 与业务站在不同源，Nt 返回假，所以没问题。
+    // 修复：把该覆盖条件整体置为 &&!1（永远不覆盖），让 e.type 保留响应类型（OAuth 时为 "code"），
+    //   从而走 An()/P(h) 带上 code&state 回跳 redirect_uri；普通后台登录（无 redirect_uri，
+    //   t 为 null）仍由 `??"login"` 兜底为 "login"，行为不变。
+    // 正则不绑定压缩变量名（Nt/t 每次构建会变），只锚定稳定的字面量片段。
+    {
+      name: 'js:oauth-keep-code-type',
+      re: /e\.type!=="device"&&\w+\([^)]*redirectUri[^)]*\)&&\(e\.type="login"\)/g,
+      to: `e.type!=="device"&&!1&&(e.type="login")`,
     },
   ];
 }
@@ -215,7 +263,9 @@ function patchJsFile(file) {
   const interesting =
     text.includes('window.location.origin') ||
     text.includes('const se=""') ||
-    text.includes('basename:"/"');
+    text.includes('basename:t="') ||
+    text.includes('function ix(') ||
+    text.includes('redirectUri'); // SigninPage 等含 OAuth 参数处理，无上述标记但需被改写
   if (!interesting) return;
 
   const original = text;
@@ -265,8 +315,8 @@ function validate() {
     // API 基址
     if (t.includes('const se=""')) problems.push(`${label}: API 基址仍为空串`);
 
-    // router basename
-    if (/basename:"\/"/.test(t)) problems.push(`${label}: router basename 仍为 "/"`);
+    // router basename：react-router Router 默认 `basename:t="/"` 必须被改成前缀
+    if (/function ix\(e\)\{let\{basename:t="\/"/.test(t)) problems.push(`${label}: router basename 仍为 "/"`);
   }
 
   const html = readFileSync(join(WEB_DIR, 'index.html'), 'utf8');

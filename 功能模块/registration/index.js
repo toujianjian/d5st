@@ -110,6 +110,9 @@ router.post('/forgot-password/request', async (req, res) => {
 router.get('/auth/login', async (req, res) => {
   const state = genState();
   req.session.csrfState = state;
+  // 关键修复：OAuth state 同时写入独立 httpOnly cookie，避免写入 session 后在
+  // MemoryStore 并发读写竞态中被旧值覆盖（子路径下同源更易触发），导致回调 CSRF 校验失败。
+  res.cookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', path: '/' });
   req.session.nextUrl = req.query.next || '/';
 
   const available = await casdoor.isAvailable();
@@ -188,9 +191,14 @@ router.get('/auth/callback', async (req, res) => {
   }
   if (!code) return res.redirect('/login?error=missing_code');
 
-  // CSRF 校验
-  if (state && req.session.csrfState && state !== req.session.csrfState) {
-    ERR('CSRF state 不匹配，可能遭 CSRF 攻击');
+  // CSRF 校验：优先比对独立 oauth_state cookie（不依赖 cookie-parser，手动解析请求头；
+  // 规避 session 值在授权页加载期间被其它页面请求覆盖的风险），回退到 session
+  const mCookie = /(?:^|;\s*)oauth_state=([^;]+)/.exec(req.headers.cookie || '');
+  const cookieState = mCookie ? decodeURIComponent(mCookie[1]) : null;
+  const expectedState = cookieState || req.session.csrfState;
+  if (cookieState) res.clearCookie('oauth_state', { path: '/' });
+  if (state && expectedState && state !== expectedState) {
+    ERR('CSRF state 不匹配: returned=' + state + ' expected=' + expectedState);
     return res.redirect('/login?error=csrf_failed');
   }
 

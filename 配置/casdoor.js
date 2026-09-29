@@ -108,7 +108,8 @@ function getAuthUrl(extra = {}) {
     `&redirect_uri=${redirectUri}` +
     `&scope=${scope}` +
     `&state=${state}` +
-    `&prompt=${extra.prompt || 'consent'}`;
+    `&prompt=${extra.prompt || 'consent'}` +
+    `&organization=${encodeURIComponent(C.organization)}`;
 }
 
 // token 端点用 beego 的 Input().Get() 取参，只解析 query 和 form-urlencoded

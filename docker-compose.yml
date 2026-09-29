@@ -51,14 +51,14 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    # Casdoor 镜像无 wget/curl，用 sh 内置的 /dev/tcp 探测 8000 端口是否就绪；
+    # Casdoor 容器是 busybox ash，不支持 /dev/tcp，但有 wget；改用 wget 探测 8000。
     # 配合 app 的 service_healthy 依赖，避免 app 抢跑时 Casdoor 尚未监听。
     healthcheck:
-      test: ["CMD", "sh", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8000"]
+      test: ["CMD", "sh", "-c", "wget -qO- --timeout=3 http://127.0.0.1:8000/ >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 10s
+      start_period: 30s
     networks:
       - d5st-network
 

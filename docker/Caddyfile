@@ -19,6 +19,17 @@
 		}
 	}
 
+	# Casdoor 前端构建产物中的懒加载 chunk 以绝对路径 /assets/*.js 引用
+	# （Vite 打包不感知 /casdoor 子路径前缀）。d5st 自有静态资源全部在 /public 下，
+	# 不占用 /assets，因此把 /assets/* 直接转发给 casdoor，
+	# 否则这些 chunk 会被 d5st 的认证中间件 302 到 /login，
+	# 进而在 OAuth 授权页加载时把 d5st 会话的 csrfState 反复覆盖，导致回调 CSRF 校验必失败。
+	handle /assets/* {
+		reverse_proxy casdoor:8000 {
+			header_up Host {host}
+		}
+	}
+
 	# 其余流量转发给 d5st 应用（根路径）
 	handle {
 		reverse_proxy app:35555
