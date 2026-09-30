@@ -6,37 +6,10 @@
    - 用 pidanai 同一套玻璃公式（--pdaim-glass-* / --control-glass-shade）渲染 d5st 卡片
    ========================================================================== */
 
-/* —— 原生光标（拆掉 pidanai 自定义光标）——
-   pidanai 的 .cursor-reveal（聚光揭示层）与 .cursor-pop（点击气泡）跟随指针时
-   带缓动延迟，视觉位置与真实指针不一致，表现为「鼠标对不上」。
-   这里彻底禁用这两个层，全站改用系统原生光标。 */
-html .cursor-reveal,
-html .cursor-pop,
-html .cursor-orb {
-  display: none !important;
-}
-html body {
-  cursor: auto;
-}
-a,
-button,
-input,
-textarea,
-select,
-[role="button"] {
-  cursor: auto;
-}
-a,
-button,
-[role="button"],
-.nav-pill,
-.auth-button,
-.theme-toggle-float,
-.d5st-card {
-  /* 压过 pidanai 的 button/a{cursor:none} 以及滚动后 .native-cursor 的 auto，
-     确保交互元素始终是明确的手型光标，不会出现「光标消失」。 */
-  cursor: pointer !important;
-}
+/* —— 保留 pidanai 原生自定义光标 ——
+   系统光标由 pidanai 自带的 cursor:none 隐藏，只保留跟随指针的自定义光标层。
+   （此前误加 cursor:auto 让系统光标与自定义圆球同时存在、位置不同步，
+    才表现为「鼠标对不上」；不要再去禁用它。） */
 
 /* —— 放开文本选择（内容站可读） —— */
 body {
@@ -55,11 +28,19 @@ body {
   min-height: auto;
   padding: 0;
 }
-/* 揭示层（光标聚光）内的 hero 保持原版满屏，不受上述收缩影响 */
+/* 揭示层（光标聚光）内的 hero 必须与 base hero 的布局完全一致：
+   reveal 层是 position:fixed 的「窗口」，靠 transform 把内容摆回它在文档
+   中的位置。若两层内边距/对齐方式不同，圆球里的内容就会和背景错位
+   （表现为「鼠标对不上」）。这里对齐 base 的 .hero.route-page 内边距，
+   并取消原版的满屏 100vh 垂直居中。 */
 .cursor-reveal .hero-stage-reveal {
-  width: 100vw;
-  height: 100vh;
-  min-height: 100vh;
+  /* 用真实文档宽度（由 JS 写入 --pdaim-doc-width）而非 100vw，
+     避免带上经典滚动条宽度造成揭示内容与背景水平错位。 */
+  width: var(--pdaim-doc-width, 100vw);
+  height: auto;
+  min-height: auto;
+  display: block;
+  padding: 116px 24px 64px;
 }
 
 /* —— 内容首块在首屏即可见：与 Hero 拉开合理间距 —— */

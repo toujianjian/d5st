@@ -77,6 +77,13 @@
     cursorReveal.style.setProperty("--cursor-inner-x", `${activeRadius - x}px`);
     cursorReveal.style.setProperty("--cursor-inner-y", `${activeRadius - y - window.scrollY}px`);
   }
+  /* 揭示层若用 100vw 定位会带上经典滚动条宽度，而 base 内容按文档宽度居中，
+     两者相差一个滚动条宽，居中后表现为半个滚动条宽的水平错位。
+     这里把真实文档宽度同步给 CSS，让揭示层与 base 共用同一宽度基准。 */
+  function syncDocWidth() {
+    const w = document.documentElement.getBoundingClientRect().width;
+    if (w > 0) root.style.setProperty("--pdaim-doc-width", `${w}px`);
+  }
   function setCursorScale(scale) {
     cursorScale = clamp(scale, 0.035, 1.06);
     updateCursorGeometry();
@@ -433,6 +440,10 @@
     updateBackgroundTransition(progress);
   }
   function flushScrollEffects() {
+    // 关键：rAF 执行后必须复位，否则 queueScrollEffects 里的
+    // `if (scrollFrame) return` 会从第二次滚动起永久拦截，导致
+    // 滚动渐显 / 背景过渡 / 光标淡出等所有滚动驱动效果只跑一次。
+    scrollFrame = 0;
     root.classList.toggle("has-scrolled", window.scrollY > window.innerHeight * 0.18);
     updateScrollCursorEffect();
     updateCursorInnerOffset();
@@ -443,7 +454,7 @@
     scrollFrame = requestAnimationFrame(flushScrollEffects);
   }
   window.addEventListener("scroll", () => { queueScrollEffects(); }, { passive: true });
-  window.addEventListener("resize", () => { queueScrollEffects(); });
+  window.addEventListener("resize", () => { syncDocWidth(); queueScrollEffects(); });
 
   /* ---------- 页面光标可用性 ---------- */
   function setPageCursorAvailability() {
@@ -504,6 +515,7 @@
   cursorReveal && cursorReveal.style.setProperty("--cursor-opacity", "0");
   root.classList.add("pdaim-cursor-ready");
   setPageCursorAvailability();
+  syncDocWidth();
   updateRevealItems();
   startFpsMeter();
   startLineField();
