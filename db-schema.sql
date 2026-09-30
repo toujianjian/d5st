@@ -443,3 +443,41 @@ INSERT IGNORE INTO home_banners (title, image_path, link_url, sort_order) VALUES
 -- 首次 Casdoor OAuth 登录时 findOrCreateCasdoorUser 会按 username 命中本行并回填真实 id。
 INSERT IGNORE INTO casdoor_users (casdoor_user_id, username, real_name, is_admin) VALUES
 ('d5st_admin_seed', 'd5stadmin', '系统管理员', 1);
+
+-- ------------------------------------------------------------
+-- 默认示例内容：论坛版块 / 一篇帖子 / 两条评论 / 一个视频
+-- 目的：新库初始化后首页与论坛即有内容，不再是空白页。
+-- 幂等：全部走 INSERT IGNORE，配合固定主键或唯一键，重复执行不会产生重复数据。
+-- 归属：示例内容挂到上面的默认管理员账号，用 SELECT 动态取 id，
+--       避免把自增主键写死（casdoor_users 的 id 由自增/后续同步决定）。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO forum_boards (name, slug, icon, description, sort_order) VALUES
+('校园闲聊', 'chat', '💬', '校园日常，随便聊聊', 1),
+('学习交流', 'study', '📚', '课程、考研、干货分享', 2),
+('情感树洞', 'emotion', '💗', '倾诉与倾听的角落', 3),
+('二手交易', 'market', '🛒', '闲置流转，校内交易', 4),
+('求职实习', 'job', '💼', '实习、校招、简历经验', 5);
+
+INSERT IGNORE INTO forum_posts (id, user_id, title, content, category, board_id, post_type, tags, views)
+SELECT 1, cu.id,
+  '图书馆三楼靠窗的位置真的太香了',
+  '每天早上八点前去三楼，靠窗那一排基本都能占到。阳光刚好，插座也有，复习效率直接翻倍。就是下午会有点晒，建议带个小夹子挂个本子挡一下。',
+  'campus',
+  (SELECT id FROM forum_boards WHERE slug = 'chat' LIMIT 1),
+  'normal', '图书馆 学习 日常', 436
+FROM casdoor_users cu WHERE cu.username = 'd5stadmin' LIMIT 1;
+
+INSERT IGNORE INTO post_comments (id, post_id, user_id, parent_id, content)
+SELECT 1, 1, cu.id, NULL, '三楼确实好，不过我这学期才发现，已经期末了😭'
+FROM casdoor_users cu WHERE cu.username = 'd5stadmin' LIMIT 1;
+
+INSERT IGNORE INTO post_comments (id, post_id, user_id, parent_id, content)
+SELECT 2, 1, cu.id, 1, '补充一下：四楼有插座的位置更多，安静程度也更好。'
+FROM casdoor_users cu WHERE cu.username = 'd5stadmin' LIMIT 1;
+
+INSERT IGNORE INTO video_posts (id, user_id, title, description, video_url, duration, views, category, is_recommended)
+SELECT 1, cu.id,
+  '校园秋季运动会开幕式航拍',
+  '无人机视角记录今年运动会的开幕式，方阵入场 + 团体操表演。',
+  'https://www.w3schools.com/html/mov_bbb.mp4', 214, 1832, 'campus', 1
+FROM casdoor_users cu WHERE cu.username = 'd5stadmin' LIMIT 1;
