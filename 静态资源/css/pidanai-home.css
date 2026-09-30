@@ -6,9 +6,40 @@
    - 用 pidanai 同一套玻璃公式（--pdaim-glass-* / --control-glass-shade）渲染 d5st 卡片
    ========================================================================== */
 
-/* —— 原生光标 / 选择 —— */
-body {
+/* —— 原生光标（拆掉 pidanai 自定义光标）——
+   pidanai 的 .cursor-reveal（聚光揭示层）与 .cursor-pop（点击气泡）跟随指针时
+   带缓动延迟，视觉位置与真实指针不一致，表现为「鼠标对不上」。
+   这里彻底禁用这两个层，全站改用系统原生光标。 */
+html .cursor-reveal,
+html .cursor-pop,
+html .cursor-orb {
+  display: none !important;
+}
+html body {
   cursor: auto;
+}
+a,
+button,
+input,
+textarea,
+select,
+[role="button"] {
+  cursor: auto;
+}
+a,
+button,
+[role="button"],
+.nav-pill,
+.auth-button,
+.theme-toggle-float,
+.d5st-card {
+  /* 压过 pidanai 的 button/a{cursor:none} 以及滚动后 .native-cursor 的 auto，
+     确保交互元素始终是明确的手型光标，不会出现「光标消失」。 */
+  cursor: pointer !important;
+}
+
+/* —— 放开文本选择（内容站可读） —— */
+body {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -29,37 +60,6 @@ body {
   width: 100vw;
   height: 100vh;
   min-height: 100vh;
-}
-
-/* —— 大标题 hover（恢复"鼠标放到标题上"的反馈，pidanai 原版无此规则）——
-   标题文字默认以渐变裁切呈现（两端为前景色，中部藏一抹冷光），hover 时
-   渐变滑过产生流光；整块轻微抬升并加投影发光。与 Hero 的 3D 倾斜并存不冲突。 */
-.hero-copy h1 {
-  cursor: default;
-  transition: transform .4s cubic-bezier(.34, 1.56, .64, 1), filter .4s ease;
-}
-.hero-copy h1:hover {
-  transform: translateY(-4px);
-  filter: drop-shadow(0 12px 34px color-mix(in srgb, var(--fg) 24%, transparent));
-}
-.hero-copy h1 .title-strong,
-.hero-copy h1 .title-light {
-  background-image: linear-gradient(100deg,
-    var(--fg) 28%,
-    color-mix(in srgb, var(--fg) 42%, #79b8ff) 50%,
-    color-mix(in srgb, var(--fg) 42%, #74e8c0) 60%,
-    var(--fg) 76%);
-  background-size: 250% 100%;
-  background-position: 0% 0;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  transition: background-position .75s ease;
-}
-.hero-copy h1:hover .title-strong,
-.hero-copy h1:hover .title-light {
-  background-position: 100% 0;
 }
 
 /* —— 内容首块在首屏即可见：与 Hero 拉开合理间距 —— */
