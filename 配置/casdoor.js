@@ -3,6 +3,7 @@
 // 参考：https://casdoor.org/docs/app/quickstart/backend
 // ============================================================
 const axios = require('axios');
+const crypto = require('crypto');
 
 const C = {
   endpoint: (process.env.CASDOOR_ENDPOINT || 'http://localhost:8000').replace(/\/$/, ''),
@@ -239,7 +240,11 @@ async function userLogout(accessToken) {
 
 // =================== 组织 / 应用 / 组 ===================
 async function getOrganization(name) {
-  return admin('get-organization', { organization: name });
+  // 与 get-user / get-application 同一个坑：Casdoor 的 get-organization 只认
+  // id 参数（格式 owner/name，organization 行的 owner 固定为 'admin'）。
+  // 此前传 organization 会返回 status='error'，被上层 catch 吞掉后误判为
+  // 「组织不存在」，于是每次都走重复创建分支，组织字段（favicon 等）永远不更新。
+  return admin('get-organization', { id: `admin/${name}` });
 }
 
 async function createOrganization(org) {
@@ -247,7 +252,9 @@ async function createOrganization(org) {
 }
 
 async function updateOrganization(org) {
-  return adminPost('update-organization', org);
+  // id 必须通过 query 参数传递（与 get-organization 一致）；
+  // 放进 body 会报 "GetOwnerAndNameFromId() error, wrong token count for ID"
+  return adminPost('update-organization', org, { id: `admin/${org.name}` });
 }
 
 async function listOrganizations() {
@@ -426,18 +433,46 @@ async function listWebhooks(org) {
 }
 
 // =================== 认证事件 & 日志 ===================
+// Casdoor 的审计日志对象是 Record：
+//   写入 POST /api/add-record，查询 GET /api/get-records
+// 旧代码用的 'add-event' / 'list-auth-logs' 两个端点在现行 Casdoor 中并不存在，
+// 导致每次登录/登出都抛 404（日志里刷 "[Auth] logEvent 失败"），
+// 后台「认证日志」也永远是空的。
 async function logEvent(event) {
   // event: { organization, application, type, user, message, requestUri, userAgent, ip }
-  return adminPost('add-event', event);
+  const record = {
+    owner: event.owner || C.organization,
+    name: typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : crypto.randomBytes(16).toString('hex'),
+    createdTime: new Date().toISOString(),
+    organization: event.organization || C.organization,
+    clientIp: event.ip || event.clientIp || '',
+    user: event.user || '',
+    method: event.method || 'POST',
+    requestUri: event.requestUri || '',
+    action: event.type || event.action || '',
+    language: 'zh',
+    object: JSON.stringify({
+      application: event.application || '',
+      message: event.message || '',
+      userAgent: event.userAgent || ''
+    }),
+    response: event.message || '',
+    statusCode: event.statusCode || 200,
+    isTriggered: true
+  };
+  return adminPost('add-record', record);
 }
 
 async function listAuthLogs(org, app, limit = 100) {
-  return admin('list-auth-logs', { organization: org, application: app, limit });
+  // 过滤必须走 field/value 传参：直接传 organization 会被忽略，
+  // 导致返回所有组织的记录（已实测）。
+  return admin('get-records', { field: 'organization', value: org, pageSize: limit, p: 1 });
 }
 
 // =================== Webhook 签名校验 ===================
 // Casdoor webhook 请求带 X-Casdoor-Signature = HMAC-SHA256(body, secret)
-const crypto = require('crypto');
 function verifyWebhookSignature(rawBody, signature, secret = C.webhookSecret) {
   if (!signature) return false;
   try {

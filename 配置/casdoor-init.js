@@ -9,10 +9,23 @@ const LOG = (msg) => console.log(`[Casdoor-Init] ${msg}`);
 const ERR = (msg) => console.warn(`[Casdoor-Init] ${msg}`);
 
 async function ensureOrganization() {
+  const desiredFavicon = `${C.appUrl}/public/images/logo.svg`;
   try {
     const existing = await casdoor.getOrganization(C.organization);
     if (existing) {
-      LOG(`组织 "${C.organization}" 已存在`);
+      // 已存在时也要同步 favicon：旧值是一个 404 的外链，
+      // 会让 Casdoor 登录页/标签页的图标破图。
+      if (existing.favicon !== desiredFavicon) {
+        existing.favicon = desiredFavicon;
+        try {
+          await casdoor.updateOrganization(existing);
+          LOG(`组织 "${C.organization}" favicon 已同步`);
+        } catch (err) {
+          ERR(`同步组织 favicon 失败: ${err.message}`);
+        }
+      } else {
+        LOG(`组织 "${C.organization}" 已存在`);
+      }
       return existing;
     }
   } catch (e) { /* not found */ }
@@ -26,7 +39,9 @@ async function ensureOrganization() {
     name: C.organization,
     displayName: 'D5ST 校园社区',
     websiteUrl: C.appUrl,
-    favicon: 'https://cdn.jsdelivr.net/gh/nextgis/d5st-logo/d5st-logo.png',
+    // 旧值指向 https://cdn.jsdelivr.net/gh/nextgis/d5st-logo/d5st-logo.png，
+    // 该资源实际 404，会让 Casdoor 登录页/标签页的图标变成破图。
+    favicon: `${C.appUrl}/public/images/logo.svg`,
     tags: ['campus', 'community'],
     // 密码策略：留空使用 Casdoor 默认值（旧代码传 passwordOptions 对象，
     // 但当前 casdoor:latest 镜像要求 passwordOptions 是 []string，
@@ -92,32 +107,44 @@ async function ensureApplication() {
       // 同步 URL 类字段到当前 APP_URL：避免本地/线上切换后 Casdoor 库里残留
       // 旧域名的 redirectUris 导致回调校验失败（典型表现：登录跳转到远程域名）
       const desiredRedirect = `${C.appUrl}/auth/callback`;
-      // 检测 signupItems 里 Email / Display name 是否仍 required（若仍 true 就同步）
+      const desiredLogo = `${C.appUrl}/public/images/logo.svg`;
+      // 检测 signupItems 的必填项是否需要放宽：
+      //  - Email / Display name 应非必填
+      //  - Phone 也必须非必填：本站没有配置短信 Provider，手机号一旦必填，
+      //    注册就会卡在「获取验证码」并报 "Phone number is invalid"（实测）
       const items = existing.signupItems || [];
       const stillRequiresEmail = items.some(i => i.name === 'Email' && i.required);
       const stillRequiresDisplayName = items.some(i => i.name === 'Display name' && i.required);
+      const stillRequiresPhone = items.some(i => i.name === 'Phone' && i.required);
       const needSync =
         !(existing.redirectUris || []).includes(desiredRedirect) ||
         existing.homepageUrl !== C.appUrl ||
         existing.logoutUrl !== `${C.appUrl}/logout` ||
         existing.redirectUrl !== C.appUrl ||
+        existing.logo !== desiredLogo ||
+        existing.favicon !== desiredLogo ||
         stillRequiresEmail ||
-        stillRequiresDisplayName;
+        stillRequiresDisplayName ||
+        stillRequiresPhone;
       if (needSync) {
         existing.redirectUris = [desiredRedirect];
         existing.homepageUrl = C.appUrl;
         existing.logoutUrl = `${C.appUrl}/logout`;
         existing.redirectUrl = C.appUrl;
-        // 只翻转 Email / Display name 的 required 为 false，保留 Casdoor 的其他默认项
+        existing.logo = desiredLogo;
+        existing.favicon = desiredLogo;
+        // 翻转 Email / Display name / Phone 的 required 为 false，保留 Casdoor 的其他默认项
         // （Confirm password / Agreement / Tag 等）不被覆盖
         existing.signupItems = (existing.signupItems || []).map(i =>
-          (i.name === 'Email' || i.name === 'Display name') ? { ...i, required: false } : i
+          (i.name === 'Email' || i.name === 'Display name' || i.name === 'Phone')
+            ? { ...i, required: false }
+            : i
         );
         // Casdoor update-application 端点要从 id 解析 owner/name，
         // owner 固定 'admin'（见上方 create 分支说明）
         existing.id = `admin/${C.application}`;
         await casdoor.updateApplication(existing);
-        LOG(`应用 "${C.application}" URL + signupItems 已同步到当前配置`);
+        LOG(`应用 "${C.application}" URL / logo / signupItems 已同步到当前配置`);
       } else {
         LOG(`应用 "${C.application}" 已存在`);
       }
@@ -131,7 +158,8 @@ async function ensureApplication() {
     owner: 'admin',
     name: C.application,
     displayName: 'D5ST 校园社区',
-    logo: 'https://cdn.jsdelivr.net/gh/nextgis/d5st-logo/d5st-logo.png',
+    // 同组织 favicon：旧外链 404 会让登录页 logo 破图
+    logo: `${C.appUrl}/public/images/logo.svg`,
     organization: C.organization,
     homepageUrl: C.appUrl,
     description: 'D5ST 校园社区网站应用',
