@@ -147,6 +147,38 @@ docker compose run --rm -p 35555:35555 app npm run dev
 - 建议在前端配置 HTTPS 反向代理（Nginx / Traefik）
 - Casdoor 管理后台默认口令请在首次登录后立即修改
 
+### 高危：`ENABLE_DEV_LOGIN` 开发登录后门
+
+`.env` 中的 `ENABLE_DEV_LOGIN=1` 会开启一个**免密开发登录入口** `GET /auth/dev-login`（仅用于本地自动化测试），**绝不能留在生产环境**。
+
+危害：
+- 任何能访问站点的人，只要请求 `/auth/dev-login` 即可**免密登录**默认账号 `dev_user`；
+- 若请求 `/auth/dev-login?admin=1`，该账号会被**直接提权为管理员**（`is_admin=1`），进而访问 `/admin` 后台、篡改/删除内容、操作数据。
+
+正确做法：
+- 本地调试：`.env` 保留 `ENABLE_DEV_LOGIN=1`（该文件已在 `.gitignore`，不入库）；
+- 生产部署：**务必删除该条目或设为 `ENABLE_DEV_LOGIN=0`**，并排查 CI / 服务器环境变量中是否残留此变量；
+- 上线前检查 `casdoor_users` 表是否存在 `dev_user` 或异常提权账号，及时清理。
+
+### 注意事项：找回密码 SMTP / MailHog
+
+当前 `.env` 的 SMTP 指向容器内 MailHog（`CASDOOR_SMTP_HOST=mail`），验证码**只在本地 `http://localhost:8025` 可见、不会真发邮件**。生产请：
+- 替换为真实 SMTP，并删除 `docker-compose.yml` 中的 `mailhog` 服务；
+- 否则 `/forgot-password/request` 发出的验证码会落到本地 MailHog，存在被本地拦截、邮件内容外泄的风险。
+
+### 注意事项：密钥与 Secret
+
+注册/登录走 Casdoor OAuth。切勿将 Casdoor 的 `Client Secret`、管理员口令、数据库密码写入前端代码或提交到仓库。
+
+### 注意事项：Session Cookie 与密钥
+
+`app.js` 使用 `express-session`，当前 cookie 仅配置了 `httpOnly: true` 与 2 小时 `maxAge`。以下生产隐患需在部署前自行处理（均为代码层配置，需改 `app.js` 的 `session(...)` 调用）：
+
+- **`SESSION_SECRET` 必须改**：代码 fallback 为 `d5st-dev-secret-change-me`、`.env.example` 占位为 `d5st_session_secret_change_in_production`。若部署者未改，攻击者可伪造 session。生产请设置强随机值（如 `openssl rand -hex 32`）。
+- **缺 `secure`**：cookie 未设 `secure`。HTTPS 部署时建议 `secure: process.env.NODE_ENV === 'production'`，避免会话 cookie 在非安全通道传输（中间人风险）。
+- **缺 `sameSite`**：建议显式 `sameSite: 'lax'`（敏感操作可用 `'strict'`），收紧跨站 CSRF 面。
+- **默认 MemoryStore**：未配置 `store`，session 存进程内存。单实例本地无碍，但容器重启会全员掉登录、多副本不共享、长期运行有内存增长。生产建议改接 MySQL（如 `express-mysql-session`）。
+
 ## 许可证
 
 MIT License
