@@ -63,15 +63,16 @@ router.get('/login', (req, res) => {
 // 注册页（Casdoor 处理注册，d5st 只提供引导）
 router.get('/register', (req, res) => {
   if (req.session.user) return res.redirect('/');
-  const state = genState();
-  req.session.csrfState = state;
-  req.session.nextUrl = req.query.next || '/';
-  const authUrl = casdoor.getAuthUrl({ state, prompt: 'consent' });
+  // 注册入口直接指向 d5st-app 的注册表单（/casdoor/signup/<application>），
+  // 而非经 OAuth 登录页（prompt=consent）后再点「立即注册」——
+  // 后者在子路径部署下会丢失应用名、被弹回登录页，用户无法注册（已实测复现）。
+  // d5st-app 的注册表单仅需用户名+密码（邮箱/手机/显示名可选，无需验证码），
+  // 注册成功后由 Casdoor 引导回 d5st 登录页完成 OAuth 登录。
+  const signupUrl = `/casdoor/signup/${casdoor.C.application}`;
   res.render('registration/register', {
     title: '注册 D5ST',
-    authUrl,
-    error: req.query.error,
-    endpoint: casdoor.C.endpoint
+    signupUrl,
+    error: req.query.error
   });
 });
 
