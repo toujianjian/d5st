@@ -89,26 +89,38 @@ docker compose logs app | grep Casdoor-Init
 ### 授予 / 取消管理员权限
 
 **权限的唯一来源是 Casdoor 的用户组**：只要用户属于组 `d5st-admin`，本站就认定其为管理员
-（见 `配置/user-service.js` 的 `isAdminFromCasdoor()`）。所以正确做法是在 Casdoor 里加组：
+（见 `配置/user-service.js` 的 `isAdminFromCasdoor()`）。
 
-1. 打开 `http://localhost:35545/casdoor` → **Users** → 点开目标用户
-2. 在 **Groups** 一栏勾选 `d5st-admin` → 保存
-3. 让该用户**退出后重新登录**（`is_admin` 只在登录时写进 session）
+#### 方式一：Casdoor 控制台（推荐）
 
-取消管理员同理：把该用户从 `d5st-admin` 组里移除，再重新登录。
+1. 打开 `http://localhost:35545/casdoor` → 左侧 **用户管理 → 用户** → 找到目标用户，点右侧 **编辑**
+2. 在编辑表单里**往下滚**，找到 **「群组」** 字段
+   （位置在 **「权限」下面**、`注册来源` / `角色` 附近；新控制台 UI 是中文，即英文界面的 `Groups`）
+3. 展开「群组」下拉 → 选中 **`D5ST 管理员 (d5st/d5st-admin)`** → 右上角 **保存**
+4. 让该用户**退出后重新登录**
 
-> ⚠️ **不要只改数据库**。本站每次登录都会用 Casdoor 的组关系**覆写**本地
-> `casdoor_users.is_admin`（`findOrCreateCasdoorUser()` 的 UPDATE 分支），
-> 所以手动 `UPDATE ... SET is_admin = 1` 在该用户**下次登录时就会被改回 0**。
+取消管理员同理：把「群组」里的 `d5st-admin` 去掉再保存，然后重新登录。
 
-只有在 Casdoor 不可用、需要应急放行时才用 SQL，并且要接受它被覆盖：
+#### 方式二：直接改组关系（控制台不好找字段时）
+
+改 Casdoor 的组关系与在控制台勾选「群组」是同一件事（`casdoor-init.js` 内部也是这么做的），
+而且它才是权威来源，**不会被覆写**：
 
 ```bash
-docker compose exec mysql mysql -u d5st -p"${MYSQL_PASSWORD:-d5st_pass_2026}" d5st \
-  -e "UPDATE casdoor_users SET is_admin = 1 WHERE username = 'some_user';"
+docker compose exec mysql mysql -u d5st -p"${MYSQL_PASSWORD:-d5st_pass_2026}" casdoor \
+  -e "UPDATE casdoor.user SET \`groups\` = '[\"d5st-admin\"]' WHERE owner = 'd5st' AND name = 'some_user';"
 ```
 
-改完该用户必须**重新登录**才生效（`is_admin` 存在 session 里，不是每次请求都查库）。
+改完让该用户**重新登录**即可（登录时会自动同步到本地 `is_admin`）。
+想立刻刷新本地库，也可以在管理员仪表盘点一次「同步用户」（`POST /admin/sync-users`）。
+
+> ⚠️ **只改本站数据库的 `is_admin` 是没用的**。本站每次登录都会用 Casdoor 的组关系
+> **覆写**本地 `casdoor_users.is_admin`（`findOrCreateCasdoorUser()` 的 UPDATE 分支），
+> 所以：
+> ```sql
+> -- 反例：下次登录就被改回 0
+> UPDATE casdoor_users SET is_admin = 1 WHERE username = 'some_user';
+> ```
 
 > 另一个坑：app 每次启动会与 Casdoor 对账，**本地存在但 Casdoor 里已不存在的用户会被删除**
 > （连带其帖子 / 评论 / 私信 / 好友关系）。所以不要指望只用 SQL 造账号。

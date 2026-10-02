@@ -174,7 +174,13 @@ docker compose up -d --build
 **原因**: 权限的唯一来源是 Casdoor 的用户组 `d5st-admin`。每次登录时，
 `findOrCreateCasdoorUser()` 都会按 Casdoor 的组关系**覆写**本地 `casdoor_users.is_admin`，
 所以只改数据库的 `is_admin` 会在该用户下次登录时被改回 0。
-**解决**: 在 Casdoor 控制台把该用户加入 `d5st-admin` 组，然后让用户重新登录。
+**解决**: 在 Casdoor 控制台 **用户管理 → 用户 → 编辑** 里，找到 **「群组」** 字段
+（在「权限」下面，页面靠下，需要往下滚；英文界面叫 `Groups`），选中 `D5ST 管理员 (d5st/d5st-admin)` 保存，
+然后让用户重新登录。控制台不好找字段时，也可直接改组（方式二）：
+```bash
+docker compose exec mysql mysql -u d5st -p"${MYSQL_PASSWORD:-d5st_pass_2026}" casdoor \
+  -e "UPDATE casdoor.user SET \`groups\` = '[\"d5st-admin\"]' WHERE owner = 'd5st' AND name = 'some_user';"
+```
 （详见 README「授予 / 取消管理员权限」）
 
 ### Q: 改了 Casdoor 控制台密码后，找回密码/用户同步/导出预览全报错
