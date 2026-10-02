@@ -333,7 +333,9 @@ async function updateUser(user) {
 }
 
 async function deleteUser(org, name) {
-  return adminPost('delete-user', { organization: org, user: name });
+  // 与 get-user / update-user 同理：该镜像的 delete-user 要求通过 id 查询参数
+  // 解析 owner/name（仅靠 body 会被静默忽略，表现为"接口成功但没删掉"）。
+  return adminPost('delete-user', { owner: org, name }, { id: `${org}/${name}` });
 }
 
 // 同上：端点已由 list-users 更名为 get-users，参数用 owner 而非 organization

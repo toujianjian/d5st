@@ -35,11 +35,10 @@ async function handleEvent(event) {
       break;
     }
     case 'User delete': {
-      const local = await userService.getUserByCasdoorId(casdoorUser.id || casdoorUser.name);
-      if (local) {
-        await userService.disableLocalUser(casdoorUser.id || casdoorUser.name);
-        console.log(`[Casdoor Webhook] 用户禁用: ${casdoorUser.name}`);
-      }
+      // Casdoor 后台删除用户 → 同步清理本地映射，使其从 d5st 中消失
+      const key = casdoorUser.id || casdoorUser.name;
+      const removed = await userService.removeLocalUser(key);
+      console.log(`[Casdoor Webhook] 用户删除: ${casdoorUser.name}（本地清理 ${removed} 行）`);
       break;
     }
     case 'User logout': {

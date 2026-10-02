@@ -152,22 +152,21 @@ async function syncAllFromCasdoor(casdoor) {
   return { synced: updated, total: users?.length || 0 };
 }
 
-// 本地映射表中"并非 Casdoor 用户"的演示/开发账号特征：
-//   seed!_%  → 配置/seed.js 写入的演示用户（casdoor_user_id 形如 seed_u1）
-//   dev-!_%  → 开发登录后门写入（casdoor_user_id 形如 dev-dev_user）
-//   dev_user → 开发登录默认账号
-// 用 '!' 作转义符，MySQL / SQLite 都支持。
-const NON_CASDOOR_PATTERNS = [
-  "casdoor_user_id LIKE 'seed!_%' ESCAPE '!'",
-  "casdoor_user_id LIKE 'dev-!_%' ESCAPE '!'",
-  "username = 'dev_user'"
-];
+// 删除本地用户映射（用于 Casdoor 侧删除用户后的同步清理）
+async function removeLocalUser(casdoorUserId) {
+  const [r] = await pool.query(
+    'DELETE FROM casdoor_users WHERE casdoor_user_id = ?',
+    [String(casdoorUserId)]
+  );
+  return (r && r.affectedRows) || 0;
+}
 
 // 与 Casdoor 对账，让本地 casdoor_users 与 Casdoor(d5st 组织) 保持一致：
 //   1) 正向：以 Casdoor 为准，把用户补齐 / 更新到本地
-//   2) 清理：删除本地表中来源为 seed.js / dev-login 的演示账号（它们不在 Casdoor）
-// 注意：删除 casdoor_users 行会级联删除其帖子/评论/私信等内容，
-//       因此这里只删「特征明确」的演示/开发账号，绝不按"未知账号"批量删除。
+//   2) 反向：删除本地表中「Casdoor 已不存在」的用户
+//      （涵盖 seed.js 演示账号、dev-login 账号，以及已在 Casdoor 后台删除的用户）
+// 安全护栏：Casdoor 返回空时不清理，避免异常导致本地被清空。
+// 注意：删除 casdoor_users 行会级联删除其帖子/评论/私信等内容。
 async function reconcileCasdoorUsers(casdoor) {
   const result = { ok: false, synced: 0, removed: 0, total: 0, reason: '' };
 
@@ -179,12 +178,12 @@ async function reconcileCasdoorUsers(casdoor) {
     return result;
   }
   if (!users || users.length === 0) {
-    // Casdoor 返回空可能是异常（或确实没用户）；此时不清理，避免误删本地数据
     result.reason = 'Casdoor 未返回用户，跳过对账';
     return result;
   }
   result.total = users.length;
 
+  // 正向：Casdoor → 本地（新增 / 更新资料与权限）
   for (const u of users) {
     try {
       await findOrCreateCasdoorUser(u);
@@ -192,13 +191,21 @@ async function reconcileCasdoorUsers(casdoor) {
     } catch (e) { /* 单个用户失败不影响整体 */ }
   }
 
+  // 反向：本地存在但 Casdoor 已无 → 删除
   try {
-    const [del] = await pool.query(
-      `DELETE FROM casdoor_users WHERE ${NON_CASDOOR_PATTERNS.join(' OR ')}`
+    const keySet = new Set();
+    users.forEach(u => { keySet.add(String(u.id)); keySet.add(String(u.name)); });
+    const [locals] = await pool.query('SELECT id, casdoor_user_id, username FROM casdoor_users');
+    const stale = (locals || []).filter(
+      row => !keySet.has(String(row.casdoor_user_id)) && !keySet.has(String(row.username))
     );
-    result.removed = (del && del.affectedRows) || 0;
+    for (const row of stale) {
+      await pool.query('DELETE FROM casdoor_users WHERE id = ?', [row.id]);
+      result.removed++;
+      console.log(`[用户同步] 清理本地用户（Casdoor 已不存在）: ${row.username}`);
+    }
   } catch (e) {
-    result.reason = '清理演示账号失败: ' + e.message;
+    result.reason = '反向清理失败: ' + e.message;
   }
 
   result.ok = true;
@@ -213,6 +220,7 @@ module.exports = {
   isAdmin,
   syncAllFromCasdoor,
   reconcileCasdoorUsers,
+  removeLocalUser,
   isAdminFromCasdoor
 };
 
