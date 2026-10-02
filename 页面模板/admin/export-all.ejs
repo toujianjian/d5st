@@ -1,0 +1,85 @@
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h3>📊 概览</h3><a href="/admin">仪表盘</a>
+    <h3>📋 内容管理</h3><a href="/admin/forum">帖子管理</a>
+    <a href="/admin/comments">评论管理</a><a href="/admin/reports">举报管理</a><a href="/admin/videos">视频管理</a><a href="/admin/boards">版块管理</a>
+    <h3>🔔 通知与弹窗</h3><a href="/admin/notifications">全局通知</a><a href="/admin/popups">弹窗管理</a>
+    <h3>🏠 首页设置</h3><a href="/admin/home-links">首页链接</a><a href="/admin/home-banners">首页横幅</a>
+    <h3>🛠️ 系统</h3><a href="/admin/path-redirects">路径重定向</a><a href="/admin/recycle-bin">回收站</a><a href="/admin/export-users">导出用户</a><a href="/admin/export-all">导出全部数据</a><a href="/admin/settings">系统设置</a>
+
+    <h3>🛡️ 内容安全</h3>
+    <a href="/admin/sensitive-words">违禁词</a>
+    <a href="/admin/sensitive-logs">拦截记录</a>
+</aside>
+  <div class="admin-content">
+    <div class="card">
+      <div class="card-title">🗄️ 导出全部数据库数据</div>
+
+      <p style="margin:0 0 6px;color:var(--text-dark);">
+        把
+        <span class="badge badge-success"><%= mainDb %></span>
+        与
+        <span class="badge badge-success"><%= casdoorDb %></span>
+        两个库的<b>全部数据</b>导出到<b>同一个 CSV</b> 文件。
+      </p>
+
+      <div class="admin-status-card" style="border-left:4px solid #e65100;margin:14px 0 4px;">
+        <div class="admin-status-dot" style="background:#e65100"></div>
+        <div>
+          <div class="admin-status-title">含敏感数据，注意保管</div>
+          <div class="admin-status-text">
+            <%= casdoorDb %> 库里包含用户密码哈希与 salt、会话、token 等；
+            导出的 CSV 请勿外发、勿提交到仓库、勿长期留在下载目录。
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">CSV 格式说明</label>
+        <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:var(--text-muted);">
+          <li>两库表结构完全不同，无法并成一张宽表，所以用<b>长表</b>格式，列固定为：
+            <code>库, 表, 行号, 字段, 值, 是否为空</code></li>
+          <li>同一「库 + 表 + 行号」的多行就是原始的<b>一行记录</b>，在 Excel 里做数据透视即可还原成表</li>
+          <li><b>是否为空 = 1</b> 表示该字段是 SQL NULL（此时「值」为空），用来区分 NULL 与空字符串</li>
+          <li><b>空表</b>会写一行 <code>行号 = 0</code>、字段为「(空表，无数据)」的标记行，
+            这样 CSV 里能看到完整表清单，不会出现「表存在却查不到」的歧义</li>
+          <li>每张表按主键排序导出，字段顺序与建表顺序一致，便于对比两次导出的差异</li>
+          <li>文件带 UTF-8 BOM，Excel 直接双击打开中文不乱码</li>
+        </ul>
+      </div>
+
+      <form method="GET" action="/admin/export-all">
+        <input type="hidden" name="format" value="csv">
+        <div class="form-group">
+          <label class="form-label">选择要导出的库（可多选，多个库会汇到同一个 CSV）</label>
+          <div class="page-checks">
+            <% databases.forEach(function (d) { %>
+              <label class="page-check">
+                <input type="checkbox" name="db" value="<%= d.database %>" checked>
+                <span><%= d.database %>（<%= d.tables %> 张表 / 约 <%= d.rows %> 行）</span>
+              </label>
+            <% }); %>
+          </div>
+          <div class="form-hint">全部勾选即导出 <%= mainDb %> + <%= casdoorDb %> 两库的完整数据。</div>
+        </div>
+        <button type="submit" class="btn btn-primary">⬇️ 下载 CSV（<%= tableCount %> 张表 / 约 <%= approxRows %> 行）</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 将导出以下表</div>
+      <table class="table">
+        <thead><tr><th style="width:120px;">库</th><th>表</th><th style="width:120px;">约行数</th></tr></thead>
+        <tbody>
+          <% targets.forEach(function (t) { %>
+            <tr>
+              <td><%- t.database === casdoorDb ? '<span class="badge badge-warning">' + t.database + '</span>' : '<span class="badge">' + t.database + '</span>' %></td>
+              <td><%= t.table %></td>
+              <td><%= t.approxRows %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

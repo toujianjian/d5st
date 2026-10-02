@@ -595,6 +595,198 @@ router.post('/sensitive-logs/clear', async (req, res) => {
   }
 });
 
+// ============================================================================
+// 全库导出：把 d5st 与 casdoor 两个库的全部数据汇成「同一个 CSV」
+//
+// 为什么是长表：两个库的表结构毫无关系（d5st 35 表 / casdoor 47 表），
+// 无法拼成一张宽表，所以采用「库/表/行号/字段/值」的长表格式，
+// 同一 (库, 表, 行号) 的多条记录即原始的一行，用数据透视即可还原。
+//
+// 列：库, 表, 行号, 字段, 值, 是否为空
+//   - 行号：该行在表内的 1-based 序号，配合「库+表」唯一确定一行
+//   - 是否为空：1 表示该字段是 SQL NULL（此时「值」为空），0 表示有值
+//     这样可区分 NULL 与空字符串，导出后仍可还原
+// ============================================================================
+const CSV_HEADERS = ['库', '表', '行号', '字段', '值', '是否为空'];
+
+// 主库与 Casdoor 库名（可用环境变量覆盖，跟随实际部署）
+const MAIN_DB_NAME = process.env.MYSQL_DATABASE || 'd5st';
+const CASDOOR_DB_NAME = process.env.CASDOOR_DB_NAME || 'casdoor';
+
+function csvEscape(v) {
+  return '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+}
+
+function formatDateValue(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' +
+    p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+// 把驱动返回的值规整成可写入 CSV 的文本
+function normalizeCell(v) {
+  if (v === null || v === undefined) return { text: '', isNull: 1 };
+  if (Buffer.isBuffer(v)) return { text: '0x' + v.toString('hex'), isNull: 0 };
+  if (v instanceof Date) return { text: formatDateValue(v), isNull: 0 };
+  if (typeof v === 'object') return { text: JSON.stringify(v), isNull: 0 };
+  return { text: String(v), isNull: 0 };
+}
+
+// 列出可导出的「库 + 表」。MySQL 模式只取业务库（排除系统库），
+// 且把主库 d5st 与 casdoor 排在前面，便于阅读。
+async function listExportTables() {
+  const targets = [];
+  if (pool.isMysql) {
+    const [dbRows] = await pool.query(
+      `SELECT schema_name AS db FROM information_schema.schemata
+        WHERE schema_name NOT IN ('information_schema','performance_schema','mysql','sys')
+        ORDER BY schema_name`
+    );
+    const found = dbRows.map(r => r.db);
+    const preferred = [MAIN_DB_NAME, CASDOOR_DB_NAME].filter(d => found.indexOf(d) > -1);
+    const others = found.filter(d => preferred.indexOf(d) === -1);
+    for (const database of preferred.concat(others)) {
+      // 注意：别名不能叫 rows（MySQL 8 保留字，会语法报错）
+      const [tRows] = await pool.query(
+        `SELECT table_name AS t, table_rows AS row_count FROM information_schema.tables
+          WHERE table_schema = ? AND table_type = 'BASE TABLE'
+          ORDER BY table_name`,
+        [database]
+      );
+      for (const t of tRows) {
+        targets.push({ database, table: t.t, approxRows: Number(t.row_count) || 0 });
+      }
+    }
+  } else {
+    // SQLite 模式（本地开发）：只有一个本地库，Casdoor 不在其中
+    const [tRows] = await pool.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    );
+    for (const t of tRows) {
+      targets.push({ database: 'sqlite', table: t.name, approxRows: 0 });
+    }
+  }
+  return targets;
+}
+
+// 取表内字段顺序（按建表顺序），并顺带取主键用于稳定排序
+async function getTableMeta(target) {
+  if (pool.isMysql) {
+    const [cols] = await pool.query(
+      `SELECT column_name AS name FROM information_schema.columns
+        WHERE table_schema = ? AND table_name = ?
+        ORDER BY ordinal_position`,
+      [target.database, target.table]
+    );
+    const [pk] = await pool.query(
+      `SELECT column_name AS name FROM information_schema.key_column_usage
+        WHERE table_schema = ? AND table_name = ? AND constraint_name = 'PRIMARY'
+        ORDER BY ordinal_position`,
+      [target.database, target.table]
+    );
+    return { columns: cols.map(c => c.name), pk: pk.map(c => c.name) };
+  }
+  const [info] = await pool.query(`PRAGMA table_info(\`${target.table}\`)`);
+  return {
+    columns: info.map(c => c.name),
+    pk: info.filter(c => c.pk > 0).sort((a, b) => a.pk - b.pk).map(c => c.name)
+  };
+}
+
+// 把「全库数据」以 CSV 流式写出（边读边写，避免把整库拼成一个大字符串）
+async function streamAllDataCsv(res, onlyDatabases) {
+  const all = await listExportTables();
+  const targets = onlyDatabases && onlyDatabases.length
+    ? all.filter(t => onlyDatabases.indexOf(t.database) > -1)
+    : all;
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="d5st-all-databases-' + stamp + '.csv"');
+  // BOM：Excel 打开中文不乱码
+  res.write('\uFEFF' + CSV_HEADERS.join(',') + '\r\n');
+
+  for (const target of targets) {
+    const meta = await getTableMeta(target);
+    if (meta.columns.length === 0) continue;
+
+    const colList = meta.columns.map(c => '`' + c + '`').join(',');
+    const from = pool.isMysql
+      ? '`' + target.database + '`.`' + target.table + '`'
+      : '`' + target.table + '`';
+    // 有主键就按主键排序，保证每次导出顺序一致（便于 diff）
+    const order = meta.pk.length
+      ? ' ORDER BY ' + meta.pk.map(c => '`' + c + '`').join(', ')
+      : '';
+
+    const [rows] = await pool.query('SELECT ' + colList + ' FROM ' + from + order);
+
+    // 空表：显式写一行标记（行号 0），否则该表在 CSV 里完全没有痕迹，
+    // 无法分辨「表不存在」还是「表存在但没数据」。
+    if (rows.length === 0) {
+      res.write([
+        csvEscape(target.database),
+        csvEscape(target.table),
+        csvEscape(0),
+        csvEscape('(空表，无数据)'),
+        csvEscape(''),
+        csvEscape('')
+      ].join(',') + '\r\n');
+      continue;
+    }
+
+    let rowNo = 0;
+    for (const row of rows) {
+      rowNo++;
+      for (const col of meta.columns) {
+        const cell = normalizeCell(row[col]);
+        res.write([
+          csvEscape(target.database),
+          csvEscape(target.table),
+          csvEscape(rowNo),
+          csvEscape(col),
+          csvEscape(cell.text),
+          csvEscape(cell.isNull)
+        ].join(',') + '\r\n');
+      }
+    }
+  }
+  res.end();
+}
+
+router.get('/export-all', async (req, res) => {
+  try {
+    const targets = await listExportTables();
+
+    if ((req.query.format || '').toLowerCase() === 'csv') {
+      const dbs = [].concat(req.query.db || []).filter(Boolean);
+      return await streamAllDataCsv(res, dbs);
+    }
+
+    // 按库聚合出预览统计
+    const byDb = {};
+    for (const t of targets) {
+      if (!byDb[t.database]) byDb[t.database] = { database: t.database, tables: 0, rows: 0 };
+      byDb[t.database].tables++;
+      byDb[t.database].rows += t.approxRows;
+    }
+
+    res.render('admin/export-all', {
+      title: '导出全部数据',
+      databases: Object.keys(byDb).map(k => byDb[k]),
+      targets,
+      tableCount: targets.length,
+      approxRows: targets.reduce((s, t) => s + t.approxRows, 0),
+      isMysql: pool.isMysql,
+      mainDb: MAIN_DB_NAME,
+      casdoorDb: CASDOOR_DB_NAME
+    });
+  } catch (err) {
+    console.error('导出全部数据失败:', err.message);
+    res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
 router.get('/export-users', async (req, res) => {
   try {
     const [users] = await pool.query('SELECT id, username, real_name, grade, class_name, student_no, points, is_admin, created_at FROM casdoor_users ORDER BY id');

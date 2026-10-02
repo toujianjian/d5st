@@ -110,6 +110,11 @@
     padding: 32px 32px 40px;
     display: flex; flex-direction: column; gap: 24px;
   }
+  /* 关键：.main-wrapper 是固定 100dvh 的 flex 容器，.admin-content 会被拉伸到满高，
+     卡片作为 flex 子项默认 flex-shrink:1 会被压扁，而 .card 又是 overflow:hidden，
+     于是长页面（表清单、设置项多时）内容直接被裁掉且不产生滚动条，永远看不到。
+     这里禁止子项收缩，让内容顶开高度、由 .main-wrapper 正常滚动。 */
+  .admin-content > * { flex-shrink: 0; }
   .admin-header {
     display: flex; align-items: center; justify-content: space-between;
   }
