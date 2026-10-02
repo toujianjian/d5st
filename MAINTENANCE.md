@@ -37,6 +37,10 @@ docker compose up -d --build
 docker compose exec mysql mysqldump -u d5st -pd5st_pass_2026 --databases d5st casdoor > backup_$(date +%Y%m%d).sql
 ```
 
+> 需要**可读/可交付**的数据快照（而不是用于还原的 SQL）时，用后台的
+> 「导出全部数据」（`/admin/export-all`）一键导出两个库的单个 CSV。
+> 注意该 CSV 含 Casdoor 密码哈希等敏感数据。
+
 ### 恢复数据库
 ```bash
 docker compose exec -T mysql mysql -u d5st -pd5st_pass_2026 < backup_20260912.sql
@@ -52,16 +56,21 @@ docker compose exec -T mysql mysql -u d5st -pd5st_pass_2026 < backup_20260912.sq
 | `MYSQL_DATABASE` | d5st | 业务数据库名 |
 | `MYSQL_USER` | d5st | MySQL 普通用户 |
 | `MYSQL_PASSWORD` | d5st_pass_2026 | MySQL 密码 |
-| `CASDOOR_ADMIN_USER` | admin | Casdoor 管理员 |
-| `CASDOOR_ADMIN_PASSWORD` | d5st_admin_2026 | Casdoor 管理员密码 |
+| `CASDOOR_ADMIN_USER` | admin | Casdoor 内置管理员账号 |
+| `CASDOOR_ADMIN_PASSWORD` | 123 | Casdoor 内置管理员密码；**必须与 Casdoor 里的实际密码一致**，在控制台改密后要同步这里并重启 app |
+| `DEFAULT_ADMIN_USER` | d5stadmin | 本站默认管理员（自动创建并加入 `d5st-admin` 组） |
+| `DEFAULT_ADMIN_PASSWORD` | d5stpassword | 本站默认管理员密码；**每次 app 启动都会按此值重写**，只能在 `.env` 改 |
 | `CASDOOR_CLIENT_ID` | d5st_client | Casdoor 应用 Client ID |
 | `CASDOOR_CLIENT_SECRET` | d5st_client_secret_2026 | Casdoor 应用 Client Secret |
 | `CASDOOR_ORGANIZATION` | d5st | Casdoor 组织名 |
 | `CASDOOR_APPLICATION` | d5st-app | Casdoor 应用名 |
-| `APP_PORT` | 35555 | D5ST 应用端口 |
-| `APP_URL` | http://localhost:35555 | 应用对外 URL |
+| `APP_PORT` | 35555 | D5ST 应用端口（容器内） |
+| `APP_URL` | http://localhost:35545 | 应用对外 URL（用于拼接 OAuth 回调） |
+| `EXTERNAL_PORT` | 35545 | Caddy 统一入口对外端口 |
+| `CASDOOR_PUBLIC_ENDPOINT` | http://localhost:35545/casdoor | 浏览器访问 Casdoor 的地址 |
 | `SESSION_SECRET` | d5st_session... | Session 加密密钥 |
 | `NODE_ENV` | production | 运行环境 |
+| `ENABLE_DEV_LOGIN` | 0 | 免密开发登录后门，**生产必须为 0** |
 
 ### 生产环境配置建议
 
@@ -110,14 +119,17 @@ NODE_ENV=production
 显示用户数、帖子数、待处理举报、私信总数。
 
 ### 功能模块
-- **帖子管理** —— 软删除违规帖子
-- **举报管理** —— 处理用户举报
-- **全局通知** —— 推送系统通知给所有用户
-- **弹窗管理** —— 在指定页面弹窗公告
-- **首页链接/横幅** —— 自定义首页展示
+- **帖子管理** —— 软删除违规帖子（删除进回收站，可恢复）
+- **评论 / 举报管理** —— 处理评论与用户举报
+- **视频 / 版块管理** —— 校园风采与论坛版块
+- **全局通知** —— 推送系统通知给所有用户（支持生效时间段）
+- **弹窗管理** —— 在指定页面弹窗公告（目标页面为多选勾选）
+- **首页链接/横幅** —— 自定义首页展示（首页「常用链接」完全由这里驱动）
+- **违禁词 / 拦截记录** —— 发帖、评论、私信命中即屏蔽并留痕
 - **路径重定向** —— 让旧路径跳转至外部
-- **导出用户** —— 查看所有注册用户
-- **系统设置** —— 修改站点名称、描述等
+- **导出用户** —— 查看/导出所有注册用户
+- **导出全部数据** —— 把 d5st + casdoor 两库数据导出为单个 CSV
+- **系统设置** —— 站点名称、默认积分、赞助入口开关等
 
 ## 常见问题排查
 
@@ -158,12 +170,30 @@ docker compose up -d --build
 ### Q: 中文显示乱码
 确保数据库和连接池都使用 `utf8mb4`。本项目已配置好。
 
+### Q: 把用户设成管理员不生效 / 过一会儿又变回普通用户
+**原因**: 权限的唯一来源是 Casdoor 的用户组 `d5st-admin`。每次登录时，
+`findOrCreateCasdoorUser()` 都会按 Casdoor 的组关系**覆写**本地 `casdoor_users.is_admin`，
+所以只改数据库的 `is_admin` 会在该用户下次登录时被改回 0。
+**解决**: 在 Casdoor 控制台把该用户加入 `d5st-admin` 组，然后让用户重新登录。
+（详见 README「授予 / 取消管理员权限」）
+
+### Q: 改了 Casdoor 控制台密码后，找回密码/用户同步/导出预览全报错
+**原因**: `.env` 的 `CASDOOR_ADMIN_PASSWORD` 与 Casdoor 内置 `admin` 的实际密码不一致，
+d5st 拿不到管理接口的 token，日志里是「管理员 token 获取失败」。
+**解决**: 把 `.env` 改成与 Casdoor 里一致的密码 → `docker compose up -d app`。
+
+### Q: 在 Casdoor 里改了 d5stadmin 的密码，重启后又变回去了
+**原因**: `casdoor-init.js` 每次 app 启动都会用 `.env` 的 `DEFAULT_ADMIN_PASSWORD`
+重写该账号密码（日志「密码已写入」）。
+**解决**: 改 `.env` 的 `DEFAULT_ADMIN_PASSWORD` 再重启；不要只在控制台改。
+
 ## 性能与扩展性
 
 ### 当前架构的局限
 - Session 存储在内存中 → 多实例部署需要 Redis
 - MySQL 单节点 → 高可用需主从或集群
-- Casdoor 内置 SQLite → 生产建议迁移到外部数据库
+- Casdoor 与 d5st 共用同一个 MySQL 实例（分别是 `casdoor` / `d5st` 两个库），
+  单点故障会同时影响认证与业务
 
 ### 建议的扩展方向
 1. 添加 Redis 做 Session 存储和缓存
@@ -177,8 +207,10 @@ docker compose up -d --build
 - [ ] `.env` 中所有密码和密钥已修改为强随机值
 - [ ] 前端使用 HTTPS（Let's Encrypt / 自建证书）
 - [ ] Docker 端口未暴露不必要的服务（MySQL 内部网络访问）
-- [ ] Casdoor 管理员密码已修改
+- [ ] Casdoor 管理员密码已修改，且 `.env` 的 `CASDOOR_ADMIN_PASSWORD` 已同步
 - [ ] 生产环境 `NODE_ENV=production`
+- [ ] `ENABLE_DEV_LOGIN` 已关闭（或 `.env` 中已删除该条目）
+- [ ] 已确认无异常提权账号（`SELECT * FROM casdoor_users WHERE is_admin = 1`）
 - [ ] 定期备份数据库（建议每天）
 - [ ] 容器镜像定期更新（`docker compose pull`）
 
