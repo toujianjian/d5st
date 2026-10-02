@@ -1,3 +1,45 @@
+<style>
+  /* 精彩推荐轮播 */
+  .d5st-carousel {
+    position: relative; border-radius: 20px; overflow: hidden;
+    box-shadow: 0 18px 48px rgba(0,0,0,.12);
+    background: rgba(0,0,0,.04);
+  }
+  .d5st-slide { display: none; text-decoration: none; color: inherit; }
+  .d5st-slide.is-active { display: block; animation: d5stFade .45s ease; }
+  @keyframes d5stFade { from { opacity: 0; } to { opacity: 1; } }
+  .d5st-slide-media {
+    /* 比例与默认横幅 banner1.svg（1200×320 = 15:4）一致，避免 cover 裁掉图内文字 */
+    width: 100%; aspect-ratio: 15 / 4;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: linear-gradient(135deg, rgba(211,47,47,.14), rgba(255,107,53,.14));
+  }
+  .d5st-slide-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .d5st-slide-ph { font-size: 46px; color: rgba(211,47,47,.35); }
+  .d5st-slide-body { padding: 18px 22px 22px; }
+  .d5st-slide-body h3 { margin: 0 0 6px; font-size: 20px; color: var(--fg, #111); }
+  .d5st-slide-body p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted, #666); }
+  .d5st-cv-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,.42); color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; transition: background .25s;
+  }
+  .d5st-cv-btn:hover { background: rgba(0,0,0,.65); }
+  .d5st-cv-btn.prev { left: 14px; }
+  .d5st-cv-btn.next { right: 14px; }
+  .d5st-dots { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; gap: 8px; justify-content: center; }
+  .d5st-dot {
+    width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%; cursor: pointer;
+    background: rgba(255,255,255,.65); box-shadow: 0 0 0 1px rgba(0,0,0,.18); transition: all .25s;
+  }
+  .d5st-dot.is-active { width: 22px; border-radius: 999px; background: #fff; }
+  @media (max-width: 720px) {
+    .d5st-cv-btn { width: 36px; height: 36px; }
+    .d5st-slide-body { padding: 14px 16px 18px; }
+  }
+</style>
+
 <canvas class="pdaim-line-field" id="pdaimLineField" aria-hidden="true"></canvas>
 <div class="page-shell">
   <span class="site-header-shadow" aria-hidden="true"></span>
@@ -129,7 +171,7 @@
         </div>
       </section>
 
-      <!-- 精彩推荐（后台横幅） -->
+      <!-- 精彩推荐（后台横幅 → 轮播） -->
       <% if (typeof banners !== 'undefined' && banners && banners.length) { %>
       <section class="d5st-block">
         <div class="d5st-head reveal-on-scroll" data-reveal>
@@ -137,19 +179,85 @@
           <h2>精彩推荐</h2>
           <p>了解更多学校精彩内容</p>
         </div>
-        <div class="d5st-grid">
-          <% banners.forEach(function (b) { %>
-            <a class="d5st-card reveal-on-scroll" data-reveal href="<%= b.link_url || '#' %>" <% if (b.link_url) { %>target="_blank"<% } %>>
-              <div class="d5st-thumb" style="height:150px;">
-                <% if (b.image_path) { %><img src="<%= b.image_path %>" alt="" onerror="this.style.display='none'" /><% } else { %><i class="fas fa-image"></i><% } %>
+        <div class="d5st-carousel" id="featuredCarousel">
+          <div class="d5st-track">
+            <% banners.forEach(function (b, i) { %>
+            <a class="d5st-slide<%= i === 0 ? ' is-active' : '' %>" href="<%= b.link_url || 'javascript:void(0)' %>"<% if (b.link_url) { %> target="_blank" rel="noopener"<% } %>>
+              <div class="d5st-slide-media">
+                <% if (b.image_path) { %>
+                  <img src="<%= b.image_path %>" alt="<%= b.title %>" onerror="this.style.display='none'" />
+                <% } else { %>
+                  <span class="d5st-slide-ph"><i class="fas fa-image"></i></span>
+                <% } %>
               </div>
-              <h3 class="d5st-title" style="font-size:15px;"><%= b.title %></h3>
-              <p class="d5st-excerpt"><%= b.description || b.title %></p>
+              <div class="d5st-slide-body">
+                <h3><%= b.title %></h3>
+                <% if (b.description) { %><p><%= b.description %></p><% } %>
+              </div>
             </a>
-          <% }); %>
+            <% }); %>
+          </div>
+
+          <% if (banners.length > 1) { %>
+          <button class="d5st-cv-btn prev" type="button" aria-label="上一张" data-dir="-1"><i class="fas fa-chevron-left"></i></button>
+          <button class="d5st-cv-btn next" type="button" aria-label="下一张" data-dir="1"><i class="fas fa-chevron-right"></i></button>
+          <div class="d5st-dots">
+            <% banners.forEach(function (b, i) { %>
+            <button type="button" class="d5st-dot<%= i === 0 ? ' is-active' : '' %>" data-index="<%= i %>" aria-label="第 <%= i + 1 %> 张"></button>
+            <% }); %>
+          </div>
+          <% } %>
         </div>
       </section>
       <% } %>
+
+      <script>
+        /* 精彩推荐轮播：自动播放 + 箭头 + 圆点 + 悬停暂停 + 触屏滑动 */
+        (function () {
+          var root = document.getElementById('featuredCarousel');
+          if (!root) return;
+          var slides = Array.prototype.slice.call(root.querySelectorAll('.d5st-slide'));
+          var dots = Array.prototype.slice.call(root.querySelectorAll('.d5st-dot'));
+          if (slides.length <= 1) return; // 只有一张时不需要轮播
+          var idx = 0, timer = null, INTERVAL = 4500;
+
+          function show(i) {
+            idx = (i + slides.length) % slides.length;
+            slides.forEach(function (s, k) { s.classList.toggle('is-active', k === idx); });
+            dots.forEach(function (d, k) { d.classList.toggle('is-active', k === idx); });
+          }
+          function next() { show(idx + 1); }
+          function stop() { if (timer) { clearInterval(timer); timer = null; } }
+          function start() { stop(); timer = setInterval(next, INTERVAL); }
+
+          root.querySelectorAll('.d5st-cv-btn').forEach(function (b) {
+            b.addEventListener('click', function (e) {
+              e.preventDefault();
+              show(idx + Number(b.dataset.dir));
+              start();
+            });
+          });
+          dots.forEach(function (d) {
+            d.addEventListener('click', function (e) {
+              e.preventDefault();
+              show(Number(d.dataset.index));
+              start();
+            });
+          });
+          root.addEventListener('mouseenter', stop);
+          root.addEventListener('mouseleave', start);
+
+          var sx = 0;
+          root.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; stop(); }, { passive: true });
+          root.addEventListener('touchend', function (e) {
+            var dx = e.changedTouches[0].clientX - sx;
+            if (Math.abs(dx) > 40) show(dx < 0 ? idx + 1 : idx - 1);
+            start();
+          }, { passive: true });
+
+          start();
+        })();
+      </script>
 
       <!-- 常用链接 -->
       <section class="d5st-block" style="padding-bottom: 20px;">
@@ -189,12 +297,12 @@
   <div class="cursor-reveal" aria-hidden="true">
     <div class="hero-stage hero-stage-reveal">
       <div class="hero-copy hero-copy-reveal js-tilt">
-        <p class="eyebrow">校园社区 · 实时连接 · 极致体验</p>
+        <p class="eyebrow">你好，新同学</p>
         <h2>
-          <span class="title-strong">D5ST</span>
-          <span class="title-light">校园社区，因你而燃</span>
+          <span class="title-strong">一起</span>
+          <span class="title-light">把校园聊热</span>
         </h2>
-        <p class="subtitle">发帖讨论 · 记录生活 · 分享视频，让每一次表达都成为精准的直觉。</p>
+        <p class="subtitle">发帖 · 交流 · 遇见同频的人</p>
       </div>
     </div>
   </div>
