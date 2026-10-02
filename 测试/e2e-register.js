@@ -1,5 +1,5 @@
 const { chromium } = require('playwright');
-const BASE = 'http://localhost:8080';
+const BASE = 'http://localhost:35545';
 
 async function gotoRetry(page, url, tries = 20) {
   for (let i = 0; i < tries; i++) {

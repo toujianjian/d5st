@@ -56,11 +56,11 @@ docker compose logs -f app
 
 ### 首次配置 Casdoor
 
-1. 浏览器打开 `http://localhost:8000`，使用 `.env` 中配置的 `CASDOOR_ADMIN_USER` / `CASDOOR_ADMIN_PASSWORD` 登录
+1. 浏览器打开 `http://localhost:35545/casdoor`，使用 `.env` 中配置的 `CASDOOR_ADMIN_USER` / `CASDOOR_ADMIN_PASSWORD` 登录
 2. 进入 **Organizations** → 创建组织 `d5st`
 3. 进入 **Applications** → 创建应用 `d5st-app`，配置：
    - **Organization**: `d5st`
-   - **Redirect URL**: `http://localhost:35555/auth/callback`
+   - **Redirect URL**: `http://localhost:35545/auth/callback`
    - **Client ID** 和 **Client Secret** 复制到 `.env` 中的对应变量
 4. 重启服务使其生效：`docker compose restart app`
 
@@ -68,8 +68,8 @@ docker compose logs -f app
 
 | 服务 | 地址 |
 |------|------|
-| D5ST 应用 | http://localhost:35555 |
-| Casdoor 控制台 | http://localhost:8000 |
+| D5ST 应用 | http://localhost:35545 |
+| Casdoor 控制台 | http://localhost:35545/casdoor |
 | MySQL | localhost:3306（仅容器内部访问） |
 
 ### 授予管理员权限
