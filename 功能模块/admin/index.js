@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
+const casdoor = require('../../配置/casdoor');
+const { reconcileCasdoorUsers } = require('../../配置/user-service');
 
 function requireAdmin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -19,8 +21,13 @@ router.get('/', async (req, res) => {
     // 评论数此前误取私信表(messages)，导致仪表盘「评论数」恒为 0，这里改为统计真实评论
     const [commentCount] = await pool.query('SELECT COUNT(*) as cnt FROM post_comments WHERE is_deleted = 0');
     const [videoCount] = await pool.query('SELECT COUNT(*) as cnt FROM video_posts WHERE is_deleted = 0');
-    res.render('admin/index', { 
-      title: '管理后台', 
+    res.render('admin/index', {
+      title: '管理后台',
+      syncResult: req.query.sync ? {
+        status: req.query.sync,
+        synced: parseInt(req.query.synced, 10) || 0,
+        removed: parseInt(req.query.removed, 10) || 0
+      } : null,
       stats: {
         users: userCount[0].cnt,
         posts: postCount[0].cnt,
@@ -32,6 +39,16 @@ router.get('/', async (req, res) => {
     });
   } catch (err) {
     res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+// 手动触发「与 Casdoor 用户对账」（正向同步 + 清理演示/开发账号）
+router.post('/sync-users', async (req, res) => {
+  try {
+    const r = await reconcileCasdoorUsers(casdoor);
+    res.redirect(`/admin?sync=${r.ok ? 'ok' : 'fail'}&synced=${r.synced}&removed=${r.removed}`);
+  } catch (e) {
+    res.redirect('/admin?sync=fail');
   }
 });
 

@@ -152,6 +152,59 @@ async function syncAllFromCasdoor(casdoor) {
   return { synced: updated, total: users?.length || 0 };
 }
 
+// 本地映射表中"并非 Casdoor 用户"的演示/开发账号特征：
+//   seed!_%  → 配置/seed.js 写入的演示用户（casdoor_user_id 形如 seed_u1）
+//   dev-!_%  → 开发登录后门写入（casdoor_user_id 形如 dev-dev_user）
+//   dev_user → 开发登录默认账号
+// 用 '!' 作转义符，MySQL / SQLite 都支持。
+const NON_CASDOOR_PATTERNS = [
+  "casdoor_user_id LIKE 'seed!_%' ESCAPE '!'",
+  "casdoor_user_id LIKE 'dev-!_%' ESCAPE '!'",
+  "username = 'dev_user'"
+];
+
+// 与 Casdoor 对账，让本地 casdoor_users 与 Casdoor(d5st 组织) 保持一致：
+//   1) 正向：以 Casdoor 为准，把用户补齐 / 更新到本地
+//   2) 清理：删除本地表中来源为 seed.js / dev-login 的演示账号（它们不在 Casdoor）
+// 注意：删除 casdoor_users 行会级联删除其帖子/评论/私信等内容，
+//       因此这里只删「特征明确」的演示/开发账号，绝不按"未知账号"批量删除。
+async function reconcileCasdoorUsers(casdoor) {
+  const result = { ok: false, synced: 0, removed: 0, total: 0, reason: '' };
+
+  let users;
+  try {
+    users = await casdoor.listUsers(casdoor.C.organization, 500, 0);
+  } catch (e) {
+    result.reason = '拉取 Casdoor 用户失败: ' + e.message;
+    return result;
+  }
+  if (!users || users.length === 0) {
+    // Casdoor 返回空可能是异常（或确实没用户）；此时不清理，避免误删本地数据
+    result.reason = 'Casdoor 未返回用户，跳过对账';
+    return result;
+  }
+  result.total = users.length;
+
+  for (const u of users) {
+    try {
+      await findOrCreateCasdoorUser(u);
+      result.synced++;
+    } catch (e) { /* 单个用户失败不影响整体 */ }
+  }
+
+  try {
+    const [del] = await pool.query(
+      `DELETE FROM casdoor_users WHERE ${NON_CASDOOR_PATTERNS.join(' OR ')}`
+    );
+    result.removed = (del && del.affectedRows) || 0;
+  } catch (e) {
+    result.reason = '清理演示账号失败: ' + e.message;
+  }
+
+  result.ok = true;
+  return result;
+}
+
 module.exports = {
   findOrCreateCasdoorUser,
   getUserById,
@@ -159,6 +212,7 @@ module.exports = {
   getUserByUsername,
   isAdmin,
   syncAllFromCasdoor,
+  reconcileCasdoorUsers,
   isAdminFromCasdoor
 };
 

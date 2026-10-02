@@ -255,8 +255,25 @@
         <div class="admin-header-title"><i class="fas fa-chart-line"></i> 仪表盘</div>
         <div class="admin-header-sub">D5ST 校园社区运行状况概览</div>
       </div>
-      <a href="/" class="admin-header-action"><i class="fas fa-external-link-alt"></i> 回到前台</a>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <form method="POST" action="/admin/sync-users" style="display:inline;">
+          <button type="submit" class="admin-header-action" style="border:none;cursor:pointer;font-family:inherit;">
+            <i class="fas fa-sync-alt"></i> 同步 Casdoor 用户
+          </button>
+        </form>
+        <a href="/" class="admin-header-action"><i class="fas fa-external-link-alt"></i> 回到前台</a>
+      </div>
     </div>
+
+    <% if (typeof syncResult !== 'undefined' && syncResult) { %>
+    <div class="admin-status-card">
+      <div class="admin-status-dot" style="background:<%= syncResult.status === 'ok' ? '#4caf50' : '#f44336' %>;"></div>
+      <div>
+        <div class="admin-status-title"><%= syncResult.status === 'ok' ? '用户同步完成' : '用户同步失败' %></div>
+        <div class="admin-status-text">与 Casdoor 对账：同步 <%= syncResult.synced %> 个，清理演示/开发账号 <%= syncResult.removed %> 个</div>
+      </div>
+    </div>
+    <% } %>
 
     <div class="admin-stats">
       <div class="admin-stat-card">

@@ -344,7 +344,17 @@ async function startServer() {
     // Casdoor 自动初始化（组织/应用/组/Webhook），失败不阻塞。
     // 使用带重试的版本，避免 Casdoor 容器先启动、内部尚未就绪时一次性失败后再不重试。
     setImmediate(async () => {
-      try { await initCasdoorWithRetry(); } catch (e) { console.warn('Casdoor init error:', e.message); }
+      try {
+        const r = await initCasdoorWithRetry();
+        // Casdoor 就绪后，把 Casdoor 用户与本地映射表对账：
+        // 正向补齐 Casdoor 用户，并清理 seed.js / dev-login 写入的演示账号，
+        // 避免"本地表数量"与 Casdoor 长期不一致。
+        if (r && r.ok) {
+          const { reconcileCasdoorUsers } = require('./配置/user-service');
+          const rc = await reconcileCasdoorUsers(casdoor);
+          console.log(`[用户同步] 对账完成：同步 ${rc.synced}/${rc.total} 个，清理演示账号 ${rc.removed} 个${rc.reason ? '（' + rc.reason + '）' : ''}`);
+        }
+      } catch (e) { console.warn('Casdoor init error:', e.message); }
     });
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`D5ST 服务运行中: http://localhost:${PORT}`);
