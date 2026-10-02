@@ -34,20 +34,28 @@
           <label class="form-label">内容</label>
           <textarea name="content" class="form-textarea" required></textarea>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="form-group">
-            <label class="form-label">类型</label>
-            <select name="type" class="form-select">
-              <option value="info">信息</option>
-              <option value="success">成功</option>
-              <option value="warning">警告</option>
-              <option value="error">错误</option>
-            </select>
+        <div class="form-group">
+          <label class="form-label">类型</label>
+          <select name="type" class="form-select">
+            <option value="info">信息</option>
+            <option value="success">成功</option>
+            <option value="warning">警告</option>
+            <option value="error">错误</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">目标页面（可多选）</label>
+          <div class="page-checks">
+            <% pages.forEach(function (pg) { %>
+              <label class="page-check">
+                <input type="checkbox" name="target_pages" value="<%= pg.key %>"
+                       data-all="<%= pg.key === 'all' ? '1' : '0' %>"
+                       <%= pg.key === 'home' ? 'checked' : '' %>>
+                <span><%= pg.label %></span>
+              </label>
+            <% }); %>
           </div>
-          <div class="form-group">
-            <label class="form-label">目标页面（逗号分隔，all=全部）</label>
-            <input type="text" name="target_pages" class="form-input" value="home" required>
-          </div>
+          <div class="form-hint">勾选「全部页面」表示所有页面；一个都不勾按「全部页面」处理。</div>
         </div>
         <div class="form-group">
           <label class="form-label"><input type="checkbox" name="show_once" value="1"> 关闭后不再显示</label>
@@ -65,10 +73,15 @@
             <tr>
               <td><%= p.id %></td>
               <td><%= p.title %></td>
-              <td><%= p.target_pages %></td>
+              <td><%= String(p.target_pages || '').split(',').map(function (k) { k = k.trim(); return (pageLabels && pageLabels[k]) || k; }).filter(Boolean).join('、') %></td>
               <td><%- p.is_active ? '<span class="badge badge-success">启用</span>' : '<span class="badge badge-default">停用</span>' %></td>
               <td><%= p.sort_order %></td>
-              <td><a href="/admin/popups/edit/<%= p.id %>" class="btn btn-ghost btn-sm">编辑</a></td>
+              <td style="white-space:nowrap;">
+                <a href="/admin/popups/edit/<%= p.id %>" class="btn btn-ghost btn-sm">编辑</a>
+                <form method="POST" action="/admin/popups/delete/<%= p.id %>" style="display:inline;margin:0;" onsubmit="return confirm('确定删除该弹窗？删除后不可恢复。');">
+                  <button class="btn btn-danger btn-sm">删除</button>
+                </form>
+              </td>
             </tr>
           <% }); %>
         </tbody>
@@ -76,3 +89,21 @@
     </div>
   </div>
 </div>
+
+<script>
+  /* 「全部页面」与具体页面互斥：选全部则清空其它，选具体则取消全部 */
+  (function () {
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('input[name="target_pages"]'));
+    if (!boxes.length) return;
+    var all = boxes.filter(function (b) { return b.dataset.all === '1'; })[0];
+    boxes.forEach(function (b) {
+      b.addEventListener('change', function () {
+        if (b === all && b.checked) {
+          boxes.forEach(function (o) { if (o !== all) o.checked = false; });
+        } else if (b !== all && b.checked && all) {
+          all.checked = false;
+        }
+      });
+    });
+  })();
+</script>

@@ -295,9 +295,44 @@ router.post('/notifications/delete/:id', async (req, res) => {
   }
 });
 
+// 弹窗「目标页面」可选值。
+// key 必须与前端 currentPageKey()（页面模板/layout.ejs）的约定一致：
+// 首页为 home，其余取路径第一段（所以 /messages/guestbook 归到 messages）。
+const POPUP_PAGES = [
+  { key: 'all', label: '全部页面' },
+  { key: 'home', label: '首页' },
+  { key: 'forum', label: '贴吧论坛' },
+  { key: 'videos', label: '校园风采' },
+  { key: 'secret', label: '保密号' },
+  { key: 'messages', label: '私信 / 留言板' },
+  { key: 'friends', label: '好友' },
+  { key: 'user', label: '个人中心' },
+  { key: 'search', label: '搜索' },
+  { key: 'sponsor', label: '赞助' },
+  { key: 'login', label: '登录页' },
+  { key: 'register', label: '注册页' },
+  { key: 'forgot-password', label: '找回密码' }
+];
+const POPUP_PAGE_LABELS = POPUP_PAGES.reduce((m, p) => { m[p.key] = p.label; return m; }, {});
+
+// 把勾选框提交的值规范成入库字符串。
+// 勾选「全部页面」或一个都没勾 → all（避免出现永远不显示的弹窗）
+function normalizeTargetPages(input) {
+  const arr = (Array.isArray(input) ? input : String(input == null ? '' : input).split(','))
+    .map(s => String(s).trim())
+    .filter(Boolean);
+  if (arr.length === 0 || arr.includes('all')) return 'all';
+  return [...new Set(arr)].join(',');
+}
+
 router.get('/popups', async (req, res) => {
   const [popups] = await pool.query('SELECT * FROM popups ORDER BY sort_order ASC, id DESC');
-  res.render('admin/popups', { title: '弹窗管理', popups });
+  res.render('admin/popups', {
+    title: '弹窗管理',
+    popups,
+    pages: POPUP_PAGES,
+    pageLabels: POPUP_PAGE_LABELS
+  });
 });
 
 router.post('/popups', async (req, res) => {
@@ -306,7 +341,7 @@ router.post('/popups', async (req, res) => {
     await pool.query(
       `INSERT INTO popups (title, content, type, target_pages, show_once, start_time, end_time, sort_order)
        VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?)`,
-      [title, content, type || 'info', target_pages || 'all', show_once ? 1 : 0, start_time || null, end_time || null, sort_order || 0]
+      [title, content, type || 'info', normalizeTargetPages(target_pages), show_once ? 1 : 0, start_time || null, end_time || null, sort_order || 0]
     );
     res.redirect('/admin/popups');
   } catch (err) {
@@ -317,7 +352,12 @@ router.post('/popups', async (req, res) => {
 router.get('/popups/edit/:id', async (req, res) => {
   const [popups] = await pool.query('SELECT * FROM popups WHERE id = ?', [req.params.id]);
   if (popups.length === 0) return res.redirect('/admin/popups');
-  res.render('admin/popups-edit', { title: '编辑弹窗', popup: popups[0] });
+  res.render('admin/popups-edit', {
+    title: '编辑弹窗',
+    popup: popups[0],
+    pages: POPUP_PAGES,
+    pageLabels: POPUP_PAGE_LABELS
+  });
 });
 
 router.post('/popups/edit/:id', async (req, res) => {
@@ -325,11 +365,27 @@ router.post('/popups/edit/:id', async (req, res) => {
   try {
     await pool.query(
       `UPDATE popups SET title=?, content=?, type=?, target_pages=?, show_once=?, start_time=NULLIF(?, ''), end_time=NULLIF(?, ''), sort_order=?, is_active=? WHERE id=?`,
-      [title, content, type || 'info', target_pages || 'all', show_once ? 1 : 0, start_time || null, end_time || null, sort_order || 0, is_active ? 1 : 0, req.params.id]
+      [title, content, type || 'info', normalizeTargetPages(target_pages), show_once ? 1 : 0, start_time || null, end_time || null, sort_order || 0, is_active ? 1 : 0, req.params.id]
     );
     res.redirect('/admin/popups');
   } catch (err) {
     res.redirect('/admin/popups?error=update_failed');
+  }
+});
+
+// 删除弹窗（此前没有该路由，后台列表也没有删除按钮，弹窗建了就删不掉）
+router.post('/popups/delete/:id', async (req, res) => {
+  const id = req.params.id;
+  try {
+    // SQLite 未建外键级联，先清理关闭记录，避免残留脏数据（MySQL 侧有 CASCADE，冗余无害）
+    try {
+      await pool.query('DELETE FROM popup_views WHERE popup_id = ?', [id]);
+    } catch (e) { /* 表不存在时忽略 */ }
+    await pool.query('DELETE FROM popups WHERE id = ?', [id]);
+    res.redirect('/admin/popups');
+  } catch (err) {
+    console.error('删除弹窗失败:', err.message);
+    res.redirect('/admin/popups?error=delete_failed');
   }
 });
 

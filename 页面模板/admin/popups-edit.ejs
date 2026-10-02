@@ -34,20 +34,39 @@
           <label class="form-label">内容</label>
           <textarea name="content" class="form-textarea" required><%= popup.content %></textarea>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="form-group">
-            <label class="form-label">类型</label>
-            <select name="type" class="form-select">
-              <option value="info" <%= popup.type === 'info' ? 'selected' : '' %>>信息</option>
-              <option value="success" <%= popup.type === 'success' ? 'selected' : '' %>>成功</option>
-              <option value="warning" <%= popup.type === 'warning' ? 'selected' : '' %>>警告</option>
-              <option value="error" <%= popup.type === 'error' ? 'selected' : '' %>>错误</option>
-            </select>
+        <div class="form-group">
+          <label class="form-label">类型</label>
+          <select name="type" class="form-select">
+            <option value="info" <%= popup.type === 'info' ? 'selected' : '' %>>信息</option>
+            <option value="success" <%= popup.type === 'success' ? 'selected' : '' %>>成功</option>
+            <option value="warning" <%= popup.type === 'warning' ? 'selected' : '' %>>警告</option>
+            <option value="error" <%= popup.type === 'error' ? 'selected' : '' %>>错误</option>
+          </select>
+        </div>
+        <%
+          var currentPages = String(popup.target_pages || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+          var knownKeys = pages.map(function (p) { return p.key; });
+        %>
+        <div class="form-group">
+          <label class="form-label">目标页面（可多选）</label>
+          <div class="page-checks">
+            <% pages.forEach(function (pg) { %>
+              <label class="page-check">
+                <input type="checkbox" name="target_pages" value="<%= pg.key %>"
+                       data-all="<%= pg.key === 'all' ? '1' : '0' %>"
+                       <%= currentPages.indexOf(pg.key) > -1 ? 'checked' : '' %>>
+                <span><%= pg.label %></span>
+              </label>
+            <% }); %>
+            <%# 兼容历史/自定义取值，避免编辑保存时丢失 %>
+            <% currentPages.filter(function (k) { return knownKeys.indexOf(k) === -1; }).forEach(function (k) { %>
+              <label class="page-check">
+                <input type="checkbox" name="target_pages" value="<%= k %>" checked>
+                <span><%= k %>（自定义）</span>
+              </label>
+            <% }); %>
           </div>
-          <div class="form-group">
-            <label class="form-label">目标页面</label>
-            <input type="text" name="target_pages" class="form-input" value="<%= popup.target_pages %>">
-          </div>
+          <div class="form-hint">勾选「全部页面」表示所有页面；一个都不勾按「全部页面」处理。</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
@@ -71,3 +90,21 @@
     </div>
   </div>
 </div>
+
+<script>
+  /* 「全部页面」与具体页面互斥：选全部则清空其它，选具体则取消全部 */
+  (function () {
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('input[name="target_pages"]'));
+    if (!boxes.length) return;
+    var all = boxes.filter(function (b) { return b.dataset.all === '1'; })[0];
+    boxes.forEach(function (b) {
+      b.addEventListener('change', function () {
+        if (b === all && b.checked) {
+          boxes.forEach(function (o) { if (o !== all) o.checked = false; });
+        } else if (b !== all && b.checked && all) {
+          all.checked = false;
+        }
+      });
+    });
+  })();
+</script>

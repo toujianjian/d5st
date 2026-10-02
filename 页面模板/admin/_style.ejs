@@ -245,6 +245,38 @@
     box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.12);
   }
 
+  /* ---------- 勾选式多选（如弹窗「目标页面」） ---------- */
+  .admin-content .page-checks {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    padding: 12px 14px;
+    border: 1px dashed rgba(211, 47, 47, 0.25);
+    border-radius: 14px;
+    background: rgba(211, 47, 47, 0.02);
+  }
+  .admin-content .page-check {
+    display: inline-flex; align-items: center; gap: 7px;
+    flex: 0 0 auto;              /* 不被 flex 压缩，否则文字会竖排 */
+    white-space: nowrap;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid rgba(211, 47, 47, 0.18);
+    font-size: 13px; font-weight: 500;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .admin-content .page-check span { line-height: 1.4; }
+  .admin-content .page-check:hover { border-color: var(--primary); }
+  .admin-content .page-check input { accent-color: var(--primary); cursor: pointer; margin: 0; }
+  .admin-content .page-check:has(input:checked) {
+    background: linear-gradient(135deg, rgba(211, 47, 47, 0.1), rgba(183, 28, 28, 0.06));
+    border-color: var(--primary);
+    color: var(--primary);
+    font-weight: 600;
+  }
+  .admin-content .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
   /* ---------- 按钮（旧版后台用的 btn-primary / btn-danger / btn-ghost / btn-sm） ---------- */
   .admin-content .btn-primary {
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
