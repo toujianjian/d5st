@@ -1,0 +1,330 @@
+<style>
+  /* ============================================================
+     D5ST 后台公共样式
+     由 layout.ejs 在所有 /admin 页面统一注入。
+     原先只有仪表盘 index.ejs 自带样式，其它后台页面（设置/首页链接/
+     首页横幅/通知/弹窗/回收站/导出用户/路径重定向等）用的 class
+     （admin-layout / admin-sidebar / admin-nav-item / admin-header /
+     admin-status-* / form-label / form-input / btn-primary …）
+     在任何 CSS 里都不存在，页面因此是"裸的"。这里集中补齐。
+     ============================================================ */
+
+  .admin-layout {
+    display: flex;
+    min-height: calc(100vh - 60px);
+    gap: 0;
+    animation: adminFade 0.5s ease-out;
+  }
+  @keyframes adminFade {
+    0% { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- 侧栏 ---------- */
+  .admin-sidebar {
+    width: 240px; flex-shrink: 0;
+    background: linear-gradient(180deg, #d32f2f 0%, #b71c1c 100%);
+    color: white;
+    padding: 28px 0;
+    border-radius: 0 24px 24px 0;
+    box-shadow: 4px 0 24px rgba(211, 47, 47, 0.25);
+    display: flex; flex-direction: column;
+    min-height: calc(100vh - 60px);
+  }
+  .admin-sidebar-logo {
+    padding: 0 24px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .admin-sidebar-logo-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .admin-sidebar-logo-text { display: flex; flex-direction: column; }
+  .admin-sidebar-title {
+    font-size: 16px; font-weight: 700; letter-spacing: 0.5px;
+    font-family: 'Noto Serif SC', serif;
+  }
+  .admin-sidebar-sub { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+
+  .admin-nav {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 0 12px; flex: 1; overflow-y: auto;
+  }
+  .admin-nav-group {
+    font-size: 11px; font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 14px 12px 6px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .admin-nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    border-radius: 12px;
+    font-size: 13px; font-weight: 500;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .admin-nav-item i { width: 18px; text-align: center; font-size: 14px; }
+  .admin-nav-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    transform: translateX(3px);
+  }
+  .admin-nav-item.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  /* 旧版侧栏写法：<h3>分组</h3> + 纯 <a> 链接 */
+  .admin-sidebar h3 {
+    font-size: 11px; font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 14px 24px 6px;
+    margin: 0;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .admin-sidebar > a {
+    display: block;
+    padding: 9px 24px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    font-size: 13px; font-weight: 500;
+    transition: background 0.2s, color 0.2s, padding-left 0.2s;
+  }
+  .admin-sidebar > a:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding-left: 28px;
+  }
+
+  /* ---------- 内容区 ---------- */
+  .admin-content {
+    flex: 1; min-width: 0;
+    padding: 32px 32px 40px;
+    display: flex; flex-direction: column; gap: 24px;
+  }
+  .admin-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .admin-header-title {
+    font-size: 24px; font-weight: 700; color: var(--text-dark);
+    font-family: 'Noto Serif SC', serif;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .admin-header-title i {
+    color: var(--primary);
+    width: 42px; height: 42px;
+    background: rgba(211, 47, 47, 0.1);
+    border-radius: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .admin-header-sub { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+  .admin-header-action {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 20px; border-radius: 999px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white; text-decoration: none;
+    font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 14px rgba(211, 47, 47, 0.3);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .admin-header-action:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(211, 47, 47, 0.45); }
+
+  /* ---------- 统计卡 ---------- */
+  .admin-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  .admin-stat-card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 22px;
+    box-shadow: var(--shadow-soft);
+    padding: 22px 20px;
+    display: flex; flex-direction: column; gap: 8px;
+    position: relative; overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .admin-stat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+  .admin-stat-card::before {
+    content: '';
+    position: absolute; top: 0; right: 0;
+    width: 100px; height: 100px;
+    background: radial-gradient(circle at top right, rgba(211, 47, 47, 0.08), transparent 70%);
+    border-radius: 0 22px 0 100px;
+  }
+  .admin-stat-top {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .admin-stat-icon {
+    width: 42px; height: 42px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 18px;
+    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.25);
+  }
+  .admin-stat-icon.posts { background: linear-gradient(135deg, #d32f2f, #b71c1c); }
+  .admin-stat-icon.users { background: linear-gradient(135deg, #ff6b35, #d32f2f); }
+  .admin-stat-icon.comments { background: linear-gradient(135deg, #ff5252, #d32f2f); }
+  .admin-stat-icon.reports { background: linear-gradient(135deg, #b71c1c, #7f0000); }
+  .admin-stat-icon.videos { background: linear-gradient(135deg, #c2185b, #7b1fa2); }
+  .admin-stat-trend {
+    font-size: 11px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 3px;
+  }
+  .admin-stat-value {
+    font-size: 32px; font-weight: 700; color: var(--text-dark);
+    font-family: 'Noto Serif SC', serif;
+    line-height: 1;
+  }
+  .admin-stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+  /* ---------- 状态提示条 ---------- */
+  .admin-status-card {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 22px;
+    box-shadow: var(--shadow-soft);
+    padding: 22px 24px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .admin-status-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #4caf50;
+    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.15);
+    animation: statusPulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes statusPulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.15); }
+    50% { box-shadow: 0 0 0 8px rgba(76, 175, 80, 0.05); }
+  }
+  .admin-status-title { font-size: 15px; font-weight: 700; color: var(--text-dark); margin-bottom: 2px; }
+  .admin-status-text { font-size: 13px; color: var(--text-muted); }
+
+  /* ---------- 表单（旧版后台用的 form-label / form-input） ---------- */
+  .admin-content .form-group { margin-bottom: 16px; }
+  .admin-content .form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px; font-weight: 600;
+    color: var(--text-dark);
+  }
+  .admin-content .form-input,
+  .admin-content input[type="text"],
+  .admin-content input[type="number"],
+  .admin-content input[type="password"],
+  .admin-content select,
+  .admin-content textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(211, 47, 47, 0.2);
+    background: #fff;
+    font-size: 14px; font-family: inherit;
+    color: var(--text-dark);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .admin-content .form-input:focus,
+  .admin-content input:focus,
+  .admin-content select:focus,
+  .admin-content textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.12);
+  }
+
+  /* ---------- 按钮（旧版后台用的 btn-primary / btn-danger / btn-ghost / btn-sm） ---------- */
+  .admin-content .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+  }
+  .admin-content .btn-danger {
+    background: rgba(211, 47, 47, 0.08);
+    color: #c62828;
+    border: 1px solid rgba(211, 47, 47, 0.25);
+  }
+  .admin-content .btn-danger:hover { background: #d32f2f; color: #fff; }
+  .admin-content .btn-ghost {
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--primary);
+    border: 1px solid rgba(211, 47, 47, 0.2);
+  }
+  .admin-content .btn-ghost:hover { background: rgba(255, 245, 245, 0.98); }
+  .admin-content .btn-warning {
+    background: rgba(255, 152, 0, 0.12);
+    color: #e65100;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+  }
+  .admin-content .btn-warning:hover { background: #ff9800; color: #fff; }
+  .admin-content .btn-sm {
+    padding: 6px 14px;
+    font-size: 12px;
+    border-radius: 999px;
+  }
+  .admin-content button.btn { cursor: pointer; border: none; font-family: inherit; }
+
+  /* ---------- 徽标（覆盖站点 .badge 的弹跳/大字号，后台用扁平小徽标） ---------- */
+  .admin-content .badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    line-height: 1.6;
+    animation: none;
+    background: rgba(0, 0, 0, 0.06);
+    color: var(--text-muted);
+  }
+  .admin-content .badge-success { background: rgba(76, 175, 80, 0.12); color: #2e7d32; }
+  .admin-content .badge-danger { background: rgba(211, 47, 47, 0.12); color: #c62828; }
+  .admin-content .badge-warning { background: rgba(255, 152, 0, 0.14); color: #e65100; }
+
+  /* ---------- 表格 ---------- */
+  .admin-content table,
+  .admin-content .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .admin-content th,
+  .admin-content td { padding: 12px 14px; text-align: left; border-bottom: 1px solid rgba(0, 0, 0, 0.06); }
+  .admin-content th {
+    font-size: 12px; color: var(--text-muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    background: rgba(211, 47, 47, 0.04);
+  }
+  .admin-content tbody tr:hover { background: rgba(211, 47, 47, 0.03); }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 1024px) {
+    .admin-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 768px) {
+    .admin-layout { flex-direction: column; }
+    .admin-sidebar {
+      width: 100%; min-height: auto;
+      border-radius: 20px 20px 0 0;
+      padding: 20px 0;
+    }
+    .admin-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+    .admin-nav-group { display: none; }
+    .admin-sidebar h3 { display: none; }
+    .admin-content { padding: 20px 16px; }
+    .admin-stats { grid-template-columns: 1fr 1fr; }
+    .admin-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  }
+</style>

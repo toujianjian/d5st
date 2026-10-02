@@ -414,6 +414,11 @@
     body.admin-mode .main-wrapper { margin-left: 0; }
     body.admin-mode .notification-ball { display: none; }
   </style>
+  <%# 后台公共样式：所有 /admin 页面统一注入，避免各页面样式缺失 %>
+  <% if (typeof currentPath !== 'undefined' && currentPath.indexOf('/admin') === 0) { %>
+  <%- include('admin/_style') %>
+  <% } %>
+
   <script src="/public/js/main.js" defer></script>
   <% if (typeof pageScript !== 'undefined' && pageScript) { %>
   <script src="<%= pageScript %>" defer></script>
