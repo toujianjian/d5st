@@ -1666,9 +1666,32 @@ body.page-body::after {
   font-size: 14px;
 }
 
+/* 侧栏用户名下的等级称号徽章（侧栏是红色渐变底，故用半透明白 + 白字保证对比度） */
+.user-level {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 8px;
+  padding: 4px 12px 4px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 12px; font-weight: 600;
+  cursor: default;
+}
+
+.user-level-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #b71c1c;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+}
+
+.user-level-name { color: #fff; }
+
 .user-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* 侧栏只展示三项：帖子 / 积分 / 等级 */
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin: 20px 0;
 }
@@ -1679,6 +1702,9 @@ body.page-body::after {
   background: rgba(255, 245, 245, 0.6);
   border-radius: 16px;
 }
+
+/* 侧栏三列较窄，避免「积分」这类两字标签被折行 */
+.user-stats .stat-label { white-space: nowrap; }
 
 .stat-value {
   display: block;

@@ -68,6 +68,27 @@
   .stat-col {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
   }
+  /* 等级进度条 */
+  .level-progress { padding: 2px 0 12px; }
+  .level-progress-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+    font-size: 13px; margin-bottom: 8px;
+  }
+  .level-cur { font-weight: 600; color: var(--primary); display: inline-flex; align-items: center; gap: 6px; }
+  .level-next { color: var(--text-muted); }
+  .level-next b { color: var(--primary); }
+  .level-bar {
+    height: 8px; border-radius: 999px;
+    background: rgba(211, 47, 47, 0.12);
+    overflow: hidden;
+  }
+  .level-bar > span {
+    display: block; height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
   .stat-num {
     font-size: 26px; font-weight: 700;
     background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -155,10 +176,11 @@
     <div class="profile-name"><%= (typeof user !== 'undefined' && user) ? (user.real_name || user.username || '用户') : (currentUser.real_name || currentUser.username || '用户') %></div>
     <div class="profile-handle">@<%= (typeof user !== 'undefined' && user) ? user.username : currentUser.username %></div>
 
+    <% var lv = (typeof levelInfo !== 'undefined' && levelInfo) ? levelInfo : null; %>
     <% if (typeof user !== 'undefined' && user) { %>
     <div class="badges-row">
       <% if (user.is_admin === 1) { %><span class="tag tag-admin"><i class="fas fa-crown"></i> 管理员</span><% } %>
-      <% if (user.points !== undefined && user.points !== null) { %><span class="tag tag-points">⭐ <%= user.points %> 积分</span><% } %>
+      <% if (typeof lv !== 'undefined') { %><span class="tag tag-points">⭐ <%= lv.pointsText %> 积分</span><% } %>
     </div>
     <% } %>
 
@@ -168,14 +190,28 @@
         <span class="stat-lbl">帖子</span>
       </div>
       <div class="stat-col">
-        <span class="stat-num"><%= typeof commentCount !== 'undefined' ? commentCount : 0 %></span>
-        <span class="stat-lbl">评论</span>
+        <span class="stat-num"><%= typeof lv !== 'undefined' ? lv.pointsText : 0 %></span>
+        <span class="stat-lbl">积分</span>
       </div>
-      <div class="stat-col">
-        <span class="stat-num">LV.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+      <div class="stat-col" title="<%= typeof lv !== 'undefined' ? lv.name : '等级' %>">
+        <span class="stat-num">LV.<%= typeof lv !== 'undefined' ? lv.level : 1 %></span>
         <span class="stat-lbl">等级</span>
       </div>
     </div>
+
+    <% if (typeof lv !== 'undefined') { %>
+    <div class="level-progress">
+      <div class="level-progress-head">
+        <span class="level-cur"><i class="fas fa-medal"></i> Lv.<%= lv.level %> <%= lv.name %></span>
+        <% if (lv.isMax) { %>
+          <span class="level-next">已达最高等级</span>
+        <% } else { %>
+          <span class="level-next">距「<%= lv.nextName %>」还差 <b><%= lv.remaining %></b> 积分</span>
+        <% } %>
+      </div>
+      <div class="level-bar"><span style="width:<%= lv.progress %>%"></span></div>
+    </div>
+    <% } %>
 
     <div class="quick-links">
       <a href="/user/edit" class="btn primary"><i class="fas fa-pen"></i> 编辑资料</a>

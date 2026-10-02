@@ -96,7 +96,7 @@
               <div class="u-av"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
               <div class="u-info">
                 <a class="u-name" href="/user/<%= u.id %>"><%= u.real_name || u.username %></a>
-                <div class="u-sub">@<%= u.username %> · ⭐ <%= u.points || 0 %> 积分</div>
+                <div class="u-sub">@<%= u.username %> · ⭐ <%= formatPoints(u.points || 0) %> 积分</div>
               </div>
               <div class="u-actions">
                 <% if (u.isFriend) { %>
@@ -164,7 +164,7 @@
             <div class="u-av"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
             <div class="u-info">
               <a class="u-name" href="/user/<%= u.id %>"><%= u.real_name || u.username %></a>
-              <div class="u-sub">@<%= u.username %> · ⭐ <%= u.points || 0 %> 积分</div>
+              <div class="u-sub">@<%= u.username %> · ⭐ <%= formatPoints(u.points || 0) %> 积分</div>
             </div>
             <div class="u-actions">
               <a class="u-btn" href="/messages/chat/<%= u.id %>"><i class="fas fa-envelope"></i> 私信</a>
@@ -185,7 +185,7 @@
             <div class="u-av"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
             <div class="u-info">
               <a class="u-name" href="/user/<%= u.id %>"><%= u.real_name || u.username %></a>
-              <div class="u-sub">@<%= u.username %> · ⭐ <%= u.points || 0 %> 积分</div>
+              <div class="u-sub">@<%= u.username %> · ⭐ <%= formatPoints(u.points || 0) %> 积分</div>
             </div>
             <div class="u-actions">
               <button class="u-btn primary js-add" data-id="<%= u.id %>"><i class="fas fa-user-plus"></i> 加好友</button>

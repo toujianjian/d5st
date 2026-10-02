@@ -5,6 +5,7 @@ const expressLayouts = require('express-ejs-layouts');
 const pool = require('./配置/db');
 const initDatabase = require('./配置/init-db');
 const casdoor = require('./配置/casdoor');
+const level = require('./配置/level');
 const { initCasdoorWithRetry } = require('./配置/casdoor-init');
 const CASDOOR_CONFIG = casdoor.C;
 
@@ -15,6 +16,9 @@ app.set('views', path.join(__dirname, '页面模板'));
 app.set('view engine', 'ejs');
 app.set('layout', 'layout');
 app.use(expressLayouts);
+
+// 模板里可直接调用：formatPoints(1200) → '1.2k'（见 配置/level.js）
+app.locals.formatPoints = level.formatPoints;
 
 app.use('/public', express.static(path.join(__dirname, '静态资源')));
 // Font Awesome 的 all.min.css 内部以 ../webfonts/ 引用字体（相对 CSS 自身），
@@ -60,8 +64,15 @@ app.use(async (req, res, next) => {
   // 侧边栏需要的统计变量
   res.locals.postCount = 0;
   res.locals.commentCount = 0;
+  // 等级/积分统一由 配置/level.js 推导（等级只跟积分挂钩，不再用帖子数估算）
   res.locals.userLevel = 1;
+  res.locals.userLevelName = level.LEVELS[0].name;
   res.locals.userPoints = 0;
+  res.locals.userPointsText = '0';
+  res.locals.levelProgress = 0;
+  res.locals.levelRemaining = 0;
+  res.locals.levelNextName = null;
+  res.locals.levelIsMax = false;
   res.locals.friendRequestCount = 0;
   res.locals.unreadMessageCount = 0;
   res.locals.pageScript = null;
@@ -87,10 +98,10 @@ app.use(async (req, res, next) => {
         'SELECT COUNT(*) as cnt FROM post_comments WHERE user_id = ? AND is_deleted = 0', [uid]
       );
       res.locals.commentCount = cRows[0]?.cnt || 0;
-      res.locals.userLevel = Math.floor((res.locals.postCount + res.locals.commentCount) / 5) + 1;
 
+      // 等级由积分推导（配置/level.js），不再用「帖子+评论」估算，避免和积分口径打架
       const [uRows] = await pool.query('SELECT points FROM casdoor_users WHERE id = ?', [uid]);
-      res.locals.userPoints = (uRows[0] && uRows[0].points) || 0;
+      level.applyToLocals(res, (uRows[0] && uRows[0].points) || 0);
 
       const [frRows] = await pool.query(
         "SELECT COUNT(*) as cnt FROM friend_requests WHERE to_user_id = ? AND status = 'pending'", [uid]

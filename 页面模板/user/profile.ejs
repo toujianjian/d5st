@@ -47,7 +47,10 @@
         <div class="stat-item"><span class="num"><%= followingCount || 0 %></span> <span class="lbl">关注</span></div>
         <div class="stat-item"><span class="num"><%= typeof friendCount !== 'undefined' ? friendCount : 0 %></span> <span class="lbl">好友</span></div>
         <div class="stat-item"><span class="num"><%= (typeof posts !== 'undefined' ? posts.length : 0) %></span> <span class="lbl">帖子</span></div>
-        <% if (typeof user.points !== 'undefined') { %>
+        <% if (typeof levelInfo !== 'undefined' && levelInfo) { %>
+        <div class="stat-item" title="当前积分"><span class="num"><%= levelInfo.pointsText %></span> <span class="lbl">积分</span></div>
+        <div class="stat-item" title="<%= levelInfo.isMax ? '已达最高等级' : ('距 ' + levelInfo.nextName + ' 还差 ' + levelInfo.remaining + ' 积分') %>"><span class="num">Lv.<%= levelInfo.level %></span> <span class="lbl"><%= levelInfo.name %></span></div>
+        <% } else if (typeof user.points !== 'undefined') { %>
         <div class="stat-item"><span class="num"><%= user.points %></span> <span class="lbl">积分</span></div>
         <% } %>
       </div>

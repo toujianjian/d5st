@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
+const level = require('../../配置/level');
 
 function requireLogin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -29,6 +30,7 @@ router.get('/', requireLogin, async (req, res) => {
     res.render('user/index', {
       title: '个人中心',
       user,
+      levelInfo: level.getLevelInfo(user.points || 0),
       posts,
       medals,
       secrets,
@@ -98,6 +100,7 @@ router.get('/:id', async (req, res, next) => {
     res.render('user/profile', {
       title: (target.real_name || target.username) + ' 的主页',
       user: target,
+      levelInfo: level.getLevelInfo(target.points || 0),
       posts,
       followerCount: followers[0].cnt || 0,
       followingCount: following[0].cnt || 0,

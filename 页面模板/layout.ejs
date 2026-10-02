@@ -490,21 +490,21 @@
       <% if (isLoggedIn) { %>
       <div class="user-avatar"><%= currentUser.real_name ? currentUser.real_name.charAt(0) : (currentUser.username || 'U').charAt(0) %></div>
       <div class="user-name"><%= currentUser.real_name || currentUser.username || '用户' %></div>
+      <div class="user-level" title="<%= (typeof levelIsMax !== 'undefined' && levelIsMax) ? '已达最高等级' : ('距 ' + (levelNextName || '下一级') + ' 还差 ' + (levelRemaining || 0) + ' 积分') %>">
+        <span class="user-level-badge">Lv.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+        <span class="user-level-name"><%= typeof userLevelName !== 'undefined' ? userLevelName : '' %></span>
+      </div>
       <div class="user-stats">
         <div class="stat-item">
           <span class="stat-num"><%= typeof postCount !== 'undefined' ? postCount : 0 %></span>
           <span class="stat-label">帖子</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-num"><%= typeof commentCount !== 'undefined' ? commentCount : 0 %></span>
-          <span class="stat-label">评论</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-num"><%= typeof userPoints !== 'undefined' ? userPoints : 0 %></span>
+        <div class="stat-item" title="当前积分">
+          <span class="stat-num"><%= typeof userPointsText !== 'undefined' ? userPointsText : 0 %></span>
           <span class="stat-label">积分</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-num"><%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
+        <div class="stat-item" title="<%= (typeof levelIsMax !== 'undefined' && levelIsMax) ? '已达最高等级' : ('距 ' + (levelNextName || '下一级') + ' 还差 ' + (levelRemaining || 0) + ' 积分') %>">
+          <span class="stat-num">Lv.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
           <span class="stat-label">等级</span>
         </div>
       </div>
