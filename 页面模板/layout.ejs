@@ -181,6 +181,12 @@
       transform: translateX(4px);
     }
     .quick-action-btn i { font-size: 16px; width: 20px; text-align: center; }
+    .qa-badge {
+      margin-left: auto; font-size: 11px; font-weight: 700;
+      padding: 1px 7px; border-radius: 999px;
+      background: #fff; color: var(--primary);
+    }
+    .qa-badge.qa-paused { background: rgba(255,255,255,0.25); color: #fff; }
     .user-avatar {
       width: 80px; height: 80px;
       background: linear-gradient(135deg, var(--primary), var(--accent));
@@ -419,9 +425,14 @@
       <a href="/forum" class="mobile-nav-link"><i class="fas fa-comment-dots"></i>贴吧</a>
       <a href="/search" class="mobile-nav-link"><i class="fas fa-search"></i>搜索</a>
       <a href="/secret" class="mobile-nav-link"><i class="fas fa-key"></i>保密号</a>
+      <% if (typeof sponsorEnabled !== 'undefined' && sponsorEnabled) { %>
       <a href="/sponsor" class="mobile-nav-link"><i class="fas fa-heart"></i>赞助</a>
+      <% } else { %>
+      <a href="/sponsor" class="mobile-nav-link" style="opacity:.6;"><i class="fas fa-heart-broken"></i>赞助（暂停）</a>
+      <% } %>
       <a href="/messages/guestbook" class="mobile-nav-link"><i class="fas fa-book"></i>留言板</a>
       <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+      <a href="/friends" class="mobile-nav-link"><i class="fas fa-user-friends"></i>好友</a>
       <a href="/messages" class="mobile-nav-link"><i class="fas fa-envelope"></i>私信</a>
       <a href="/user" class="mobile-nav-link"><i class="fas fa-user"></i><%= currentUser.real_name || currentUser.username %></a>
       <% if (currentUser.is_admin === 1) { %>
@@ -469,6 +480,10 @@
           <span class="stat-label">评论</span>
         </div>
         <div class="stat-item">
+          <span class="stat-num"><%= typeof userPoints !== 'undefined' ? userPoints : 0 %></span>
+          <span class="stat-label">积分</span>
+        </div>
+        <div class="stat-item">
           <span class="stat-num"><%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
           <span class="stat-label">等级</span>
         </div>
@@ -476,9 +491,14 @@
       <div class="quick-actions">
         <a href="/" class="quick-action-btn"><i class="fas fa-home"></i> 首页</a>
         <a href="/forum" class="quick-action-btn"><i class="fas fa-comment-dots"></i> 贴吧</a>
+        <a href="/friends" class="quick-action-btn"><i class="fas fa-user-friends"></i> 好友<% if (typeof friendRequestCount !== 'undefined' && friendRequestCount > 0) { %><span class="qa-badge"><%= friendRequestCount %></span><% } %></a>
+        <a href="/messages" class="quick-action-btn"><i class="fas fa-envelope"></i> 私信<% if (typeof unreadMessageCount !== 'undefined' && unreadMessageCount > 0) { %><span class="qa-badge"><%= unreadMessageCount %></span><% } %></a>
         <a href="/secret" class="quick-action-btn"><i class="fas fa-key"></i> 保密号</a>
+        <% if (typeof sponsorEnabled !== 'undefined' && sponsorEnabled) { %>
         <a href="/sponsor" class="quick-action-btn"><i class="fas fa-heart"></i> 赞助</a>
-        <a href="/messages" class="quick-action-btn"><i class="fas fa-envelope"></i> 私信</a>
+        <% } else { %>
+        <a href="/sponsor" class="quick-action-btn" style="opacity:.6;"><i class="fas fa-heart-broken"></i> 赞助<span class="qa-badge qa-paused">暂停</span></a>
+        <% } %>
         <a href="/search" class="quick-action-btn"><i class="fas fa-search"></i> 搜索</a>
         <a href="/user" class="quick-action-btn"><i class="fas fa-user"></i> 个人中心</a>
         <% if (currentUser.is_admin === 1) { %>
@@ -495,7 +515,11 @@
         <a href="/" class="quick-action-btn"><i class="fas fa-home"></i> 首页</a>
         <a href="/forum" class="quick-action-btn"><i class="fas fa-comment-dots"></i> 贴吧</a>
         <a href="/secret" class="quick-action-btn"><i class="fas fa-key"></i> 保密号</a>
+        <% if (typeof sponsorEnabled !== 'undefined' && sponsorEnabled) { %>
         <a href="/sponsor" class="quick-action-btn"><i class="fas fa-heart"></i> 赞助</a>
+        <% } else { %>
+        <a href="/sponsor" class="quick-action-btn" style="opacity:.6;"><i class="fas fa-heart-broken"></i> 赞助<span class="qa-badge qa-paused">暂停</span></a>
+        <% } %>
         <a href="/messages/guestbook" class="quick-action-btn"><i class="fas fa-book"></i> 留言板</a>
         <a href="/search" class="quick-action-btn"><i class="fas fa-search"></i> 搜索</a>
         <a href="/login" class="quick-action-btn"><i class="fas fa-sign-in-alt"></i> 登录 / 注册</a>

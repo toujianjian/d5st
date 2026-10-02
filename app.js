@@ -61,15 +61,46 @@ app.use(async (req, res, next) => {
   res.locals.postCount = 0;
   res.locals.commentCount = 0;
   res.locals.userLevel = 1;
+  res.locals.userPoints = 0;
+  res.locals.friendRequestCount = 0;
+  res.locals.unreadMessageCount = 0;
   res.locals.pageScript = null;
+
+  // 赞助入口开关（system_settings.sponsor_enabled；0 或缺失 = 暂停）
+  res.locals.sponsorEnabled = false;
+  try {
+    const [sRows] = await pool.query(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'sponsor_enabled' LIMIT 1"
+    );
+    res.locals.sponsorEnabled = sRows.length > 0 && String(sRows[0].setting_value) === '1';
+  } catch (e) { /* 设置表可能不存在，忽略 */ }
 
   if (req.session.user) {
     try {
-      const [pRows] = await pool.query('SELECT COUNT(*) as cnt FROM posts WHERE user_id = ?', [req.session.user.id]);
+      const uid = req.session.user.id;
+      // 注意：真实表名是 forum_posts / post_comments（旧代码查 posts/comments 永远为 0）
+      const [pRows] = await pool.query(
+        'SELECT COUNT(*) as cnt FROM forum_posts WHERE user_id = ? AND is_deleted = 0', [uid]
+      );
       res.locals.postCount = pRows[0]?.cnt || 0;
-      const [cRows] = await pool.query('SELECT COUNT(*) as cnt FROM comments WHERE user_id = ?', [req.session.user.id]);
+      const [cRows] = await pool.query(
+        'SELECT COUNT(*) as cnt FROM post_comments WHERE user_id = ? AND is_deleted = 0', [uid]
+      );
       res.locals.commentCount = cRows[0]?.cnt || 0;
       res.locals.userLevel = Math.floor((res.locals.postCount + res.locals.commentCount) / 5) + 1;
+
+      const [uRows] = await pool.query('SELECT points FROM casdoor_users WHERE id = ?', [uid]);
+      res.locals.userPoints = (uRows[0] && uRows[0].points) || 0;
+
+      const [frRows] = await pool.query(
+        "SELECT COUNT(*) as cnt FROM friend_requests WHERE to_user_id = ? AND status = 'pending'", [uid]
+      );
+      res.locals.friendRequestCount = frRows[0]?.cnt || 0;
+
+      const [umRows] = await pool.query(
+        'SELECT COUNT(*) as cnt FROM messages WHERE receiver_id = ? AND is_read = 0', [uid]
+      );
+      res.locals.unreadMessageCount = umRows[0]?.cnt || 0;
     } catch (e) {
       // 表可能不存在，忽略
     }
@@ -138,6 +169,7 @@ app.use('/', require('./功能模块/registration'));
 app.use('/user', require('./功能模块/user'));
 app.use('/forum', require('./功能模块/forum'));
 app.use('/messages', require('./功能模块/messages'));
+app.use('/friends', require('./功能模块/friends'));
 app.use('/search', require('./功能模块/search'));
 app.use('/secret', require('./功能模块/secret-code'));
 app.use('/sponsor', require('./功能模块/sponsor'));

@@ -45,6 +45,7 @@
       <div class="profile-stats">
         <div class="stat-item"><span class="num"><%= followerCount || 0 %></span> <span class="lbl">粉丝</span></div>
         <div class="stat-item"><span class="num"><%= followingCount || 0 %></span> <span class="lbl">关注</span></div>
+        <div class="stat-item"><span class="num"><%= typeof friendCount !== 'undefined' ? friendCount : 0 %></span> <span class="lbl">好友</span></div>
         <div class="stat-item"><span class="num"><%= (typeof posts !== 'undefined' ? posts.length : 0) %></span> <span class="lbl">帖子</span></div>
         <% if (typeof user.points !== 'undefined') { %>
         <div class="stat-item"><span class="num"><%= user.points %></span> <span class="lbl">积分</span></div>
@@ -52,10 +53,17 @@
       </div>
     </div>
     <% if (!isSelf && typeof currentUser !== 'undefined' && currentUser) { %>
-    <button id="followBtn" class="follow-btn <%= isFollowing ? 'following' : '' %>" data-id="<%= user.id %>">
-      <i class="fas <%= isFollowing ? 'fa-user-minus' : 'fa-user-plus' %>"></i>
-      <span><%= isFollowing ? '已关注' : '关注' %></span>
-    </button>
+    <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;">
+      <button id="followBtn" class="follow-btn <%= isFollowing ? 'following' : '' %>" data-id="<%= user.id %>">
+        <i class="fas <%= isFollowing ? 'fa-user-minus' : 'fa-user-plus' %>"></i>
+        <span><%= isFollowing ? '已关注' : '关注' %></span>
+      </button>
+      <button id="friendBtn" class="follow-btn <%= isFriend ? 'following' : '' %>" data-id="<%= user.id %>" <%= isFriend ? 'disabled' : '' %>>
+        <i class="fas <%= isFriend ? 'fa-user-check' : 'fa-user-plus' %>"></i>
+        <span><%= isFriend ? '已是好友' : (friendRequestSent ? '已申请' : '加好友') %></span>
+      </button>
+      <a class="follow-btn" href="/messages/chat/<%= user.id %>"><i class="fas fa-envelope"></i> 私信</a>
+    </div>
     <% } %>
   </div>
 
@@ -120,6 +128,28 @@
             btn.querySelector('span').textContent = '关注';
             btn.querySelector('i').className = 'fas fa-user-plus';
           }
+        });
+    });
+  })();
+
+  (function() {
+    var fbtn = document.getElementById('friendBtn');
+    if (!fbtn) return;
+    fbtn.addEventListener('click', function() {
+      if (fbtn.disabled) return;
+      fetch('/friends/request/' + fbtn.dataset.id, { method: 'POST', headers: {'Content-Type':'application/json'} })
+        .then(function(r){ if (r.status === 401) { alert('请先登录'); return null; } return r.json(); })
+        .then(function(data) {
+          if (!data) return;
+          if (data.status === 'friend') {
+            fbtn.classList.add('following'); fbtn.disabled = true;
+            fbtn.querySelector('span').textContent = '已是好友';
+            fbtn.querySelector('i').className = 'fas fa-user-check';
+          } else if (data.status === 'requested') {
+            fbtn.disabled = true;
+            fbtn.querySelector('span').textContent = '已申请';
+            fbtn.querySelector('i').className = 'fas fa-hourglass-half';
+          } else if (data.error) { alert(data.error); }
         });
     });
   })();

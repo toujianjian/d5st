@@ -240,13 +240,32 @@ INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description) 
 ('site_name', 'D5ST 校园社区', '网站名称'),
 ('site_description', '连接每一位同学，共享校园生活', '网站描述'),
 ('enable_registration', '1', '是否开放注册'),
-('default_points', '100', '新用户默认积分');
+('default_points', '100', '新用户默认积分'),
+('sponsor_enabled', '0', '赞助入口是否开放（0=暂停，1=开放）');
 
 CREATE TABLE IF NOT EXISTS user_follows (
   follower_id INTEGER NOT NULL,
   following_id INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   PRIMARY KEY (follower_id, following_id)
+);
+
+CREATE TABLE IF NOT EXISTS user_friends (
+  user_id INTEGER NOT NULL,
+  friend_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  PRIMARY KEY (user_id, friend_id)
+);
+
+CREATE TABLE IF NOT EXISTS friend_requests (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  from_user_id INTEGER NOT NULL,
+  to_user_id INTEGER NOT NULL,
+  message TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  handled_at TEXT,
+  UNIQUE(from_user_id, to_user_id)
 );
 
 CREATE TABLE IF NOT EXISTS tags (

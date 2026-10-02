@@ -20,8 +20,12 @@ router.get('/', requireLogin, async (req, res) => {
 
     const [followers] = await pool.query('SELECT COUNT(*) as cnt FROM user_follows WHERE following_id = ?', [userId]);
     const [following] = await pool.query('SELECT COUNT(*) as cnt FROM user_follows WHERE follower_id = ?', [userId]);
+    const [friendRows] = await pool.query('SELECT COUNT(*) as cnt FROM user_friends WHERE user_id = ?', [userId]);
 
-    const user = req.session.user;
+    // 查库取最新资料（session 里没有 points，直接用会让积分永远显示不出来）
+    const [uRows] = await pool.query('SELECT * FROM casdoor_users WHERE id = ?', [userId]);
+    const user = uRows[0] || req.session.user;
+
     res.render('user/index', {
       title: '个人中心',
       user,
@@ -31,6 +35,7 @@ router.get('/', requireLogin, async (req, res) => {
       transactions,
       followerCount: followers[0].cnt || 0,
       followingCount: following[0].cnt || 0,
+      friendCount: friendRows[0].cnt || 0,
       isSelf: true
     });
   } catch (err) {
@@ -62,6 +67,8 @@ router.get('/:id', async (req, res, next) => {
 
     let isFollowing = false;
     let isSelf = false;
+    let isFriend = false;
+    let friendRequestSent = false;
     if (req.session.user) {
       isSelf = req.session.user.id === targetId;
       const [check] = await pool.query(
@@ -69,7 +76,24 @@ router.get('/:id', async (req, res, next) => {
         [req.session.user.id, targetId]
       );
       isFollowing = check && check.length > 0;
+
+      if (!isSelf) {
+        const [fr] = await pool.query(
+          'SELECT 1 FROM user_friends WHERE user_id = ? AND friend_id = ? LIMIT 1',
+          [req.session.user.id, targetId]
+        );
+        isFriend = fr && fr.length > 0;
+        const [reqRow] = await pool.query(
+          "SELECT 1 FROM friend_requests WHERE from_user_id = ? AND to_user_id = ? AND status = 'pending'",
+          [req.session.user.id, targetId]
+        );
+        friendRequestSent = reqRow && reqRow.length > 0;
+      }
     }
+
+    const [friendRows] = await pool.query(
+      'SELECT COUNT(*) as cnt FROM user_friends WHERE user_id = ?', [targetId]
+    );
 
     res.render('user/profile', {
       title: (target.real_name || target.username) + ' 的主页',
@@ -77,7 +101,10 @@ router.get('/:id', async (req, res, next) => {
       posts,
       followerCount: followers[0].cnt || 0,
       followingCount: following[0].cnt || 0,
+      friendCount: friendRows[0].cnt || 0,
       isFollowing,
+      isFriend,
+      friendRequestSent,
       isSelf
     });
   } catch (err) {

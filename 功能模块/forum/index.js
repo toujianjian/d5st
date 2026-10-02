@@ -370,8 +370,15 @@ router.get('/:id', async (req, res) => {
 
     const structuredTags = await getPostTagNames(post.id);
 
+    // 是否可删除：本人或管理员
+    const isOwner = !!req.session.user && (
+      String(req.session.user.id) === String(post.user_id) ||
+      req.session.user.is_admin === 1
+    );
+
     res.render('forum/show', {
       title: post.title || '帖子详情',
+      isOwner,
       post: {
         ...post,
         author: post.real_name || post.username || '匿名',
@@ -475,6 +482,37 @@ router.post('/report/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '举报失败' });
+  }
+});
+
+// ============ 删除自己的帖子（软删除，进回收站） ============
+router.post('/delete/:id', async (req, res) => {
+  if (!req.session.user) return res.status(401).json({ error: '请先登录' });
+  const id = req.params.id;
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM forum_posts WHERE id = ? AND is_deleted = 0 LIMIT 1', [id]
+    );
+    if (!rows || rows.length === 0) return res.status(404).json({ error: '帖子不存在' });
+    const post = rows[0];
+    const isOwner = String(post.user_id) === String(req.session.user.id);
+    const isAdmin = req.session.user.is_admin === 1;
+    if (!isOwner && !isAdmin) return res.status(403).json({ error: '只能删除自己的帖子' });
+
+    await pool.query('UPDATE forum_posts SET is_deleted = 1 WHERE id = ?', [id]);
+    // 记入回收站，便于后台恢复
+    try {
+      await pool.query(
+        'INSERT INTO deleted_items (item_type, item_id, deleted_by, data) VALUES (?, ?, ?, ?)',
+        ['forum_post', Number(id), req.session.user.id, JSON.stringify({
+          title: post.title, content: post.content, user_id: post.user_id
+        })]
+      );
+    } catch (e) { /* 回收站写入失败不影响删除结果 */ }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('删除帖子失败:', err);
+    res.status(500).json({ error: '删除失败' });
   }
 });
 

@@ -1,0 +1,264 @@
+<style>
+  .friends-wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 80px; }
+  .friends-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .friends-title { font-size: 24px; font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 10px; }
+  .friends-title i { color: var(--primary); }
+  .friends-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .f-tab {
+    padding: 8px 16px; border-radius: 999px; font-size: 13px; text-decoration: none;
+    background: rgba(255,255,255,.6); border: 1px solid var(--glass-border);
+    color: var(--text-light); transition: all .25s ease;
+  }
+  .f-tab:hover { border-color: var(--primary); color: var(--primary); }
+  .f-tab.active { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; border-color: transparent; }
+  .f-tab .pill { margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: rgba(211,47,47,.12); color: var(--primary); font-weight: 700; }
+  .f-tab.active .pill { background: rgba(255,255,255,.3); color: #fff; }
+
+  .f-section {
+    background: var(--glass-bg); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-radius: 20px; padding: 20px 22px; box-shadow: var(--shadow-soft); margin-bottom: 16px;
+  }
+  .f-section-title { font-size: 15px; font-weight: 700; color: var(--text-dark); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .f-section-title i { color: var(--primary); }
+
+  .u-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,.05);
+  }
+  .u-row:last-child { border-bottom: none; }
+  .u-av {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px;
+  }
+  .u-info { flex: 1; min-width: 0; }
+  .u-name { font-size: 14px; font-weight: 600; color: var(--text-dark); text-decoration: none; }
+  .u-name:hover { color: var(--primary); }
+  .u-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .u-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .u-btn {
+    padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    border: 1px solid rgba(211,47,47,.3); background: rgba(255,255,255,.7); color: var(--primary);
+    text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all .22s ease;
+  }
+  .u-btn:hover { background: var(--primary); color: #fff; border-color: transparent; }
+  .u-btn.primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; border-color: transparent; }
+  .u-btn.ghost { border-color: rgba(0,0,0,.12); color: var(--text-light); }
+  .u-btn.ghost:hover { background: #eee; color: var(--text-dark); }
+  .u-btn[disabled] { opacity: .6; cursor: default; }
+
+  .f-search { display: flex; gap: 8px; margin-bottom: 4px; }
+  .f-search input {
+    flex: 1; padding: 11px 16px; border-radius: 999px; font-size: 14px;
+    border: 1px solid rgba(211,47,47,.2); background: rgba(255,255,255,.8); color: var(--text-dark); outline: none;
+  }
+  .f-search input:focus { border-color: var(--primary); }
+  .f-search button {
+    padding: 0 22px; border-radius: 999px; border: none; cursor: pointer; font-weight: 600; font-size: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;
+  }
+  .f-empty { text-align: center; padding: 26px; color: var(--text-muted); font-size: 14px; }
+  .f-empty i { font-size: 30px; display: block; margin-bottom: 8px; opacity: .4; }
+</style>
+
+<div class="friends-wrap">
+  <div class="friends-head">
+    <div class="friends-title"><i class="fas fa-user-friends"></i> 好友</div>
+    <div class="friends-tabs">
+      <a class="f-tab <%= activeTab === 'friends' ? 'active' : '' %>" href="/friends">
+        好友<% if (friends && friends.length) { %><span class="pill"><%= friends.length %></span><% } %>
+      </a>
+      <a class="f-tab <%= activeTab === 'requests' ? 'active' : '' %>" href="/friends?tab=requests">
+        请求<% if (incoming && incoming.length) { %><span class="pill"><%= incoming.length %></span><% } %>
+      </a>
+      <a class="f-tab <%= activeTab === 'search' ? 'active' : '' %>" href="/friends?tab=search">发现同学</a>
+    </div>
+  </div>
+
+  <% if (activeTab === 'search') { %>
+    <div class="f-section">
+      <div class="f-section-title"><i class="fas fa-search"></i> 搜索同学</div>
+      <form class="f-search" method="GET" action="/friends/search">
+        <input type="text" name="q" placeholder="输入用户名或昵称…" value="<%= keyword %>" autocomplete="off" />
+        <button type="submit">搜索</button>
+      </form>
+    </div>
+    <% if (searchResults) { %>
+      <div class="f-section">
+        <div class="f-section-title"><i class="fas fa-list"></i> 搜索结果（<%= searchResults.length %>）</div>
+        <% if (searchResults.length) { %>
+          <% searchResults.forEach(function(u) { %>
+            <div class="u-row">
+              <div class="u-av"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+              <div class="u-info">
+                <a class="u-name" href="/user/<%= u.id %>"><%= u.real_name || u.username %></a>
+                <div class="u-sub">@<%= u.username %> · ⭐ <%= u.points || 0 %> 积分</div>
+              </div>
+              <div class="u-actions">
+                <% if (u.isFriend) { %>
+                  <span class="u-btn ghost" disabled><i class="fas fa-check"></i> 已是好友</span>
+                <% } else if (u.requestSent) { %>
+                  <span class="u-btn ghost" disabled><i class="fas fa-hourglass-half"></i> 已申请</span>
+                <% } else { %>
+                  <button class="u-btn primary js-add" data-id="<%= u.id %>"><i class="fas fa-user-plus"></i> 加好友</button>
+                <% } %>
+                <a class="u-btn" href="/messages/chat/<%= u.id %>"><i class="fas fa-envelope"></i> 私信</a>
+              </div>
+            </div>
+          <% }); %>
+        <% } else { %>
+          <div class="f-empty"><i class="fas fa-user-slash"></i>没有找到匹配的同学</div>
+        <% } %>
+      </div>
+    <% } %>
+  <% } else if (activeTab === 'requests') { %>
+    <div class="f-section">
+      <div class="f-section-title"><i class="fas fa-inbox"></i> 收到的请求</div>
+      <% if (incoming && incoming.length) { %>
+        <% incoming.forEach(function(r) { %>
+          <div class="u-row">
+            <div class="u-av"><%= (r.real_name || r.username || 'U').charAt(0) %></div>
+            <div class="u-info">
+              <a class="u-name" href="/user/<%= r.from_user_id %>"><%= r.real_name || r.username %></a>
+              <div class="u-sub"><%= r.message ? r.message : '想加你为好友' %></div>
+            </div>
+            <div class="u-actions">
+              <button class="u-btn primary js-accept" data-id="<%= r.id %>"><i class="fas fa-check"></i> 接受</button>
+              <button class="u-btn ghost js-reject" data-id="<%= r.id %>"><i class="fas fa-times"></i> 拒绝</button>
+            </div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <div class="f-empty"><i class="fas fa-inbox"></i>暂时没有新的好友请求</div>
+      <% } %>
+    </div>
+    <div class="f-section">
+      <div class="f-section-title"><i class="fas fa-paper-plane"></i> 我发出的请求</div>
+      <% if (outgoing && outgoing.length) { %>
+        <% outgoing.forEach(function(r) { %>
+          <div class="u-row">
+            <div class="u-av"><%= (r.real_name || r.username || 'U').charAt(0) %></div>
+            <div class="u-info">
+              <a class="u-name" href="/user/<%= r.to_user_id %>"><%= r.real_name || r.username %></a>
+              <div class="u-sub">等待对方确认…</div>
+            </div>
+            <div class="u-actions">
+              <span class="u-btn ghost" disabled><i class="fas fa-hourglass-half"></i> 待确认</span>
+            </div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <div class="f-empty"><i class="fas fa-paper-plane"></i>还没有发出好友请求</div>
+      <% } %>
+    </div>
+  <% } else { %>
+    <div class="f-section">
+      <div class="f-section-title"><i class="fas fa-user-friends"></i> 我的好友</div>
+      <% if (friends && friends.length) { %>
+        <% friends.forEach(function(u) { %>
+          <div class="u-row">
+            <div class="u-av"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+            <div class="u-info">
+              <a class="u-name" href="/user/<%= u.id %>"><%= u.real_name || u.username %></a>
+              <div class="u-sub">@<%= u.username %> · ⭐ <%= u.points || 0 %> 积分</div>
+            </div>
+            <div class="u-actions">
+              <a class="u-btn" href="/messages/chat/<%= u.id %>"><i class="fas fa-envelope"></i> 私信</a>
+              <button class="u-btn ghost js-remove" data-id="<%= u.id %>"><i class="fas fa-user-minus"></i> 删除</button>
+            </div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <div class="f-empty"><i class="fas fa-user-plus"></i>还没有好友，去「发现同学」加一个吧</div>
+      <% } %>
+    </div>
+
+    <div class="f-section">
+      <div class="f-section-title"><i class="fas fa-user-plus"></i> 推荐同学</div>
+      <% if (suggestions && suggestions.length) { %>
+        <% suggestions.forEach(function(u) { %>
+          <div class="u-row">
+            <div class="u-av"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+            <div class="u-info">
+              <a class="u-name" href="/user/<%= u.id %>"><%= u.real_name || u.username %></a>
+              <div class="u-sub">@<%= u.username %> · ⭐ <%= u.points || 0 %> 积分</div>
+            </div>
+            <div class="u-actions">
+              <button class="u-btn primary js-add" data-id="<%= u.id %>"><i class="fas fa-user-plus"></i> 加好友</button>
+              <a class="u-btn" href="/messages/chat/<%= u.id %>"><i class="fas fa-envelope"></i> 私信</a>
+            </div>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <div class="f-empty"><i class="fas fa-users"></i>暂无更多推荐</div>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+
+<script>
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:9999;'
+      + 'background:rgba(45,45,45,.92);color:#fff;padding:10px 22px;border-radius:999px;'
+      + 'font-size:14px;box-shadow:0 8px 28px rgba(0,0,0,.3);transition:opacity .4s;';
+    document.body.appendChild(t);
+    setTimeout(function () { t.style.opacity = '0'; setTimeout(function () { t.remove(); }, 400); }, 1600);
+  }
+
+  async function call(url) {
+    var r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    var d = await r.json().catch(function () { return {}; });
+    return { status: r.status, data: d };
+  }
+
+  // 加好友：成功后即时把按钮变为「已申请」，并弹出提示（不再静默刷新）
+  document.querySelectorAll('.js-add').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      if (b.disabled) return;
+      b.disabled = true;
+      try {
+        var res = await call('/friends/request/' + b.dataset.id);
+        if (res.status === 401) { toast('请先登录'); b.disabled = false; return; }
+        if (res.data.error) { toast(res.data.error); b.disabled = false; return; }
+        b.className = 'u-btn ghost';
+        if (res.data.status === 'friend') {
+          b.innerHTML = '<i class="fas fa-user-check"></i> 已是好友';
+          toast('你们已经是好友了');
+        } else {
+          b.innerHTML = '<i class="fas fa-hourglass-half"></i> 已申请';
+          toast('已发送好友请求，等待对方确认');
+        }
+      } catch (e) { toast('操作失败'); b.disabled = false; }
+    });
+  });
+
+  // 接受 / 拒绝 / 删除：成功后刷新列表
+  function reloadAfter(b, url, confirmMsg) {
+    b.addEventListener('click', async function () {
+      if (confirmMsg && !confirm(confirmMsg)) return;
+      if (b.disabled) return;
+      b.disabled = true;
+      try {
+        var res = await call(url);
+        if (res.status === 401) { toast('请先登录'); b.disabled = false; return; }
+        if (res.data.error) { toast(res.data.error); b.disabled = false; return; }
+        location.reload();
+      } catch (e) { toast('操作失败'); b.disabled = false; }
+    });
+  }
+  document.querySelectorAll('.js-accept').forEach(function (b) {
+    reloadAfter(b, '/friends/accept/' + b.dataset.id);
+  });
+  document.querySelectorAll('.js-reject').forEach(function (b) {
+    reloadAfter(b, '/friends/reject/' + b.dataset.id);
+  });
+  document.querySelectorAll('.js-remove').forEach(function (b) {
+    reloadAfter(b, '/friends/remove/' + b.dataset.id, '确定删除该好友吗？');
+  });
+</script>

@@ -127,6 +127,13 @@
       <button class="act-btn" onclick="document.getElementById('commentInput').focus()">
         <i class="far fa-comment"></i> 评论
       </button>
+      <% if (typeof currentUser !== 'undefined' && currentUser && String(currentUser.id) !== String(post.user_id)) { %>
+      <a class="act-btn" href="/messages/chat/<%= post.user_id %>"><i class="fas fa-envelope"></i> 私信</a>
+      <button class="act-btn" id="friendBtn" data-id="<%= post.user_id %>"><i class="fas fa-user-plus"></i> 加好友</button>
+      <% } %>
+      <% if (typeof isOwner !== 'undefined' && isOwner) { %>
+      <button class="act-btn" id="deleteBtn" style="border-color:rgba(211,47,47,.5);color:#d32f2f;"><i class="fas fa-trash"></i> 删除</button>
+      <% } %>
     </div>
   </div>
 
@@ -231,6 +238,43 @@
         var d = await r.json();
         if (d.success) { location.reload(); } else { alert(d.error || '评论失败'); }
       } catch (e) { alert('评论失败'); }
+    });
+  }
+
+  // 删除自己的帖子
+  var delBtn = document.getElementById('deleteBtn');
+  if (delBtn) {
+    delBtn.addEventListener('click', async function () {
+      if (!confirm('确定删除这篇帖子吗？')) return;
+      try {
+        var r = await fetch('/forum/delete/' + POST_ID, { method: 'POST' });
+        if (r.status === 401) { alert('请先登录'); return; }
+        var d = await r.json();
+        if (d.success) { location.href = '/forum'; } else { alert(d.error || '删除失败'); }
+      } catch (e) { alert('删除失败'); }
+    });
+  }
+
+  // 加好友按钮（读取并展示好友状态）
+  var friendBtn = document.getElementById('friendBtn');
+  if (friendBtn) {
+    (async function () {
+      try {
+        var r = await fetch('/friends/status/' + friendBtn.dataset.id);
+        var d = await r.json();
+        if (d.isFriend) { friendBtn.innerHTML = '<i class="fas fa-user-check"></i> 已是好友'; friendBtn.disabled = true; }
+        else if (d.requestSent) { friendBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> 已申请'; friendBtn.disabled = true; }
+      } catch (e) { /* ignore */ }
+    })();
+    friendBtn.addEventListener('click', async function () {
+      try {
+        var r = await fetch('/friends/request/' + friendBtn.dataset.id, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        if (r.status === 401) { alert('请先登录'); return; }
+        var d = await r.json();
+        if (d.status === 'friend') { friendBtn.innerHTML = '<i class="fas fa-user-check"></i> 已是好友'; friendBtn.disabled = true; }
+        else if (d.status === 'requested') { friendBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> 已申请'; friendBtn.disabled = true; }
+        else if (d.error) { alert(d.error); }
+      } catch (e) { alert('操作失败'); }
     });
   }
 </script>

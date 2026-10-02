@@ -211,9 +211,9 @@
     </div>
 
     <% if (otherUser) { %>
-    <form class="chat-input-area" method="POST" action="/messages/chat/<%= otherUser.id %>">
+    <form class="chat-input-area" id="chatForm" data-id="<%= otherUser.id %>">
       <div class="chat-input-form">
-        <input type="text" name="content" class="chat-input" placeholder="输入消息..." maxlength="2000" autocomplete="off" required />
+        <input type="text" name="content" id="chatInput" class="chat-input" placeholder="输入消息..." maxlength="2000" autocomplete="off" required />
         <button type="submit" class="chat-send-btn" title="发送">
           <i class="fas fa-paper-plane"></i>
         </button>
@@ -227,5 +227,26 @@
   (function() {
     var list = document.getElementById('chatMessages');
     if (list) list.scrollTop = list.scrollHeight;
+  })();
+
+  (function() {
+    var form = document.getElementById('chatForm');
+    if (!form) return;
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var input = document.getElementById('chatInput');
+      var content = input.value.trim();
+      if (!content) return;
+      try {
+        var r = await fetch('/messages/send/' + form.dataset.id, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: content })
+        });
+        if (r.status === 401) { alert('请先登录'); return; }
+        var d = await r.json();
+        if (d.success) { location.reload(); } else { alert(d.error || '发送失败'); }
+      } catch (err) { alert('发送失败'); }
+    });
   })();
 </script>

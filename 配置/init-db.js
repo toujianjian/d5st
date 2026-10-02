@@ -167,6 +167,45 @@ async function repairEncoding() {
   if (fixed > 0) console.log(`[DB] 编码自愈完成，修复 ${fixed} 行乱码数据`);
 }
 
+// 移除历史版本写入的示例内容。
+// db-schema.sql 早期会向新库注入一篇示例帖子 + 两条评论 + 一个视频，
+// 使得首页/侧栏出现「看起来是写死的」假数据。这里做一次性清理：
+// 仅当内容与示例原文完全一致时才删除，绝不误伤真实用户内容。
+const SEED_CONTENT = [
+  {
+    table: 'forum_posts',
+    where: "id = 1 AND title = ? AND content = ?",
+    params: [
+      '图书馆三楼靠窗的位置真的太香了',
+      '每天早上八点前去三楼，靠窗那一排基本都能占到。阳光刚好，插座也有，复习效率直接翻倍。就是下午会有点晒，建议带个小夹子挂个本子挡一下。'
+    ]
+  },
+  {
+    table: 'video_posts',
+    where: "id = 1 AND title = ?",
+    params: ['校园秋季运动会开幕式航拍']
+  },
+  {
+    table: 'post_comments',
+    where: 'id IN (1,2) AND post_id = 1',
+    params: []
+  }
+];
+
+async function removeSeedContent() {
+  let removed = 0;
+  for (const s of SEED_CONTENT) {
+    if (!await tableExists(s.table)) continue;
+    try {
+      const [res] = await pool.query(`DELETE FROM \`${s.table}\` WHERE ${s.where}`, s.params);
+      if (res && res.affectedRows > 0) removed += res.affectedRows;
+    } catch (err) {
+      console.error(`[DB] 清理示例内容失败 ${s.table}:`, err.message);
+    }
+  }
+  if (removed > 0) console.log(`[DB] 已移除 ${removed} 条历史示例内容（首页/论坛只展示真实数据）`);
+}
+
 async function initDatabase() {
   if (initialized) return;
   try {
@@ -183,6 +222,8 @@ async function initDatabase() {
       await repairEncoding();
       // 清理重复种子数据并补唯一键，保证 INSERT IGNORE 真正幂等
       await dedupeAndIndex();
+      // 移除历史版本注入的示例帖子/评论/视频
+      await removeSeedContent();
     } else {
       await pool.exec(initSchema);
       console.log('[DB] SQLite 数据库初始化完成');

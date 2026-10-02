@@ -118,10 +118,10 @@
     <% if (typeof conversations !== 'undefined' && conversations && conversations.length > 0) { %>
       <% conversations.forEach(function(c) { %>
         <a href="/messages/chat/<%= c.other_id %>" class="conv-item">
-          <div class="conv-avatar"><%= c.avatar || '👤' %></div>
+          <div class="conv-avatar"><%= (c.other_name || 'U').charAt(0) %></div>
           <div class="conv-body">
             <div class="conv-top">
-              <span class="conv-name"><%= c.real_name || c.username %></span>
+              <span class="conv-name"><%= c.other_name %></span>
               <span class="conv-time"><%= new Date(c.last_time).toLocaleString('zh-CN') %></span>
             </div>
             <div class="conv-preview"><%= c.last_message %></div>

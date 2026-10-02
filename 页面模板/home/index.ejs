@@ -21,7 +21,15 @@
       <a class="nav-pill" data-liquid-glass href="/forum"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>贴吧</span></a>
       <a class="nav-pill" data-liquid-glass href="/videos"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>风采</span></a>
       <a class="nav-pill" data-liquid-glass href="/secret"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>保密号</span></a>
+      <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+      <a class="nav-pill" data-liquid-glass href="/friends"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>好友</span></a>
+      <a class="nav-pill" data-liquid-glass href="/messages"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>私信</span></a>
+      <% } %>
+      <% if (typeof sponsorEnabled !== 'undefined' && sponsorEnabled) { %>
       <a class="nav-pill" data-liquid-glass href="/sponsor"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>赞助</span></a>
+      <% } else { %>
+      <a class="nav-pill" data-liquid-glass href="/sponsor" style="opacity:.6;"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>赞助（暂停）</span></a>
+      <% } %>
     </nav>
 
     <div class="header-actions">
@@ -154,7 +162,11 @@
           <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/secret"><div class="d5st-link-icon"><i class="fas fa-key"></i></div><h3>保密号</h3></a>
           <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/forum"><div class="d5st-link-icon"><i class="fas fa-comments"></i></div><h3>贴吧论坛</h3></a>
           <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/videos"><div class="d5st-link-icon"><i class="fas fa-play"></i></div><h3>校园风采</h3></a>
+          <% if (typeof sponsorEnabled !== 'undefined' && sponsorEnabled) { %>
           <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/sponsor"><div class="d5st-link-icon"><i class="fas fa-heart"></i></div><h3>赞助支持</h3></a>
+          <% } else { %>
+          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/sponsor" style="opacity:.6;"><div class="d5st-link-icon"><i class="fas fa-heart-broken"></i></div><h3>赞助支持（暂停）</h3></a>
+          <% } %>
           <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/messages/guestbook"><div class="d5st-link-icon"><i class="fas fa-sticky-note"></i></div><h3>留言板</h3></a>
           <% if (typeof links !== 'undefined' && links && links.length) { %>
             <% links.forEach(function (l) { %>

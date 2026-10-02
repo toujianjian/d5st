@@ -129,6 +129,15 @@
       <div class="error-banner"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
     <% } %>
 
+    <% var sponsorOn = (typeof enabled === 'undefined') ? true : enabled; %>
+    <% if (!sponsorOn) { %>
+      <div class="error-banner" style="background:#fff3e0;color:#e65100;border-color:rgba(230,81,0,.25);">
+        <i class="fas fa-pause-circle"></i> 赞助功能暂停中，感谢一路以来的支持！
+      </div>
+      <button type="button" class="btn primary" disabled style="opacity:.55;cursor:not-allowed;">
+        <i class="fas fa-pause-circle"></i> 暂不支持赞助
+      </button>
+    <% } else { %>
     <form method="POST" action="/sponsor">
       <div class="amount-row">
         <button type="button" class="amount-chip" data-amount="5">¥5</button>
@@ -146,6 +155,7 @@
 
       <button type="submit" class="btn primary"><i class="fas fa-rocket"></i> 立即支持</button>
     </form>
+    <% } %>
   </div>
 
   <% if (typeof sponsors !== 'undefined' && sponsors && sponsors.length > 0) { %>
