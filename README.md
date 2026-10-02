@@ -30,32 +30,55 @@
 
 ## 快速开始
 
+> 适用于 Linux / macOS / WSL。首次启动会自动拉取基础镜像、构建 `app` / `casdoor` / `mail` 镜像、初始化数据库与 Casdoor（`配置/casdoor-init.js`），约 1–3 分钟。
+
 ### 前置条件
 
-- Docker 20.10+
-- Docker Compose 2.0+
+- Docker 20.10+ 且 Docker Compose v2（`docker compose` 子命令）
+- 一个空闲端口（默认 `35545`，可用 `.env` 的 `EXTERNAL_PORT` 改）
+- 生产：一个域名或固定公网 IP，并在防火墙放行该端口的入站 TCP
 
-### 一键部署
+### 一键部署（本地 / 单台机器）
 
 ```bash
-# 1. 克隆或下载项目
-cd d5st
+git clone <repo-url> d5st && cd d5st
 
-# 2. 复制环境变量文件
-copy .env.example .env
+cp .env.example .env          # Linux/macOS 用 cp；Windows 用 copy
+vim .env                      # 生产务必先改密码（见下文「部署到远程服务器」与「修改密码」）
 
-# 3. 根据需要修改 .env（生产环境务必改密码！）
-# Windows 下用记事本打开: notepad .env
-
-# 4. 启动所有服务（首次会自动拉取镜像、初始化数据库）
-docker compose up -d --build
-
-# 5. 查看启动状态
-docker compose ps
-
-# 6. 查看日志
-docker compose logs -f app
+docker compose up -d --build  # 首次构建镜像并初始化
+docker compose ps             # 确认 5 个服务 healthy / running
+docker compose logs -f app    # 看启动日志，出现 Casdoor-Init 即初始化成功
 ```
+
+启动后访问：
+- 站点：`http://<机器地址>:35545`
+- Casdoor 控制台：`http://<机器地址>:35545/casdoor`，登录 `admin` / `123`（默认，请尽快改）
+
+### 部署到远程 Linux 服务器（关键）
+
+在**非本机**访问时，有两处地址必须改成服务器的**可访问地址**，不能是 `localhost`，
+否则 OAuth 回调会跳回 `localhost` 导致登录失败：
+
+```bash
+# .env
+APP_URL=http://你的服务器IP:35545              # 或 https://你的域名
+CASDOOR_PUBLIC_ENDPOINT=http://你的服务器IP:35545/casdoor
+```
+
+其余配置（MySQL、`CASDOOR_ENDPOINT=http://d5st-casdoor:8000` 等）保持默认即可——
+它们只在 Docker 内部网络使用，`localhost` 默认值在容器内依然有效。
+
+```bash
+# 放行防火墙（以 ufw 为例；云厂商控制台也要放行同一端口）
+sudo ufw allow 35545/tcp
+
+docker compose up -d --build
+docker compose logs -f app    # 等到日志出现 Casdoor-Init 即就绪
+```
+
+`docker-compose.yml` 当前把端口映射到 `0.0.0.0`（无 IP 限制），公网机器务必只放行需要的端口，
+并通过防火墙 / 安全组限制来源，不要直接裸奔。
 
 ### Casdoor 初始化（通常无需手工操作）
 
@@ -244,9 +267,25 @@ docker compose logs -f app        # 查看应用日志
 docker compose exec app sh        # 进入应用容器
 docker compose exec mysql mysql -u d5st -p   # 进入 MySQL
 
+# 升级（拉取最新代码后重建镜像，数据在挂载卷里不会丢）
+git pull
+docker compose up -d --build
+
 # 开发模式（热重载）
 docker compose run --rm -p 35555:35555 app npm run dev
 ```
+
+### 数据在哪 / 如何备份
+
+- MySQL 数据：`mysql_data` 卷；Casdoor 数据：`casdoor_data` 卷（`docker volume ls` 可见）。
+  容器删除、镜像重建都不影响这两个卷。
+- 整库备份（含 d5st + casdoor）：
+
+  ```bash
+  docker compose exec mysql mysqldump -u d5st -p"${MYSQL_PASSWORD:-d5st_pass_2026}" \
+    --databases d5st casdoor > backup_$(date +%Y%m%d).sql
+  ```
+- 也可在后台「导出全部数据」（`/admin/export-all`）一键导出两库的 CSV（注意含 Casdoor 密码哈希，勿外发）。
 
 ## 安全提示
 
