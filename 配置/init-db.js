@@ -206,6 +206,29 @@ async function removeSeedContent() {
   if (removed > 0) console.log(`[DB] 已移除 ${removed} 条历史示例内容（首页/论坛只展示真实数据）`);
 }
 
+// 清理孤立数据：post_tags 表早期没有外键级联，帖子被硬删除后会留下
+// 指向已不存在帖子的标签关联；这些残留会让「热门话题」显示早已没有的标签。
+// 顺带清理没有任何帖子引用的 tags 行。幂等，可反复执行。
+async function cleanupOrphanTags() {
+  if (!await tableExists('post_tags') || !await tableExists('tags')) return;
+  try {
+    const [pt] = await pool.query(
+      'DELETE FROM post_tags WHERE post_id NOT IN (SELECT id FROM forum_posts)'
+    );
+    if (pt && pt.affectedRows > 0) {
+      console.log(`[DB] 清理孤立帖子标签关联 ${pt.affectedRows} 条`);
+    }
+    const [tg] = await pool.query(
+      'DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM post_tags)'
+    );
+    if (tg && tg.affectedRows > 0) {
+      console.log(`[DB] 清理无引用标签 ${tg.affectedRows} 条`);
+    }
+  } catch (err) {
+    console.error('[DB] 清理孤立标签失败:', err.message);
+  }
+}
+
 async function initDatabase() {
   if (initialized) return;
   try {
@@ -224,6 +247,8 @@ async function initDatabase() {
       await dedupeAndIndex();
       // 移除历史版本注入的示例帖子/评论/视频
       await removeSeedContent();
+      // 清理指向已不存在帖子的标签关联（会让热门话题显示幽灵标签）
+      await cleanupOrphanTags();
     } else {
       await pool.exec(initSchema);
       console.log('[DB] SQLite 数据库初始化完成');

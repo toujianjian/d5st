@@ -115,12 +115,16 @@ CREATE TABLE IF NOT EXISTS tags (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='话题标签';
 
 -- 帖子-标签关联
+-- 外键级联：帖子/标签被删除时自动清理关联，避免残留孤立数据
+-- （旧库无外键，启动时会由 init-db 的 cleanupOrphanTags 兜底清理）
 CREATE TABLE IF NOT EXISTS post_tags (
   post_id INT NOT NULL,
   tag_id INT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (post_id, tag_id),
-  INDEX idx_tag (tag_id)
+  INDEX idx_tag (tag_id),
+  FOREIGN KEY (post_id) REFERENCES forum_posts(id) ON DELETE CASCADE,
+  FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='帖子标签关联';
 
 -- 用户关注

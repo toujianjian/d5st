@@ -127,9 +127,12 @@ async function buildSidebar(req) {
 
   let popularTags = [];
   try {
+    // 只统计「存在且未删除」的帖子：否则帖子被删后残留的标签关联
+    // （post_tags 无外键级联、或帖子被软删）会让热门话题显示已不存在的标签。
     const [tagsRows] = await pool.query(
       `SELECT t.name, COUNT(*) as cnt FROM tags t
        JOIN post_tags pt ON pt.tag_id = t.id
+       JOIN forum_posts fp ON fp.id = pt.post_id AND fp.is_deleted = 0
        GROUP BY t.id ORDER BY cnt DESC LIMIT 15`
     );
     popularTags = tagsRows;
