@@ -461,11 +461,15 @@ INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VAL
 ('default_points', '100', '新用户默认积分'),
 ('sponsor_enabled', '0', '赞助入口是否开放（0=暂停，1=开放）');
 
+-- 首页「常用链接」默认项。首页该区域完全由本表驱动（后台「首页链接」可增删改）。
+-- icon 使用 FontAwesome class；若填其它文本则按纯文本渲染。
 INSERT IGNORE INTO home_links (title, url, icon, sort_order) VALUES
-('校园贴吧', '/forum', '💬', 1),
-('保密号中心', '/secret', '🔒', 2),
-('个人中心', '/user', '👤', 3),
-('赞助支持', '/sponsor', '❤️', 4);
+('贴吧论坛', '/forum', 'fas fa-comments', 1),
+('校园风采', '/videos', 'fas fa-play', 2),
+('保密号', '/secret', 'fas fa-key', 3),
+('留言板', '/messages/guestbook', 'fas fa-sticky-note', 4),
+('个人中心', '/user', 'fas fa-user', 5),
+('赞助支持', '/sponsor', 'fas fa-heart', 6);
 
 INSERT IGNORE INTO home_banners (title, image_path, link_url, sort_order) VALUES
 ('欢迎来到 D5ST', '/public/images/banner1.svg', '/', 1);

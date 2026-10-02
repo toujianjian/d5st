@@ -259,7 +259,7 @@
         })();
       </script>
 
-      <!-- 常用链接 -->
+      <!-- 常用链接：完全由后台「首页链接」(home_links) 驱动，不再写死 -->
       <section class="d5st-block" style="padding-bottom: 20px;">
         <div class="d5st-head reveal-on-scroll" data-reveal>
           <p class="section-kicker">Shortcuts</p>
@@ -267,20 +267,24 @@
           <p>便捷入口，一键直达</p>
         </div>
         <div class="d5st-grid cols-4">
-          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/secret"><div class="d5st-link-icon"><i class="fas fa-key"></i></div><h3>保密号</h3></a>
-          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/forum"><div class="d5st-link-icon"><i class="fas fa-comments"></i></div><h3>贴吧论坛</h3></a>
-          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/videos"><div class="d5st-link-icon"><i class="fas fa-play"></i></div><h3>校园风采</h3></a>
-          <% if (typeof sponsorEnabled !== 'undefined' && sponsorEnabled) { %>
-          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/sponsor"><div class="d5st-link-icon"><i class="fas fa-heart"></i></div><h3>赞助支持</h3></a>
-          <% } else { %>
-          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/sponsor" style="opacity:.6;"><div class="d5st-link-icon"><i class="fas fa-heart-broken"></i></div><h3>赞助支持（暂停）</h3></a>
-          <% } %>
-          <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="/messages/guestbook"><div class="d5st-link-icon"><i class="fas fa-sticky-note"></i></div><h3>留言板</h3></a>
-          <% if (typeof links !== 'undefined' && links && links.length) { %>
-            <% links.forEach(function (l) { %>
-              <a class="d5st-card d5st-link reveal-on-scroll" data-reveal href="<%= l.url %>" target="_blank"><div class="d5st-link-icon"><i class="fas fa-link"></i></div><h3><%= l.title %></h3></a>
-            <% }); %>
-          <% } %>
+          <% (typeof links !== 'undefined' && links ? links : []).forEach(function (l) { %>
+            <%
+              var isExternal = /^https?:\/\//i.test(l.url);
+              // 赞助入口：开关关闭时显示为「暂停」（与站点其它入口保持一致）
+              var paused = /^\/sponsor\b/.test(l.url) && !(typeof sponsorEnabled !== 'undefined' && sponsorEnabled);
+              var icon = l.icon || '';
+            %>
+            <a class="d5st-card d5st-link reveal-on-scroll" data-reveal
+               href="<%= l.url %>"<% if (isExternal) { %> target="_blank" rel="noopener"<% } %>
+               <% if (paused) { %>style="opacity:.6;"<% } %>>
+              <div class="d5st-link-icon">
+                <% if (/^fa[srlb]?\s/.test(icon)) { %><i class="<%= icon %>"></i>
+                <% } else if (icon) { %><span style="font-size:22px;"><%= icon %></span>
+                <% } else { %><i class="fas fa-link"></i><% } %>
+              </div>
+              <h3><%= l.title %><%= paused ? '（暂停）' : '' %></h3>
+            </a>
+          <% }); %>
         </div>
       </section>
     </div>

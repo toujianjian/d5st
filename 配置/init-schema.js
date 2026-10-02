@@ -296,10 +296,12 @@ CREATE TABLE IF NOT EXISTS video_posts (
 );
 
 INSERT OR IGNORE INTO home_links (title, url, icon, sort_order) VALUES
-('校园贴吧', '/forum', '💬', 1),
-('保密号中心', '/secret', '🔒', 2),
-('个人中心', '/user', '👤', 3),
-('赞助支持', '/sponsor', '❤️', 4);
+('贴吧论坛', '/forum', 'fas fa-comments', 1),
+('校园风采', '/videos', 'fas fa-play', 2),
+('保密号', '/secret', 'fas fa-key', 3),
+('留言板', '/messages/guestbook', 'fas fa-sticky-note', 4),
+('个人中心', '/user', 'fas fa-user', 5),
+('赞助支持', '/sponsor', 'fas fa-heart', 6);
 
 INSERT OR IGNORE INTO home_banners (title, image_path, link_url, sort_order) VALUES
 ('欢迎来到 D5ST', '/public/images/banner1.jpg', '/', 1);

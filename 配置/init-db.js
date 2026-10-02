@@ -206,6 +206,51 @@ async function removeSeedContent() {
   if (removed > 0) console.log(`[DB] 已移除 ${removed} 条历史示例内容（首页/论坛只展示真实数据）`);
 }
 
+// 首页「常用链接」默认项（与 db-schema.sql / init-schema.js 保持一致）。
+// 首页该区域已改为完全由 home_links 驱动，这里保证老库也有完整默认项。
+const DEFAULT_HOME_LINKS = [
+  ['贴吧论坛', '/forum', 'fas fa-comments', 1],
+  ['校园风采', '/videos', 'fas fa-play', 2],
+  ['保密号', '/secret', 'fas fa-key', 3],
+  ['留言板', '/messages/guestbook', 'fas fa-sticky-note', 4],
+  ['个人中心', '/user', 'fas fa-user', 5],
+  ['赞助支持', '/sponsor', 'fas fa-heart', 6]
+];
+
+// 历史默认项（早期种子）。若某行仍是这些原始值，说明用户没改过，可安全清理，
+// 避免首页出现「校园贴吧 / 贴吧论坛」这类重复入口。
+const LEGACY_HOME_LINKS = [
+  ['校园贴吧', '/forum'],
+  ['保密号中心', '/secret']
+];
+
+async function ensureHomeLinks() {
+  if (!await tableExists('home_links')) return;
+  try {
+    for (const [title, url, icon, order] of DEFAULT_HOME_LINKS) {
+      await pool.query(
+        'INSERT IGNORE INTO home_links (title, url, icon, sort_order) VALUES (?, ?, ?, ?)',
+        [title, url, icon, order]
+      );
+      // 老库中的同名默认项（title+url 一致）同步排序，保证首页顺序整齐
+      await pool.query(
+        'UPDATE home_links SET sort_order = ? WHERE title = ? AND url = ?',
+        [order, title, url]
+      );
+      // 图标若还是旧的 emoji，统一成 FontAwesome（不覆盖用户自定义的 fa* 图标）
+      await pool.query(
+        "UPDATE home_links SET icon = ? WHERE title = ? AND url = ? AND (icon IS NULL OR icon NOT LIKE 'fa%')",
+        [icon, title, url]
+      );
+    }
+    for (const [title, url] of LEGACY_HOME_LINKS) {
+      await pool.query('DELETE FROM home_links WHERE title = ? AND url = ?', [title, url]);
+    }
+  } catch (err) {
+    console.error('[DB] 初始化首页链接失败:', err.message);
+  }
+}
+
 // 清理孤立数据：post_tags 表早期没有外键级联，帖子被硬删除后会留下
 // 指向已不存在帖子的标签关联；这些残留会让「热门话题」显示早已没有的标签。
 // 顺带清理没有任何帖子引用的 tags 行。幂等，可反复执行。
@@ -249,6 +294,8 @@ async function initDatabase() {
       await removeSeedContent();
       // 清理指向已不存在帖子的标签关联（会让热门话题显示幽灵标签）
       await cleanupOrphanTags();
+      // 保证首页「常用链接」默认项存在（该区域已完全由 home_links 驱动）
+      await ensureHomeLinks();
     } else {
       await pool.exec(initSchema);
       console.log('[DB] SQLite 数据库初始化完成');
