@@ -80,9 +80,10 @@ router.get('/register', (req, res) => {
 router.get('/forgot-password', (req, res) => {
   res.render('registration/forgot-password', {
     title: '找回密码',
-    casdoorEndpoint: casdoor.C.endpoint,
-    organization: casdoor.C.organization,
-    application: casdoor.C.application
+    // 必须用「浏览器可达」的公网地址：endpoint 是容器内地址（d5st-casdoor:8000），
+    // 浏览器打开会直接报错（ERR_NAME_NOT_RESOLVED）。
+    // 另注意 Casdoor 的重置路由是 /forget（非 /forgot），/forgot 会被重定向回登录页。
+    casdoorForgotUrl: `${casdoor.C.publicEndpoint}/forget`
   });
 });
 
