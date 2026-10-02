@@ -62,10 +62,90 @@
         flex: 0 0 auto !important;
         background-color: currentColor !important;
       }
+
+      /* 首页弹窗样式（layout-home 此前没有，导致弹窗无法显示） */
+      .popup-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none; align-items: center; justify-content: center;
+        z-index: 2000; backdrop-filter: blur(8px);
+      }
+      .popup-overlay.show { display: flex; }
+      .popup-container {
+        background: #fff; border-radius: 24px; padding: 32px;
+        width: 90%; max-width: 500px; position: relative;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+      .popup-close-btn {
+        position: absolute; top: 16px; right: 16px;
+        width: 36px; height: 36px; border: none;
+        background: rgba(0, 0, 0, 0.05); border-radius: 50%;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        font-size: 16px; color: #999;
+      }
+      .popup-title { font-size: 22px; font-weight: 700; color: #2d2d2d; text-align: center; margin-bottom: 16px; }
+      .popup-content { font-size: 15px; color: #666; line-height: 1.7; text-align: center; margin-bottom: 24px; }
+      .popup-btn {
+        display: block; width: 100%; padding: 14px 24px;
+        border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
+        background: linear-gradient(135deg, #d32f2f, #b71c1c); color: #fff;
+      }
     </style>
   </head>
   <body>
     <%- body %>
+
+    <script>
+      /* 首页弹窗支持：首页使用 layout-home，此前不含弹窗逻辑，
+         导致后台配置的「首页弹窗」永远不会显示。这里补齐。 */
+      (function () {
+        function showPopup(popup) {
+          var overlay = document.createElement('div');
+          overlay.className = 'popup-overlay';
+          var container = document.createElement('div');
+          container.className = 'popup-container';
+          var closeBtn = document.createElement('button');
+          closeBtn.className = 'popup-close-btn';
+          closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+          var close = function () {
+            overlay.classList.remove('show');
+            fetch('/api/popups/' + popup.id + '/close', { method: 'POST' }).catch(function () {});
+            setTimeout(function () { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }, 300);
+          };
+          closeBtn.onclick = close;
+          var title = document.createElement('h3');
+          title.className = 'popup-title';
+          title.textContent = popup.title || '';
+          var content = document.createElement('div');
+          content.className = 'popup-content';
+          content.innerHTML = popup.content || '';
+          var btn = document.createElement('button');
+          btn.className = 'popup-btn';
+          btn.textContent = '知道了';
+          btn.onclick = close;
+          container.appendChild(closeBtn);
+          container.appendChild(title);
+          container.appendChild(content);
+          container.appendChild(btn);
+          overlay.appendChild(container);
+          document.body.appendChild(overlay);
+          setTimeout(function () { overlay.classList.add('show'); }, 100);
+        }
+        async function loadPopups() {
+          try {
+            var res = await fetch('/api/popups?page=home');
+            var popups = await res.json();
+            popups.forEach(showPopup);
+          } catch (e) { /* ignore */ }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadPopups);
+        } else {
+          loadPopups();
+        }
+      })();
+    </script>
+
     <script src="/public/js/pidanai-liquid.js" defer></script>
     <script src="/public/js/home-shell.js" defer></script>
   </body>

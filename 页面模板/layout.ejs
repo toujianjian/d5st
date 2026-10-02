@@ -279,7 +279,8 @@
       transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
       overflow: hidden;
     }
-    .notification-ball:hover .notification-panel {
+    .notification-ball:hover .notification-panel,
+    html.notif-open .notification-panel {
       opacity: 1; visibility: visible;
       transform: translateY(-50%) translateX(0);
     }
@@ -546,11 +547,36 @@
     document.addEventListener('DOMContentLoaded', function() {
       loadPopups();
       loadNotifications();
+
+      /* 通知铃铛：点击开合（触屏没有 hover，仅靠 :hover 打不开） */
+      var nb = document.getElementById('notificationBtn');
+      if (nb) {
+        nb.addEventListener('click', function (e) {
+          e.stopPropagation();
+          document.documentElement.classList.toggle('notif-open');
+        });
+        document.addEventListener('click', function () {
+          document.documentElement.classList.remove('notif-open');
+        });
+      }
     });
 
+    /* 当前页面标识：与后台弹窗 target_pages 的取值约定一致
+       （home / forum / videos / secret / user / messages / search / sponsor / all） */
+    function currentPageKey() {
+      var p = window.location.pathname;
+      if (p === '/' || p === '') return 'home';
+      var seg = p.split('/').filter(Boolean)[0] || 'home';
+      return seg;
+    }
+
     async function loadPopups() {
+      // 后台不弹站内弹窗（否则覆盖层会把后台按钮全部挡住）
+      if (window.location.pathname.indexOf('/admin') === 0) return;
       try {
-        var response = await fetch('/api/popups');
+        // 关键：必须带上当前页面，否则后端默认按 'home' 返回，
+        // 会让「首页弹窗」在所有页面（含登录页）都弹出。
+        var response = await fetch('/api/popups?page=' + encodeURIComponent(currentPageKey()));
         var popups = await response.json();
         if (popups.length > 0) {
           for (var i = 0; i < popups.length; i++) {
@@ -764,7 +790,7 @@
     })();
   </script>
 
-  <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+  <%# 通知铃铛对所有人生效：已登录看到「个人通知 + 全局通知」，访客只看到全局通知 %>
   <div class="notification-ball">
     <div class="notification-panel">
       <div class="notification-panel-header"><i class="fas fa-bell"></i> 通知</div>
@@ -772,9 +798,8 @@
         <div class="notification-empty"><i class="fas fa-bell-slash"></i><p>暂无通知</p></div>
       </div>
     </div>
-    <button class="notification-btn" id="notificationBtn"><i class="fas fa-bell"></i></button>
+    <button class="notification-btn" id="notificationBtn" type="button" aria-label="通知"><i class="fas fa-bell"></i></button>
   </div>
-  <% } %>
 
 </body>
 </html>

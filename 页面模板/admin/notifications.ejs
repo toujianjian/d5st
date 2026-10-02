@@ -50,10 +50,21 @@
     
     <div class="card">
       <div class="card-title">📜 历史通知</div>
+      <% if (typeof notifications !== 'undefined' && notifications.length === 0) { %>
+        <div style="padding:12px;color:var(--text-secondary);">还没有全局通知</div>
+      <% } %>
       <% notifications.forEach(function(n) { %>
         <div style="padding:12px;border-bottom:1px solid var(--border);">
-          <strong><%= n.title %></strong>
-          <span class="badge <%= n.is_active ? 'badge-success' : 'badge-default' %>" style="margin-left:8px;"><%= n.is_active ? '活跃' : '已停用' %></span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong><%= n.title %></strong>
+            <span class="badge <%= n.is_active ? 'badge-success' : 'badge-default' %>"><%= n.is_active ? '活跃' : '已停用' %></span>
+            <form method="POST" action="/admin/notifications/toggle/<%= n.id %>" style="display:inline;margin:0;">
+              <button class="btn btn-ghost btn-sm"><%= n.is_active ? '停用' : '启用' %></button>
+            </form>
+            <form method="POST" action="/admin/notifications/delete/<%= n.id %>" style="display:inline;margin:0;" onsubmit="return confirm('确定删除该通知？')">
+              <button class="btn btn-danger btn-sm">删除</button>
+            </form>
+          </div>
           <p style="color:var(--text-secondary);font-size:13px;margin-top:4px;"><%= n.content %></p>
           <small style="color:var(--text-secondary);"><%= new Date(n.created_at).toLocaleString('zh-CN') %></small>
         </div>

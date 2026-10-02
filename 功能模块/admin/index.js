@@ -275,6 +275,26 @@ router.post('/notifications', async (req, res) => {
   }
 });
 
+// 启用 / 停用全局通知
+router.post('/notifications/toggle/:id', async (req, res) => {
+  try {
+    await pool.query('UPDATE global_notifications SET is_active = 1 - is_active WHERE id = ?', [req.params.id]);
+    res.redirect('/admin/notifications');
+  } catch (err) {
+    res.redirect('/admin/notifications?error=toggle_failed');
+  }
+});
+
+// 删除全局通知
+router.post('/notifications/delete/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM global_notifications WHERE id = ?', [req.params.id]);
+    res.redirect('/admin/notifications');
+  } catch (err) {
+    res.redirect('/admin/notifications?error=delete_failed');
+  }
+});
+
 router.get('/popups', async (req, res) => {
   const [popups] = await pool.query('SELECT * FROM popups ORDER BY sort_order ASC, id DESC');
   res.render('admin/popups', { title: '弹窗管理', popups });

@@ -248,12 +248,16 @@ app.post('/api/popups/:id/close', async (req, res) => {
 
 app.get('/api/notifications', async (req, res) => {
   const userId = req.session.user?.id;
-  if (!userId) return res.json([]);
   try {
-    const [userNotif] = await pool.query(
-      'SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT 10',
-      [userId]
-    );
+    // 未登录也返回全局通知（站内公告对访客同样可见）；个人通知需登录
+    let userNotif = [];
+    if (userId) {
+      const [rows] = await pool.query(
+        'SELECT * FROM notifications WHERE user_id = ? AND is_read = 0 ORDER BY created_at DESC LIMIT 10',
+        [userId]
+      );
+      userNotif = rows;
+    }
     const [globalNotif] = await pool.query(
       `SELECT * FROM global_notifications 
        WHERE is_active = 1 AND (start_time IS NULL OR start_time <= CURRENT_TIMESTAMP)
