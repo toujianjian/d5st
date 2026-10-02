@@ -415,12 +415,32 @@ router.post('/recycle-bin/restore/:id', async (req, res) => {
   }
 });
 
-// 回收站：永久删除（直接从 deleted_items 表移除，原始数据不可恢复）
+// 回收站：永久删除（真正删除原始记录及其标签关联，不可恢复）
+// 说明：原实现只删 deleted_items 行，原始帖子仍停留在 is_deleted=1 的软删状态，
+//       其标签关联（post_tags，旧库无外键级联）会继续残留并污染「热门话题」。
 router.post('/recycle-bin/purge/:id', async (req, res) => {
   try {
+    const [rows] = await pool.query('SELECT * FROM deleted_items WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: '记录不存在' });
+    const item = rows[0];
+    const id = item.item_id;
+
+    if (item.item_type === 'post') {
+      // 先删标签关联（旧库无外键），再删帖子本体；评论/点赞/举报由外键级联清理
+      await pool.query('DELETE FROM post_tags WHERE post_id = ?', [id]);
+      await pool.query('DELETE FROM forum_posts WHERE id = ?', [id]);
+      // 清理不再被任何帖子引用的标签
+      await pool.query('DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM post_tags)');
+    } else if (item.item_type === 'video') {
+      await pool.query('DELETE FROM video_posts WHERE id = ?', [id]);
+    } else if (item.item_type === 'comment') {
+      await pool.query('DELETE FROM post_comments WHERE id = ?', [id]);
+    }
+
     await pool.query('DELETE FROM deleted_items WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (err) {
+    console.error('回收站彻底删除失败:', err);
     res.status(500).json({ error: '操作失败' });
   }
 });
