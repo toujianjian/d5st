@@ -46,6 +46,22 @@
       @media (max-width: 720px), (pointer: coarse) {
         .pdaim-fps { display: none !important; }
       }
+      /* 移动端顶部汉堡按钮：保证三条横线可见（浅色背景下白色线条会看不清），
+         并给出可点击的手型光标与最小触控尺寸。 */
+      .mobile-menu-toggle {
+        color: var(--fg) !important;
+        cursor: pointer;
+        min-width: 44px;
+        min-height: 44px;
+      }
+      .mobile-menu-toggle span {
+        /* 按钮内容区仅 26px，而 3 条线各带 5px 上下外边距共需 36px，
+           会被 flex 压缩成 0 高（线条看不见）。收紧外边距并禁止收缩。 */
+        height: 2px !important;
+        margin: 3px 0 !important;
+        flex: 0 0 auto !important;
+        background-color: currentColor !important;
+      }
     </style>
   </head>
   <body>

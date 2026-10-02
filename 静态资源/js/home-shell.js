@@ -478,6 +478,42 @@
     window.setTimeout(() => root.classList.remove("theme-changing"), 520);
   });
 
+  /* ---------- 移动端顶部菜单开关 ----------
+     触屏（pointer: coarse）下顶部导航折叠为汉堡菜单，靠 html.mobile-menu-open 展开。
+     此前没有任何 JS 绑定该按钮，导致点一下毫无反应、导航无法打开。 */
+  const mobileToggle = document.querySelector("#mobileMenuToggle");
+  const primaryNav = document.querySelector("#primaryNav");
+  if (mobileToggle && primaryNav) {
+    const setMenu = (open) => {
+      root.classList.toggle("mobile-menu-open", open);
+      mobileToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    mobileToggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setMenu(!root.classList.contains("mobile-menu-open"));
+    });
+    // 点击菜单里的链接后自动收起
+    primaryNav.addEventListener("click", (event) => {
+      if (event.target.closest("a")) setMenu(false);
+    });
+    // 点击菜单以外区域收起
+    document.addEventListener("click", (event) => {
+      if (!root.classList.contains("mobile-menu-open")) return;
+      if (mobileToggle.contains(event.target) || primaryNav.contains(event.target)) return;
+      setMenu(false);
+    });
+    // Esc 收起
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setMenu(false);
+    });
+    // 回到桌面布局（按钮被隐藏）时自动收起，避免状态残留
+    window.addEventListener("resize", () => {
+      if (getComputedStyle(mobileToggle).display === "none" && root.classList.contains("mobile-menu-open")) {
+        setMenu(false);
+      }
+    });
+  }
+
   /* ---------- 统计数字滚动 ---------- */
   function startCountUp() {
     const nums = document.querySelectorAll(".num[data-count]");

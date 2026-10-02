@@ -97,6 +97,7 @@
     background: rgba(211,47,47,.08); color: var(--primary); transition: all .2s;
   }
   .tag-cloud a:hover { background: var(--primary); color: #fff; }
+  .side-empty { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
   .user-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
   .user-row .av {
     width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
@@ -222,16 +223,18 @@
       </div>
       <% } %>
 
-      <% if (popularTags && popularTags.length > 0) { %>
       <div class="side-card">
         <div class="side-title"><i class="fas fa-tags"></i> 热门话题</div>
+        <% if (popularTags && popularTags.length > 0) { %>
         <div class="tag-cloud">
           <% popularTags.forEach(function(t) { %>
           <a href="/forum?tag=<%= encodeURIComponent(t.name) %>"><%= t.name %> · <%= t.cnt %></a>
           <% }); %>
         </div>
+        <% } else { %>
+        <div class="side-empty">还没有话题标签，发帖时加上标签就会出现在这里</div>
+        <% } %>
       </div>
-      <% } %>
 
       <% if (activeUsers && activeUsers.length > 0) { %>
       <div class="side-card">
