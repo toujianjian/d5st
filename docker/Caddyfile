@@ -9,6 +9,10 @@
 	# Casdoor 部署在 /casdoor 子路径：
 	# 请求剥离 /casdoor 前缀后转发给后端（后端仍以根路径服务静态资源与 API）。
 	handle_path /casdoor* {
+		# Casdoor 前端产物是「原地打补丁」：文件名(hash)不变、内容会变。
+		# 若允许浏览器强缓存，旧文件会被长期复用（表现为登录页报
+		# `Unexpected token '<'`，即使服务端已修好）。故禁用强缓存、强制回源校验。
+		header Cache-Control "no-cache"
 		reverse_proxy casdoor:8000 {
 			header_up Host {host}
 			# 后端返回的相对路径重定向（如 Location: /login）需补回 /casdoor 前缀，
@@ -25,6 +29,7 @@
 	# 否则这些 chunk 会被 d5st 的认证中间件 302 到 /login，
 	# 进而在 OAuth 授权页加载时把 d5st 会话的 csrfState 反复覆盖，导致回调 CSRF 校验必失败。
 	handle /assets/* {
+		header Cache-Control "no-cache"
 		reverse_proxy casdoor:8000 {
 			header_up Host {host}
 		}

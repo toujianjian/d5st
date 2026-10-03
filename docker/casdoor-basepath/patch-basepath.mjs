@@ -159,8 +159,12 @@ function jsRules() {
     // fetch(`${je.serverUrl}/api/...`) 带上前缀。
     {
       name: 'js:api-base-const',
-      re: /const se="",U=zy;/g,
-      to: `const se=${P},U=zy;`,
+      // serverUrl 基址是模块级 const，压缩变量名随构建变化
+      // （旧版 se；2026-09 版 casbin/casdoor:latest 为 ce，见 w9({serverUrl:ce,appName:...})）。
+      // 当前版本中 `const ce=""` 是唯一出现的 `const X=""`，故按此形态锚定。
+      // 若上游再次变更变量名：构建末尾 validate() 会报「API 基址仍为空串」，按新名更新本行。
+      re: /const ce=""/g,
+      to: `const ce=${P}`,
     },
 
     // ---- 模板串拼接：`${window.location.origin}/xxx` ----
@@ -200,7 +204,9 @@ function jsRules() {
     // 下正确解析路由、保留 OAuth 授权参数（否则客户端重定向到 /login 会丢参数）。
     {
       name: 'js:router-basename-ix',
-      re: /(function ix\(e\)\{let\{basename:t=)"\/"/g,
+      // react-router 的 Router 组件默认 `basename:t="/"`，其所在函数名随构建变化
+      // （旧版 ix；2026-09 版 z8）。故不锚定函数名，只锚定「函数参数解构里的 basename:t="/"」。
+      re: /(function [A-Za-z_$][\w$]*\(e\)\{let\{basename:t=)"\/"/g,
       to: (_m, p1) => `${p1}${P}`,
     },
 
@@ -245,7 +251,9 @@ function jsRules() {
     // 正则不绑定压缩变量名（Nt/t 每次构建会变），只锚定稳定的字面量片段。
     {
       name: 'js:oauth-keep-code-type',
-      re: /e\.type!=="device"&&\w+\([^)]*redirectUri[^)]*\)&&\(e\.type="login"\)/g,
+      // 注：同源判定函数名可能含 $（如 2026-09 版为 $t，旧版用 \w+ 匹配不到），
+      //     故此处用 [\w$]+ 覆盖含 $ 的标识符。
+      re: /e\.type!=="device"&&[\w$]+\([^)]*redirectUri[^)]*\)&&\(e\.type="login"\)/g,
       to: `e.type!=="device"&&!1&&(e.type="login")`,
     },
   ];
@@ -313,10 +321,10 @@ function validate() {
     if (plus) problems.push(`${label}: 加号拼接未改写 x${plus.length}`);
 
     // API 基址
-    if (t.includes('const se=""')) problems.push(`${label}: API 基址仍为空串`);
+    if (t.includes('const ce=""')) problems.push(`${label}: API 基址仍为空串`);
 
     // router basename：react-router Router 默认 `basename:t="/"` 必须被改成前缀
-    if (/function ix\(e\)\{let\{basename:t="\/"/.test(t)) problems.push(`${label}: router basename 仍为 "/"`);
+    if (/function [A-Za-z_$][\w$]*\(e\)\{let\{basename:t="\/"/.test(t)) problems.push(`${label}: router basename 仍为 "/"`);
   }
 
   const html = readFileSync(join(WEB_DIR, 'index.html'), 'utf8');
