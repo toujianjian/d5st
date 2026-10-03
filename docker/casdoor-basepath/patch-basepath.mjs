@@ -43,6 +43,8 @@
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const MARKER = '__CASDOOR_BASE_PATH_PATCHED__';
 
@@ -337,6 +339,58 @@ function validate() {
 }
 
 // ============================================================
+// 4. 缓存击穿：给资源引用统一追加 ?v=<版本>
+// ============================================================
+// 因为本补丁是「原地改内容、不改名」：文件名的 hash 由 Vite 依据「原始」构建产物生成，
+// 打补丁不改变文件名。于是对浏览器而言 URL 不变、已缓存的旧产物会被长期复用——
+// 即使服务端已修好，老用户仍看到旧行为（登录页报 Unexpected token '<' 等）。
+// 解决：把补丁后所有 JS/CSS 的引用统一追加 ?v=<version>（对 import()、modulepreload、
+// <script>/<link> 都生效）。version 取本脚本内容的 sha1，脚本一改版本就变、URL 就变，
+// 浏览器必然回源拉取新产物。
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function pluginVersion() {
+  try {
+    return createHash('sha1').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex').slice(0, 8);
+  } catch {
+    return '1';
+  }
+}
+
+function cacheBust(version) {
+  const all = walk(WEB_DIR);
+  const names = new Set();
+  for (const f of all) {
+    const rel = relative(WEB_DIR, f).split('\\').join('/');
+    if (/^assets\/[^/]+\.(js|css)$/.test(rel)) names.add(rel.slice(7)); // 去掉 "assets/"
+    else if (/^[^/]+\.js$/.test(rel)) names.add(rel);                   // 顶层入口 js
+  }
+  // 长名优先，避免短名是长名子串时先被替换
+  const list = [...names].sort((a, b) => b.length - a.length);
+
+  let files = 0;
+  let refs = 0;
+  for (const f of all) {
+    const rel = relative(WEB_DIR, f).split('\\').join('/');
+    if (!/\.(js|css|html)$/.test(rel)) continue;
+    let text = readFileSync(f, 'utf8');
+    const before = text;
+    for (const n of list) {
+      // 边界：文件名后不能再跟 [.\\w-]（避免命中 "X.js.map"），且未带过 ?v=
+      const re = new RegExp(escapeRegExp(n) + '(?![.\\w-])(?!\\?v=)', 'g');
+      text = text.replace(re, () => { refs += 1; return `${n}?v=${version}`; });
+    }
+    if (text !== before) {
+      writeFileSync(f, text);
+      files += 1;
+    }
+  }
+  log(`缓存击穿：版本 ${version}，改写 ${files} 个文件、${refs} 处引用`);
+}
+
+// ============================================================
 // 主流程
 // ============================================================
 function main() {
@@ -365,7 +419,10 @@ function main() {
   log(`扫描 ${jsFiles.length} 个 JS 文件 ...`);
   for (const f of jsFiles) patchJsFile(f);
 
-  // 3) 校验
+  // 3) 缓存击穿：给资源引用加 ?v=<脚本哈希>（脚本一改、URL 就变，绕过旧缓存）
+  if (!DRY_RUN) cacheBust(pluginVersion());
+
+  // 4) 校验
   if (!DRY_RUN) {
     log('');
     log('校验中 ...');
