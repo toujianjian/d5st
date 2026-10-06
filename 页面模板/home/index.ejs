@@ -75,6 +75,25 @@
       box-shadow: 0 8px 20px rgba(211,47,47,.3);
     }
   }
+
+  /* 移动端：把「精彩推荐」轮播与快捷按钮移到页面顶部（轮播上方留白，避免贴边/被遮挡） */
+  @media (max-width: 1024px) {
+    /* 顶栏为 fixed，顶部留白既避免遮挡又不过分占高 */
+    .page-shell { padding: 74px 14px 24px; }
+    .d5st-content { display: flex; flex-direction: column; padding: 0 4px 40px; }
+    .featured-carousel-block { order: -2; margin-top: 8px; padding-top: 12px; }
+    .mobile-auth-row { order: -1; }
+    .d5st-version { order: 99; }
+  }
+
+  /* 首页底部版本号（一般放备案号的位置） */
+  .d5st-version {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted, #999);
+    padding: 24px 0 28px;
+    letter-spacing: .5px;
+  }
 </style>
 
 <canvas class="pdaim-line-field" id="pdaimLineField" aria-hidden="true"></canvas>
@@ -210,7 +229,7 @@
 
       <!-- 精彩推荐（后台横幅 → 轮播） -->
       <% if (typeof banners !== 'undefined' && banners && banners.length) { %>
-      <section class="d5st-block">
+      <section class="d5st-block featured-carousel-block">
         <div class="d5st-head reveal-on-scroll" data-reveal>
           <p class="section-kicker">Featured</p>
           <h2>精彩推荐</h2>
@@ -341,6 +360,9 @@
           <% }); %>
         </div>
       </section>
+
+      <!-- 首页底部：软件版本号（一般放置 ICP 备案号的位置） -->
+      <footer class="d5st-version">D5ST 校园社区 v1.1.2</footer>
     </div>
   </div>
 

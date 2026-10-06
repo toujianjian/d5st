@@ -347,9 +347,10 @@
          总高会超出视口 50px，底部内容永远滚不到。这里改为「视口高 - 顶栏高」。 */
       .main-wrapper {
         margin-left: 0;
-        margin-top: 50px;
-        height: calc(100vh - 50px);
-        height: calc(100dvh - 50px);
+        margin-top: 0;              /* 顶栏已移除，不再预留 50px，内容占满整屏 */
+        height: 100vh;
+        height: 100dvh;
+        overflow-x: hidden;
         animation: none; /* 移动端横向滑入动画会带来横向溢出，关掉 */
       }
       .user-sidebar { display: none; }
@@ -371,8 +372,9 @@
       padding: 0 10px; z-index: 100;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
+    /* 移动端顶栏承载的链接与侧栏完全重复，已整体移除；导航改用左侧窄条展开侧栏 */
     @media (max-width: 1024px) {
-      .mobile-nav { display: flex; }
+      .mobile-nav { display: none !important; }
     }
     .mobile-nav-btn {
       color: white; text-decoration: none; font-size: 14px;
@@ -416,9 +418,9 @@
       .mobile-nav { height: 44px; }
       .mobile-nav-btn, .mobile-nav-link { min-height: 36px; }
       .main-wrapper {
-        margin-top: 44px;
-        height: calc(100vh - 44px);
-        height: calc(100dvh - 44px);
+        margin-top: 0;
+        height: 100vh;
+        height: 100dvh;
       }
       /* 横屏竖向空间紧张，首页按钮收成圆形小尺寸，减少对内容的遮挡 */
       .doc-btn { padding: 8px 12px; font-size: 13px; bottom: 12px; left: 12px; }
@@ -433,10 +435,10 @@
     @media (max-width: 1024px) {
       .mobile-sidebar-edge {
         display: flex; align-items: center; justify-content: center;
-        position: fixed; left: 0; top: 50px; bottom: 0; width: 16px;
+        position: fixed; left: 0; top: 0; bottom: 0; width: 20px;
         z-index: 1200; cursor: pointer; border: none; padding: 0;
         background: linear-gradient(180deg, rgba(211,47,47,.92), rgba(183,28,28,.92));
-        color: #fff; font-size: 10px;
+        color: #fff; font-size: 11px;
         box-shadow: 2px 0 8px rgba(0,0,0,.18);
         -webkit-tap-highlight-color: transparent;
       }
@@ -445,21 +447,30 @@
       /* 展开时按需显示（覆盖全局的 .user-sidebar{display:none}） */
       body.sidebar-open .user-sidebar {
         display: block !important;
-        position: fixed; left: 0; top: 50px; bottom: 0;
+        position: fixed; left: 0; top: 0; bottom: 0;
         width: 260px; max-width: 82vw; height: auto;
         z-index: 1300; overflow-y: auto;
         box-shadow: 0 0 40px rgba(0,0,0,.32);
       }
       body.sidebar-open .sidebar-backdrop {
-        display: block; position: fixed; left: 0; right: 0; top: 50px; bottom: 0;
+        display: block; position: fixed; left: 0; right: 0; top: 0; bottom: 0;
         background: rgba(0,0,0,.35); z-index: 1250;
       }
-      /* 移动端字号与内边距收紧，解决“字体过大、操作困难” */
-      .page-container, .page-wrap { padding-left: 12px !important; padding-right: 12px !important; }
-      .page-wrap h1, .page-container h1 { font-size: 1.35rem !important; }
-      .page-wrap h2, .page-container h2 { font-size: 1.15rem !important; }
-      /* 保证可点击元素足够大 */
-      .mobile-nav-link, .btn, button { min-height: 44px; }
+      /* 移动端适配：彻底消除横向滚动 */
+      html, body { overflow-x: hidden !important; max-width: 100%; }
+      img, video, table, pre, iframe { max-width: 100%; }
+      /* 字号与内边距收紧：尽量让整页在一屏内完整呈现 */
+      .main-wrapper { font-size: 14px; }
+      .page-container, .page-wrap {
+        padding-left: 12px !important; padding-right: 12px !important;
+        padding-top: 14px !important;
+        padding-bottom: 72px !important; /* 给右下角浮动按钮留出空间 */
+      }
+      .page-wrap h1, .page-container h1 { font-size: 1.3rem !important; }
+      .page-wrap h2, .page-container h2 { font-size: 1.12rem !important; }
+      .page-wrap h3, .page-container h3 { font-size: 1rem !important; }
+      /* 保证可点击元素足够大（且不超出屏幕） */
+      .btn, button, .quick-action-btn { min-height: 44px; max-width: 100%; }
     }
   </style>
   <%# 后台公共样式：所有 /admin 页面统一注入，避免各页面样式缺失 %>
