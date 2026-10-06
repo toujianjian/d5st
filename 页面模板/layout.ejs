@@ -427,6 +427,40 @@
     body.admin-mode .user-sidebar { display: none; }
     body.admin-mode .main-wrapper { margin-left: 0; }
     body.admin-mode .notification-ball { display: none; }
+    /* ===== 移动端侧栏：收成贴边窄条，点击展开浮层（电脑端不受影响） ===== */
+    .mobile-sidebar-edge { display: none; }
+    .sidebar-backdrop { display: none; }
+    @media (max-width: 1024px) {
+      .mobile-sidebar-edge {
+        display: flex; align-items: center; justify-content: center;
+        position: fixed; left: 0; top: 50px; bottom: 0; width: 16px;
+        z-index: 1200; cursor: pointer; border: none; padding: 0;
+        background: linear-gradient(180deg, rgba(211,47,47,.92), rgba(183,28,28,.92));
+        color: #fff; font-size: 10px;
+        box-shadow: 2px 0 8px rgba(0,0,0,.18);
+        -webkit-tap-highlight-color: transparent;
+      }
+      .mobile-sidebar-edge i { transition: transform .25s ease; }
+      body.sidebar-open .mobile-sidebar-edge i { transform: rotate(180deg); }
+      /* 展开时按需显示（覆盖全局的 .user-sidebar{display:none}） */
+      body.sidebar-open .user-sidebar {
+        display: block !important;
+        position: fixed; left: 0; top: 50px; bottom: 0;
+        width: 260px; max-width: 82vw; height: auto;
+        z-index: 1300; overflow-y: auto;
+        box-shadow: 0 0 40px rgba(0,0,0,.32);
+      }
+      body.sidebar-open .sidebar-backdrop {
+        display: block; position: fixed; left: 0; right: 0; top: 50px; bottom: 0;
+        background: rgba(0,0,0,.35); z-index: 1250;
+      }
+      /* 移动端字号与内边距收紧，解决“字体过大、操作困难” */
+      .page-container, .page-wrap { padding-left: 12px !important; padding-right: 12px !important; }
+      .page-wrap h1, .page-container h1 { font-size: 1.35rem !important; }
+      .page-wrap h2, .page-container h2 { font-size: 1.15rem !important; }
+      /* 保证可点击元素足够大 */
+      .mobile-nav-link, .btn, button { min-height: 44px; }
+    }
   </style>
   <%# 后台公共样式：所有 /admin 页面统一注入，避免各页面样式缺失 %>
   <% if (typeof currentPath !== 'undefined' && currentPath.indexOf('/admin') === 0) { %>
@@ -454,7 +488,7 @@
       <% if (typeof currentUser !== 'undefined' && currentUser) { %>
       <a href="/friends" class="mobile-nav-link"><i class="fas fa-user-friends"></i>好友</a>
       <a href="/messages" class="mobile-nav-link"><i class="fas fa-envelope"></i>私信</a>
-      <a href="/user" class="mobile-nav-link"><i class="fas fa-user"></i><%= currentUser.real_name || currentUser.username %></a>
+      <a href="/user" class="mobile-nav-link"><i class="fas fa-user"></i><%= currentUser.nickname || currentUser.real_name || currentUser.username %></a>
       <% if (currentUser.is_admin === 1) { %>
       <a href="/admin" class="mobile-nav-link"><i class="fas fa-cog"></i>管理</a>
       <% } %>
@@ -488,8 +522,8 @@
   <aside class="user-sidebar" id="userSidebar">
     <div class="sidebar-content">
       <% if (isLoggedIn) { %>
-      <div class="user-avatar"><%= currentUser.real_name ? currentUser.real_name.charAt(0) : (currentUser.username || 'U').charAt(0) %></div>
-      <div class="user-name"><%= currentUser.real_name || currentUser.username || '用户' %></div>
+      <div class="user-avatar"><%= (currentUser.nickname || currentUser.real_name || currentUser.username || 'U').charAt(0) %></div>
+      <div class="user-name"><%= currentUser.nickname || currentUser.real_name || currentUser.username || '用户' %></div>
       <div class="user-level" title="<%= (typeof levelIsMax !== 'undefined' && levelIsMax) ? '已达最高等级' : ('距 ' + (levelNextName || '下一级') + ' 还差 ' + (levelRemaining || 0) + ' 积分') %>">
         <span class="user-level-badge">Lv.<%= typeof userLevel !== 'undefined' ? userLevel : 1 %></span>
         <span class="user-level-name"><%= typeof userLevelName !== 'undefined' ? userLevelName : '' %></span>
@@ -547,6 +581,10 @@
       <% } %>
     </div>
   </aside>
+
+  <%# 移动端：侧栏贴边窄条（点击展开）与遮罩 %>
+  <button class="mobile-sidebar-edge" type="button" id="sidebarEdge" aria-label="展开侧栏" aria-expanded="false"><i class="fas fa-chevron-right"></i></button>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <div class="main-wrapper" id="mainWrapper">
     <%- body %>
@@ -819,6 +857,27 @@
     </div>
     <button class="notification-btn" id="notificationBtn" type="button" aria-label="通知"><i class="fas fa-bell"></i></button>
   </div>
+
+  <script>
+    /* 移动端侧栏：点击左侧窄条展开/收起，点遮罩关闭 */
+    (function () {
+      var edge = document.getElementById('sidebarEdge');
+      var backdrop = document.getElementById('sidebarBackdrop');
+      if (!edge) return;
+      function setOpen(open) {
+        document.body.classList.toggle('sidebar-open', open);
+        edge.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      edge.addEventListener('click', function () {
+        setOpen(!document.body.classList.contains('sidebar-open'));
+      });
+      backdrop && backdrop.addEventListener('click', function () { setOpen(false); });
+      // 视口变大回桌面端时兜底关闭
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 1024) setOpen(false);
+      });
+    })();
+  </script>
 
 </body>
 </html>

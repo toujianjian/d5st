@@ -1,16 +1,89 @@
+<style>
+  /* 注册页此前引用了 .login-container / .casdoor-login-btn / .casdoor-logo
+     三个全站未定义的类，且自身没有 <style>，导致页面几乎裸奔
+     （logo 为巨型默认尺寸、按钮为裸链接）。这里补齐与登录页一致的样式。 */
+  .login-container {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px;
+  }
+  .login-card {
+    width: 100%; max-width: 440px;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 28px;
+    box-shadow: 0 24px 64px rgba(211, 47, 47, 0.22);
+    padding: 44px 36px 36px;
+    text-align: center;
+    position: relative;
+    animation: registerPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes registerPop {
+    0% { opacity: 0; transform: translateY(32px) scale(0.94); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .login-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary) 100%);
+    border-radius: 28px 28px 0 0;
+  }
+  .login-card h1 {
+    font-size: 26px; font-weight: 700;
+    color: var(--text-dark);
+    font-family: 'ZCOOL XiaoWei', 'Noto Serif SC', serif;
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+  }
+  .login-card .subtitle {
+    font-size: 13px; color: var(--text-muted);
+    margin-bottom: 28px;
+    letter-spacing: 1px;
+  }
+  .casdoor-login-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    text-decoration: none;
+    border-radius: 999px;
+    font-size: 16px; font-weight: 600;
+    font-family: 'Noto Serif SC', serif;
+    box-shadow: 0 12px 28px rgba(211, 47, 47, 0.4);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .casdoor-login-btn:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(211, 47, 47, 0.5); }
+  .casdoor-login-btn:active { transform: translateY(-1px); }
+  .casdoor-logo { width: 20px; height: 20px; flex-shrink: 0; }
+  .register-foot {
+    margin-top: 22px;
+    font-size: 12px; color: var(--text-muted);
+    line-height: 1.9;
+  }
+  .register-foot a { color: var(--primary); text-decoration: none; font-weight: 600; }
+  .register-foot a:hover { text-decoration: underline; }
+  @media (max-width: 480px) {
+    .login-card { padding: 36px 24px 28px; border-radius: 24px; }
+    .login-card h1 { font-size: 22px; }
+  }
+</style>
+
 <section class="login-container">
   <div class="login-card">
     <h1>✨ 加入 D5ST</h1>
     <p class="subtitle">通过学校统一认证系统注册</p>
-    
+
     <a href="<%= signupUrl %>" class="casdoor-login-btn">
       <svg class="casdoor-logo" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
       通过 Casdoor 创建账号
     </a>
-    
-    <p style="margin-top:20px;font-size:12px;color:var(--text-secondary);">
+
+    <p class="register-foot">
       注册完成后，按 Casdoor 提示返回 D5ST 登录即可。<br/>
-      已有账号？<a href="/login" style="color:var(--primary);">直接登录</a>
+      已有账号？<a href="/login">直接登录</a>
     </p>
   </div>
 </section>

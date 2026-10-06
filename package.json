@@ -19,6 +19,7 @@
     "express": "^4.21.2",
     "express-ejs-layouts": "^2.5.1",
     "express-session": "^1.18.1",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^3.11.3",
     "sql.js": "^1.11.0"
   },

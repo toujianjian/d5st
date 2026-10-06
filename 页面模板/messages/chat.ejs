@@ -194,7 +194,7 @@
           <div class="msg-row <%= isSent ? 'sent' : 'received' %>">
             <div class="msg-avatar">
               <% if (isSent) { %>
-                <%= currentUser && currentUser.real_name ? currentUser.real_name.charAt(0) : (currentUser && currentUser.username ? currentUser.username.charAt(0) : '我') %>
+                <%= (currentUser && (currentUser.nickname || currentUser.real_name)) ? (currentUser.nickname || currentUser.real_name).charAt(0) : (currentUser && currentUser.username ? currentUser.username.charAt(0) : '我') %>
               <% } else if (otherUser) { %>
                 <%= otherUser.real_name ? otherUser.real_name.charAt(0) : (otherUser.username ? otherUser.username.charAt(0) : 'U') %>
               <% } else { %>

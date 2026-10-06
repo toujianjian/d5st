@@ -22,7 +22,7 @@ async function findOrCreateCasdoorUser(casdoorUser) {
       `UPDATE casdoor_users 
        SET username = ?, 
            real_name = COALESCE(?, real_name), 
-           avatar = COALESCE(?, avatar),
+           avatar = CASE WHEN avatar LIKE '/avatar/%' THEN avatar ELSE COALESCE(?, avatar) END,
            email = COALESCE(?, email),
            phone = COALESCE(?, phone),
            is_admin = ?,
@@ -59,7 +59,7 @@ async function findOrCreateCasdoorUser(casdoorUser) {
       `UPDATE casdoor_users
        SET casdoor_user_id = ?,
            real_name = COALESCE(?, real_name),
-           avatar = COALESCE(?, avatar),
+           avatar = CASE WHEN avatar LIKE '/avatar/%' THEN avatar ELSE COALESCE(?, avatar) END,
            email = COALESCE(?, email),
            phone = COALESCE(?, phone),
            is_admin = GREATEST(is_admin, ?),
@@ -191,22 +191,11 @@ async function reconcileCasdoorUsers(casdoor) {
     } catch (e) { /* 单个用户失败不影响整体 */ }
   }
 
-  // 反向：本地存在但 Casdoor 已无 → 删除
-  try {
-    const keySet = new Set();
-    users.forEach(u => { keySet.add(String(u.id)); keySet.add(String(u.name)); });
-    const [locals] = await pool.query('SELECT id, casdoor_user_id, username FROM casdoor_users');
-    const stale = (locals || []).filter(
-      row => !keySet.has(String(row.casdoor_user_id)) && !keySet.has(String(row.username))
-    );
-    for (const row of stale) {
-      await pool.query('DELETE FROM casdoor_users WHERE id = ?', [row.id]);
-      result.removed++;
-      console.log(`[用户同步] 清理本地用户（Casdoor 已不存在）: ${row.username}`);
-    }
-  } catch (e) {
-    result.reason = '反向清理失败: ' + e.message;
-  }
+  // 反向清理（危险，默认关闭）：本地存在但 Casdoor 已无 → 删除。
+  // 之前这里会 DELETE 本地用户，而 casdoor_users 是帖子/评论/私信的父表，
+  // 级联删除会连用户内容一起清掉；Casdoor 抖动或分页截断时极易误删。
+  // 现改为「绝不自动删除」。如需清理，走 casdoor-webhook 的删除事件（精确、单用户）。
+  result.removed = 0;
 
   result.ok = true;
   return result;

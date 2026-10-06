@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
 const level = require('../../配置/level');
+const { avatarUpload } = require('../../配置/upload');
 
 function requireLogin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -46,6 +47,33 @@ router.get('/', requireLogin, async (req, res) => {
   }
 });
 
+// 上传/更新头像（二进制存 user_avatars 表；并把 casdoor_users.avatar 指向本地输出地址）
+router.post('/avatar', requireLogin, (req, res) => {
+  avatarUpload.single('avatar')(req, res, async (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? '头像不能超过 3MB' : (err.message || '上传失败');
+      return res.redirect('/user/edit?error=' + encodeURIComponent(msg));
+    }
+    if (!req.file) {
+      return res.redirect('/user/edit?error=' + encodeURIComponent('请选择图片文件'));
+    }
+    try {
+      const uid = req.session.user.id;
+      await pool.query(
+        `INSERT INTO user_avatars (user_id, mime, data) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE mime = VALUES(mime), data = VALUES(data), updated_at = CURRENT_TIMESTAMP`,
+        [uid, req.file.mimetype, req.file.buffer]
+      );
+      await pool.query('UPDATE casdoor_users SET avatar = ? WHERE id = ?', ['/avatar/' + uid, uid]);
+      req.session.user.avatar = '/avatar/' + uid;
+      res.redirect('/user/edit?avatar=ok');
+    } catch (e) {
+      console.error('头像保存失败:', e);
+      res.redirect('/user/edit?error=' + encodeURIComponent('头像保存失败'));
+    }
+  });
+});
+
 // 查看他人主页
 // 注意：/edit、/achievements 等更具体的路由定义在本路由之后，若这里把非数字 id
 // 直接判成 404，那些页面就会被 /:id 抢先匹配成「用户不存在」而无法访问。
@@ -55,7 +83,7 @@ router.get('/:id', async (req, res, next) => {
     const targetId = parseInt(req.params.id, 10);
     if (isNaN(targetId)) return next();
 
-    const [users] = await pool.query('SELECT id, username, real_name, avatar, grade, class_name, points FROM casdoor_users WHERE id = ?', [targetId]);
+    const [users] = await pool.query('SELECT id, username, nickname, real_name, avatar, grade, class_name, points FROM casdoor_users WHERE id = ?', [targetId]);
     if (!users || users.length === 0) return res.status(404).render('errors/404', { title: '用户不存在' });
     const target = users[0];
 
@@ -98,7 +126,7 @@ router.get('/:id', async (req, res, next) => {
     );
 
     res.render('user/profile', {
-      title: (target.real_name || target.username) + ' 的主页',
+      title: (target.nickname || target.real_name || target.username) + ' 的主页',
       user: target,
       levelInfo: level.getLevelInfo(target.points || 0),
       posts,
@@ -177,7 +205,12 @@ router.get('/following/list', requireLogin, async (req, res) => {
 
 router.get('/edit', requireLogin, async (req, res) => {
   const [user] = await pool.query('SELECT * FROM casdoor_users WHERE id = ?', [req.session.user.id]);
-  res.render('user/edit', { title: '编辑资料', user: user[0] });
+  res.render('user/edit', {
+    title: '编辑资料',
+    user: user[0],
+    error: req.query.error || null,
+    avatarSaved: req.query.avatar === 'ok'
+  });
 });
 
 router.post('/edit', requireLogin, async (req, res) => {
@@ -187,6 +220,11 @@ router.post('/edit', requireLogin, async (req, res) => {
       'UPDATE casdoor_users SET nickname = ?, grade = ?, class_name = ?, student_no = ? WHERE id = ?',
       [nickname || null, grade || null, class_name || null, student_no || null, req.session.user.id]
     );
+    // 同步刷新 session，否则顶栏/侧栏等用 session 渲染的地方仍显示旧昵称
+    req.session.user.nickname = nickname || null;
+    req.session.user.grade = grade || null;
+    req.session.user.class_name = class_name || null;
+    req.session.user.student_no = student_no || null;
     res.redirect('/user');
   } catch (err) {
     res.redirect('/user/edit?error=update_failed');

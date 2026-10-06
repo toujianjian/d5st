@@ -45,7 +45,7 @@ router.get('/show', async (req, res) => {
   const code = req.query.code || '';
   try {
     const [users] = await pool.query(
-      `SELECT cu.id, cu.username, cu.real_name, cu.nickname, cu.avatar, us.secret_code, us.created_at
+      `SELECT cu.id, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.nickname, cu.avatar, us.secret_code, us.created_at
        FROM user_secrets us JOIN casdoor_users cu ON us.user_id = cu.id
        WHERE us.secret_code = ?`,
       [code]

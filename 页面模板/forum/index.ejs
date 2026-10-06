@@ -168,7 +168,7 @@
       <% posts.forEach(function(p) { %>
       <a href="/forum/<%= p.id %>" class="post-card">
         <% if (p.cover_image) { %>
-        <img class="post-cover" src="<%= p.cover_image %>" alt="" onerror="this.style.display='none'" />
+        <img class="post-cover" src="<%= p.cover_image %>" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" />
         <% } %>
         <div class="post-main">
           <div class="post-title-row">

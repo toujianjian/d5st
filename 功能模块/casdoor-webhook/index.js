@@ -35,10 +35,12 @@ async function handleEvent(event) {
       break;
     }
     case 'User delete': {
-      // Casdoor 后台删除用户 → 同步清理本地映射，使其从 d5st 中消失
+      // Casdoor 后台删除用户 → 本地只降权、不删行。
+      // 原因：casdoor_users 是帖子/评论/私信的父表，DELETE 会级联清空该用户全部内容。
+      // 为避免误删数据，这里保留记录（可人工在后台再处理）。
       const key = casdoorUser.id || casdoorUser.name;
-      const removed = await userService.removeLocalUser(key);
-      console.log(`[Casdoor Webhook] 用户删除: ${casdoorUser.name}（本地清理 ${removed} 行）`);
+      await userService.disableLocalUser(key);
+      console.log(`[Casdoor Webhook] 用户删除: ${casdoorUser.name}（已降权，内容保留）`);
       break;
     }
     case 'User logout': {

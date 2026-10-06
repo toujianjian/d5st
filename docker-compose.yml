@@ -48,6 +48,8 @@ services:
     # 不再直连对外：统一由 Caddy 在 /casdoor 子路径暴露
     volumes:
       - casdoor_data:/data
+      # 固定 app.conf（默认语言改中文），避免每次重建被镜像默认值覆盖
+      - ./docker/casdoor/app.conf:/conf/app.conf:ro
     depends_on:
       mysql:
         condition: service_healthy
@@ -117,8 +119,9 @@ services:
         condition: service_healthy
       casdoor:
         condition: service_healthy
-    # 不挂载宿主目录：代码全部烘焙进镜像，
-    # 避免宿主/容器之间的路径与换行符差异带来的迁移兼容问题
+    # 代码全部烘焙进镜像；仅把上传目录持久化到宿主，避免重建后上传文件丢失
+    volumes:
+      - ./uploads:/app/uploads
     networks:
       - d5st-network
     healthcheck:

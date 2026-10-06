@@ -20,7 +20,14 @@
   .field input:focus, .field textarea:focus, .field select:focus {
     outline: none; border-color: var(--primary); background: rgba(255,255,255,.95);
   }
+  .field input[type="file"] { padding: 10px; background: rgba(255,255,255,.6); cursor: pointer; }
   .hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .err-banner {
+    background: rgba(211,47,47,.1); border: 1px solid rgba(211,47,47,.3);
+    color: var(--primary-dark); border-radius: 12px; padding: 10px 14px;
+    font-size: 13px; margin-bottom: 16px;
+  }
+  .divider-or { text-align: center; font-size: 12px; color: var(--text-muted); margin: 4px 0 14px; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
   .check-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-dark); }
@@ -30,7 +37,8 @@
     background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff;
     font-size: 15px; font-weight: 600; transition: all .25s;
   }
-  .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(211,47,47,.4); }
+  .btn-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(211,47,47,.4); }
+  .btn-submit:disabled { opacity: .65; cursor: not-allowed; }
   .btn-cancel {
     padding: 14px 22px; border-radius: 14px; text-decoration: none;
     border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.7);
@@ -42,27 +50,39 @@
   <div class="n-title"><i class="fas fa-upload"></i> 上传视频</div>
   <div class="n-sub">分享校园里的精彩瞬间</div>
 
-  <form class="form-card" id="videoForm">
+  <% if (typeof error !== 'undefined' && error) { %>
+  <div class="err-banner"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
+  <% } %>
+
+  <form class="form-card" id="videoForm" method="POST" action="/videos" enctype="multipart/form-data">
     <div class="field">
       <label><i class="fas fa-heading"></i> 标题</label>
-      <input type="text" id="title" placeholder="给视频起个标题" />
+      <input type="text" id="title" name="title" placeholder="给视频起个标题" required />
     </div>
 
     <div class="field">
-      <label><i class="fas fa-link"></i> 视频地址</label>
-      <input type="text" id="video_url" placeholder="视频文件地址（mp4/webm）或站点播放页链接" />
-      <div class="hint">填写 .mp4/.webm 直链可在站内直接播放</div>
+      <label><i class="fas fa-file-video"></i> 上传视频文件</label>
+      <input type="file" id="video_file" name="video_file" accept="video/mp4,video/webm,video/quicktime" />
+      <div class="hint">支持 mp4 / webm / mov，单个文件最大 <strong>100MB</strong></div>
+    </div>
+
+    <div class="divider-or">— 或者 —</div>
+
+    <div class="field">
+      <label><i class="fas fa-link"></i> 视频外链地址</label>
+      <input type="text" id="video_url" name="video_url" placeholder="视频文件地址（mp4/webm）或站点播放页链接" />
+      <div class="hint">填写 .mp4/.webm 直链可在站内直接播放；已上传文件时此项忽略</div>
     </div>
 
     <div class="field">
       <label><i class="fas fa-image"></i> 封面图地址</label>
-      <input type="text" id="cover_url" placeholder="封面图 URL（可选）" />
+      <input type="text" id="cover_url" name="cover_url" placeholder="封面图 URL（可选）" />
     </div>
 
     <div class="row2">
       <div class="field">
         <label><i class="fas fa-folder"></i> 分类</label>
-        <select id="category">
+        <select id="category" name="category">
           <% Object.keys(categories).forEach(function(k) { %>
           <option value="<%= k %>"><%= categories[k].icon %> <%= categories[k].label %></option>
           <% }); %>
@@ -70,49 +90,52 @@
       </div>
       <div class="field">
         <label><i class="fas fa-clock"></i> 时长（秒）</label>
-        <input type="text" id="duration" placeholder="如 180" />
+        <input type="text" id="duration" name="duration" placeholder="如 180" />
       </div>
     </div>
 
     <div class="field">
       <label><i class="fas fa-align-left"></i> 简介</label>
-      <textarea id="description" placeholder="介绍一下这个视频…"></textarea>
+      <textarea id="description" name="description" placeholder="介绍一下这个视频…"></textarea>
     </div>
 
     <div class="field">
-      <label class="check-row"><input type="checkbox" id="is_recommended" style="width:auto;" /> 设为首页推荐（进入轮播）</label>
+      <label class="check-row"><input type="checkbox" id="is_recommended" name="is_recommended" value="1" style="width:auto;" /> 设为首页推荐（进入轮播）</label>
     </div>
 
     <div class="submit-row">
-      <button type="submit" class="btn-submit"><i class="fas fa-paper-plane"></i> 发布</button>
+      <button type="submit" class="btn-submit" id="submitBtn"><i class="fas fa-paper-plane"></i> 发布</button>
       <a href="/videos" class="btn-cancel">取消</a>
     </div>
   </form>
 </div>
 
 <script>
-  document.getElementById('videoForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    var body = {
-      title: document.getElementById('title').value,
-      video_url: document.getElementById('video_url').value,
-      cover_url: document.getElementById('cover_url').value,
-      category: document.getElementById('category').value,
-      duration: document.getElementById('duration').value,
-      description: document.getElementById('description').value,
-      is_recommended: document.getElementById('is_recommended').checked ? 1 : 0
-    };
-    if (!body.title || !body.video_url) { alert('标题和视频地址必填'); return; }
-    try {
-      var r = await fetch('/videos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (r.redirected) { window.location.href = r.url; return; }
-      if (r.ok) { window.location.href = '/videos'; return; }
-      var d = await r.json().catch(function () { return {}; });
-      alert(d.error || '发布失败');
-    } catch (err) { alert('发布失败'); }
-  });
+  (function () {
+    var MAX = 100 * 1024 * 1024;
+    var form = document.getElementById('videoForm');
+    form.addEventListener('submit', function (e) {
+      var file = document.getElementById('video_file').files[0];
+      var url = document.getElementById('video_url').value.trim();
+      if (!document.getElementById('title').value.trim()) {
+        e.preventDefault();
+        alert('请填写标题');
+        return;
+      }
+      if (!file && !url) {
+        e.preventDefault();
+        alert('请上传视频文件，或填写视频外链地址');
+        return;
+      }
+      if (file && file.size > MAX) {
+        e.preventDefault();
+        alert('视频超过 100MB 限制（当前 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB）');
+        return;
+      }
+      // 大文件上传耗时，禁用按钮避免重复提交
+      var btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中…';
+    });
+  })();
 </script>

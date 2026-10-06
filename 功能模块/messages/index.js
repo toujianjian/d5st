@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
     for (const c of conversations) {
       const otherId = c.other_id;
       const [others] = await pool.query(
-        'SELECT id, username, real_name, avatar FROM casdoor_users WHERE id = ?',
+        `SELECT id, username, COALESCE(NULLIF(nickname, ''), NULLIF(real_name, ''), username) AS real_name, avatar FROM casdoor_users WHERE id = ?`,
         [otherId]
       );
       const other = others[0];
@@ -71,7 +71,7 @@ router.get('/chat/:userId', async (req, res) => {
       [myId, otherId]
     );
     const [otherUser] = await pool.query(
-      'SELECT id, username, real_name, avatar FROM casdoor_users WHERE id = ?',
+      `SELECT id, username, COALESCE(NULLIF(nickname, ''), NULLIF(real_name, ''), username) AS real_name, avatar FROM casdoor_users WHERE id = ?`,
       [otherId]
     );
     res.render('messages/chat', { 
@@ -139,7 +139,7 @@ router.post('/guestbook', async (req, res) => {
   const raw = content.trim();
   const { filtered, matched } = scan(raw);
   const authorId = req.session.user?.id || null;
-  const name = authorId ? (req.session.user.real_name || req.session.user.username) : (author_name || '匿名用户');
+  const name = authorId ? (req.session.user.nickname || req.session.user.real_name || req.session.user.username) : (author_name || '匿名用户');
   try {
     const [result] = await pool.query('INSERT INTO guestbook (author_id, author_name, content) VALUES (?, ?, ?)', [authorId, name, filtered]);
     let gid = result && result.insertId;

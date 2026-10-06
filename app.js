@@ -25,17 +25,23 @@ app.use('/public', express.static(path.join(__dirname, '静态资源')));
 // 解析后是 /public/webfonts/，但字体实际放在 /public/font-awesome/webfonts/ 下，
 // 会导致所有图标 404。这里补一条映射，不改动原有目录结构。
 app.use('/public/webfonts', express.static(path.join(__dirname, '静态资源/font-awesome/webfonts')));
+// 用户上传的视频等文件：容器内 /app/uploads，由 docker-compose 挂宿主 ./uploads 持久化
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+app.set('trust proxy', 1);
 
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'd5st-dev-secret-change-me',
     resave: false,
     saveUninitialized: false,
+    rolling: true,
     cookie: {
-      maxAge: 1000 * 60 * 60 * 2,
-      httpOnly: true
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+      httpOnly: true,
+      sameSite: 'lax'
     }
   })
 );
@@ -191,6 +197,21 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// 用户头像输出（二进制存 user_avatars 表，随数据库迁移）
+app.get('/avatar/:id', async (req, res) => {
+  const uid = parseInt(req.params.id, 10);
+  if (isNaN(uid)) return res.status(400).end();
+  try {
+    const [rows] = await pool.query('SELECT mime, data FROM user_avatars WHERE user_id = ?', [uid]);
+    if (!rows || rows.length === 0) return res.status(404).end();
+    res.set('Content-Type', rows[0].mime || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(rows[0].data);
+  } catch (e) {
+    res.status(500).end();
+  }
+});
+
 app.get('/api/check-login', (req, res) => {
   if (!req.session.user) {
     return res.status(401).json({ loggedIn: false, error: '会话已过期' });
@@ -298,7 +319,7 @@ app.post('/api/notifications/:id/read', async (req, res) => {
 app.get('/rss.xml', async (req, res) => {
   try {
     const [posts] = await pool.query(
-      `SELECT fp.*, cu.username, cu.real_name FROM forum_posts fp
+      `SELECT fp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name FROM forum_posts fp
        LEFT JOIN casdoor_users cu ON fp.user_id = cu.id
        WHERE fp.is_deleted = 0
        ORDER BY fp.created_at DESC LIMIT 20`

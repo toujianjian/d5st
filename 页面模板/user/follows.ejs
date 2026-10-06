@@ -61,9 +61,9 @@
     <% if (typeof following !== 'undefined' && following && following.length > 0) { %>
       <% following.forEach(function(u) { %>
         <a class="follows-item" href="/user/<%= u.id %>">
-          <div class="follows-avatar"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+          <div class="follows-avatar"><%= (u.nickname || u.real_name || u.username || 'U').charAt(0) %></div>
           <div>
-            <div class="follows-name"><%= u.real_name || u.username %></div>
+            <div class="follows-name"><%= u.nickname || u.real_name || u.username %></div>
             <div class="follows-meta">
               @<%= u.username %>
               <% if (u.grade) { %> · <%= u.grade %><% } %>
@@ -84,9 +84,9 @@
     <% if (typeof followers !== 'undefined' && followers && followers.length > 0) { %>
       <% followers.forEach(function(u) { %>
         <a class="follows-item" href="/user/<%= u.id %>">
-          <div class="follows-avatar"><%= (u.real_name || u.username || 'U').charAt(0) %></div>
+          <div class="follows-avatar"><%= (u.nickname || u.real_name || u.username || 'U').charAt(0) %></div>
           <div>
-            <div class="follows-name"><%= u.real_name || u.username %></div>
+            <div class="follows-name"><%= u.nickname || u.real_name || u.username %></div>
             <div class="follows-meta">
               @<%= u.username %>
               <% if (u.grade) { %> · <%= u.grade %><% } %>

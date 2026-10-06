@@ -54,27 +54,27 @@ async function acceptRequest(requestId, me) {
 // 汇总好友页所需数据（好友/收到请求/发出请求/推荐）
 async function loadFriendPage(me) {
   const [friends] = await pool.query(
-    `SELECT cu.id, cu.username, cu.real_name, cu.avatar, cu.points, uf.created_at
+    `SELECT cu.id, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar, cu.points, uf.created_at
      FROM user_friends uf JOIN casdoor_users cu ON uf.friend_id = cu.id
      WHERE uf.user_id = ? ORDER BY uf.created_at DESC`,
     [me]
   );
   const [incoming] = await pool.query(
     `SELECT fr.id, fr.from_user_id, fr.message, fr.created_at,
-            cu.username, cu.real_name, cu.avatar
+            cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar
      FROM friend_requests fr JOIN casdoor_users cu ON fr.from_user_id = cu.id
      WHERE fr.to_user_id = ? AND fr.status = 'pending' ORDER BY fr.created_at DESC`,
     [me]
   );
   const [outgoing] = await pool.query(
     `SELECT fr.id, fr.to_user_id, fr.created_at,
-            cu.username, cu.real_name, cu.avatar
+            cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar
      FROM friend_requests fr JOIN casdoor_users cu ON fr.to_user_id = cu.id
      WHERE fr.from_user_id = ? AND fr.status = 'pending' ORDER BY fr.created_at DESC`,
     [me]
   );
   const [suggestions] = await pool.query(
-    `SELECT cu.id, cu.username, cu.real_name, cu.avatar, cu.points
+    `SELECT cu.id, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar, cu.points
      FROM casdoor_users cu
      WHERE cu.id <> ?
        AND cu.id NOT IN (SELECT friend_id FROM user_friends WHERE user_id = ?)
@@ -114,7 +114,7 @@ router.get('/search', requireLoginPage, async (req, res) => {
     if (kw) {
       const like = '%' + kw + '%';
       const [rows] = await pool.query(
-        `SELECT id, username, real_name, avatar, points
+        `SELECT id, username, COALESCE(NULLIF(nickname,''), NULLIF(real_name,''), username) AS real_name, avatar, points
          FROM casdoor_users
          WHERE id <> ? AND (username LIKE ? OR real_name LIKE ?)
          ORDER BY points DESC, id DESC LIMIT 30`,

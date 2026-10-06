@@ -53,7 +53,7 @@
 
 <div class="p-wrap">
   <div class="crumbs">
-    <a href="/videos">校园风采</a>
+    <a href="/videos">视频</a>
     › <a href="/videos?category=<%= video.category %>"><%= video.category_icon %> <%= video.category_label %></a>
     › <%= video.title %>
   </div>
@@ -94,7 +94,7 @@
       <a class="rel-item" href="/videos/<%= r.id %>">
         <div class="rel-thumb">
           <% if (r.cover_url) { %>
-          <img src="<%= r.cover_url %>" alt="" onerror="this.style.display='none'" />
+          <img src="<%= r.cover_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" />
           <% } else { %>🎬<% } %>
         </div>
         <div class="rel-body">

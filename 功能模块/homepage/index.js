@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
     const [banners] = await pool.query('SELECT * FROM home_banners WHERE is_active = 1 ORDER BY sort_order ASC');
     const [links] = await pool.query('SELECT * FROM home_links WHERE is_active = 1 ORDER BY sort_order ASC');
     const [posts] = await pool.query(
-      `SELECT fp.*, cu.username, cu.real_name, cu.avatar,
+      `SELECT fp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar,
         (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = fp.id AND pc.is_deleted = 0) as comment_count
        FROM forum_posts fp
        LEFT JOIN casdoor_users cu ON fp.user_id = cu.id

@@ -96,7 +96,7 @@
 <div class="v-wrap">
   <div class="v-head">
     <div>
-      <div class="v-title"><i class="fas fa-play-circle"></i> 校园风采</div>
+      <div class="v-title"><i class="fas fa-play-circle"></i> 视频</div>
       <div class="v-sub">记录校园里的每一份精彩 · 共 <%= total %> 个视频</div>
     </div>
     <% if (typeof currentUser !== 'undefined' && currentUser) { %>
@@ -113,7 +113,7 @@
       <% recommended.forEach(function(v, i) { %>
       <a href="/videos/<%= v.id %>" class="slide <%= i === 0 ? 'active' : '' %>" data-i="<%= i %>">
         <% if (v.cover_url) { %>
-        <img src="<%= v.cover_url %>" alt="" onerror="this.style.display='none';this.parentNode.querySelector('.slide-fallback').style.display='flex';" />
+        <img src="<%= v.cover_url %>" alt="" <%- i === 0 ? '' : 'loading="lazy" decoding="async" ' %>onerror="this.style.display='none';this.parentNode.querySelector('.slide-fallback').style.display='flex';" />
         <div class="slide-fallback" style="display:none;">🎬</div>
         <% } else { %>
         <div class="slide-fallback">🎬</div>
@@ -150,7 +150,7 @@
     <a href="/videos/<%= v.id %>" class="v-card">
       <div class="v-thumb">
         <% if (v.cover_url) { %>
-        <img src="<%= v.cover_url %>" alt="" onerror="this.style.display='none'" />
+        <img src="<%= v.cover_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" />
         <% } else { %>
         <div class="ph">🎬</div>
         <% } %>

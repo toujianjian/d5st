@@ -545,7 +545,11 @@
     }
   }
 
-  /* ---------- 初始化（与原版尾部一致） ---------- */
+  /* ---------- 初始化 ----------
+     移动端（小屏 / 触屏）跳过耗算力的逐帧动画（线场背景、光标跟随、FPS 表），
+     只保留主题切换、汉堡菜单、滚动揭示与数字统计，显著降低手机 CPU 占用。
+     （注意：汉堡菜单与主题切换在本文件下方绑定，不能整体禁用本脚本。） */
+  const liteMode = window.matchMedia("(max-width: 1024px), (pointer: coarse)").matches;
   setPointerVars(cursorX, cursorY);
   setCursorScale(0.035);
   cursorReveal && cursorReveal.style.setProperty("--cursor-opacity", "0");
@@ -553,13 +557,15 @@
   setPageCursorAvailability();
   syncDocWidth();
   updateRevealItems();
-  startFpsMeter();
-  startLineField();
   updateBackgroundTransition();
-  updateScrollCursorEffect();
   startCountUp();
-  if (hasHeroCursor) {
-    cursorLoopStarted = true;
-    requestAnimationFrame(animateCursor);
+  if (!liteMode) {
+    startFpsMeter();
+    startLineField();
+    updateScrollCursorEffect();
+    if (hasHeroCursor) {
+      cursorLoopStarted = true;
+      requestAnimationFrame(animateCursor);
+    }
   }
 })();

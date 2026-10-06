@@ -210,7 +210,7 @@ async function removeSeedContent() {
 // 首页该区域已改为完全由 home_links 驱动，这里保证老库也有完整默认项。
 const DEFAULT_HOME_LINKS = [
   ['贴吧论坛', '/forum', 'fas fa-comments', 1],
-  ['校园风采', '/videos', 'fas fa-play', 2],
+  ['视频', '/videos', 'fas fa-play', 2],
   ['保密号', '/secret', 'fas fa-key', 3],
   ['留言板', '/messages/guestbook', 'fas fa-sticky-note', 4],
   ['个人中心', '/user', 'fas fa-user', 5],

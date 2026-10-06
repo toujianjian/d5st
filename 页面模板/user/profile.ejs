@@ -13,7 +13,9 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 40px; color: white; font-weight: 700;
     box-shadow: 0 4px 15px rgba(211,47,47,0.3); flex-shrink: 0;
+    position: relative; overflow: hidden;
   }
+  .profile-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .profile-info { flex: 1; }
   .profile-name { font-size: 22px; font-weight: 700; color: var(--text-dark); font-family: 'Noto Serif SC', serif; }
   .profile-meta { font-size: 13px; color: var(--text-light); margin-top: 6px; }
@@ -35,9 +37,13 @@
 <div class="page-container">
   <% if (typeof user !== 'undefined' && user) { %>
   <div class="profile-card">
-    <div class="profile-avatar"><%= (user.real_name || user.username || 'U').charAt(0) %></div>
+    <div class="profile-avatar"><% if (user.avatar) { %><img src="<%= user.avatar %>" alt="" onerror="this.style.display='none'" /><% } %><%= (user.nickname || user.real_name || user.username || 'U').charAt(0) %></div>
     <div class="profile-info">
-      <div class="profile-name"><%= user.real_name || user.username %></div>
+      <div class="profile-name"><%= user.nickname || user.real_name || user.username %></div>
+      <% var _pDisp = user.nickname || user.real_name || user.username || ''; %>
+      <% if (user.real_name && user.real_name !== _pDisp) { %>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:-4px;">姓名：<%= user.real_name %></div>
+      <% } %>
       <div class="profile-meta">
         <% if (user.grade) { %><i class="fas fa-school"></i> <%= user.grade %><% } %>
         <% if (user.class_name) { %> · <%= user.class_name %><% } %>

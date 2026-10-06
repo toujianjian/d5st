@@ -167,6 +167,7 @@ router.get('/auth/dev-login', async (req, res) => {
       id: loginUser.id,
       casdoor_user_id: loginUser.casdoor_user_id,
       username: loginUser.username,
+      nickname: loginUser.nickname || null,
       real_name: loginUser.real_name || loginUser.username,
       avatar: loginUser.avatar,
       email: loginUser.email,
@@ -238,6 +239,7 @@ router.get('/auth/callback', async (req, res) => {
       id: localUser.id,
       casdoor_user_id: localUser.casdoor_user_id,
       username: localUser.username,
+      nickname: localUser.nickname || null,
       real_name: localUser.real_name,
       avatar: localUser.avatar,
       email: localUser.email,
@@ -253,6 +255,9 @@ router.get('/auth/callback', async (req, res) => {
 
     await logAuthEvent('User login', localUser.username, '用户登录成功', req);
     LOG(`用户登录: ${localUser.username} (admin=${isAdmin})`);
+
+    // 登录后安排一次「防抖」用户对账（1 分钟后执行，只正向不删除）
+    try { require('../../配置/casdoor-sync').scheduleSync(casdoor); } catch (e) { /* 忽略 */ }
 
     const nextUrl = req.session.nextUrl || '/';
     req.session.nextUrl = null;

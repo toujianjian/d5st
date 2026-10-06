@@ -43,6 +43,8 @@ async function ensureOrganization() {
     // 该资源实际 404，会让 Casdoor 登录页/标签页的图标变成破图。
     favicon: `${C.appUrl}/public/images/logo.svg`,
     tags: ['campus', 'community'],
+    // 手机号国家码：Casdoor 取列表「首项」作为默认区号，CN 放首位 → 默认 +86
+    countryCodes: ['CN', 'US', 'ES', 'FR', 'DE', 'GB', 'JP', 'KR', 'VN', 'ID', 'SG', 'IN'],
     // 密码策略：留空使用 Casdoor 默认值（旧代码传 passwordOptions 对象，
     // 但当前 casdoor:latest 镜像要求 passwordOptions 是 []string，
     // 会让 add-organization 返回 status:'error' 被静默吞掉）

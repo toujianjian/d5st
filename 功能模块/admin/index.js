@@ -302,7 +302,7 @@ const POPUP_PAGES = [
   { key: 'all', label: '全部页面' },
   { key: 'home', label: '首页' },
   { key: 'forum', label: '贴吧论坛' },
-  { key: 'videos', label: '校园风采' },
+  { key: 'videos', label: '视频' },
   { key: 'secret', label: '保密号' },
   { key: 'messages', label: '私信 / 留言板' },
   { key: 'friends', label: '好友' },

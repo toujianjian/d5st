@@ -38,8 +38,10 @@
     box-shadow: 0 10px 32px rgba(211, 47, 47, 0.4);
     border: 4px solid rgba(255, 255, 255, 0.6);
     position: relative;
+    overflow: hidden;
     animation: floaty 4s ease-in-out infinite;
   }
+  .profile-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   @keyframes floaty {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-6px); }
@@ -171,9 +173,16 @@
 <div class="page-wrap">
   <div class="profile-card">
     <div class="profile-avatar">
-      <%= (typeof user !== 'undefined' && user && (user.real_name || user.username)) ? ((user.real_name || user.username).charAt(0)) : ((currentUser && (currentUser.real_name || currentUser.username)) ? (currentUser.real_name || currentUser.username).charAt(0) : 'U') %>
+      <% if (typeof user !== 'undefined' && user && user.avatar) { %>
+      <img src="<%= user.avatar %>" alt="" onerror="this.style.display='none'" />
+      <% } %>
+      <%= (typeof user !== 'undefined' && user && (user.nickname || user.real_name || user.username)) ? ((user.nickname || user.real_name || user.username).charAt(0)) : ((currentUser && (currentUser.nickname || currentUser.real_name || currentUser.username)) ? (currentUser.nickname || currentUser.real_name || currentUser.username).charAt(0) : 'U') %>
     </div>
-    <div class="profile-name"><%= (typeof user !== 'undefined' && user) ? (user.real_name || user.username || '用户') : (currentUser.real_name || currentUser.username || '用户') %></div>
+    <div class="profile-name"><%= (typeof user !== 'undefined' && user) ? (user.nickname || user.real_name || user.username || '用户') : (currentUser.nickname || currentUser.real_name || currentUser.username || '用户') %></div>
+    <% var _myDisp = (typeof user !== 'undefined' && user) ? (user.nickname || user.real_name || user.username || '') : ''; %>
+    <% if (typeof user !== 'undefined' && user && user.real_name && user.real_name !== _myDisp) { %>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:2px;">姓名：<%= user.real_name %></div>
+    <% } %>
     <div class="profile-handle">@<%= (typeof user !== 'undefined' && user) ? user.username : currentUser.username %></div>
 
     <% var lv = (typeof levelInfo !== 'undefined' && levelInfo) ? levelInfo : null; %>

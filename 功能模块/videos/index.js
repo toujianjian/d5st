@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
+const { videoUpload } = require('../../配置/upload');
 
 // 分类定义（meyho 走马灯分类导航）
 const CATEGORIES = {
@@ -76,7 +77,7 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * PAGE_SIZE;
 
     const [videos] = await pool.query(
-      `SELECT vp.*, cu.username, cu.real_name, cu.avatar FROM video_posts vp
+      `SELECT vp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar FROM video_posts vp
        LEFT JOIN casdoor_users cu ON vp.user_id = cu.id
        ${where} ORDER BY vp.created_at DESC LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
       params
@@ -88,7 +89,7 @@ router.get('/', async (req, res) => {
     ]);
 
     res.render('videos/index', {
-      title: '校园风采',
+      title: '视频',
       videos: videos.map(v => ({
         ...v,
         author: v.real_name || v.username || '匿名',
@@ -110,37 +111,57 @@ router.get('/', async (req, res) => {
 // ============ 上传页 ============
 router.get('/new', (req, res) => {
   if (!req.session.user) return res.redirect('/login');
-  res.render('videos/new', { title: '上传视频', categories: CATEGORIES });
+  res.render('videos/new', { title: '上传视频', categories: CATEGORIES, error: req.query.error || null });
 });
 
-// ============ 发布视频 ============
-router.post('/', async (req, res) => {
-  if (!req.session.user) return res.status(401).json({ error: '请先登录' });
-  const { title, description, video_url, cover_url, category, duration, is_recommended } = req.body;
-  if (!title || !video_url) {
-    return res.status(400).json({ error: '标题和视频地址必填' });
-  }
-  try {
-    const [result] = await pool.query(
-      `INSERT INTO video_posts (user_id, title, description, video_url, cover_url, category, duration, is_recommended)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.session.user.id,
-        title.trim(),
-        (description || '').trim(),
-        video_url.trim(),
-        (cover_url || '').trim(),
-        category || 'campus',
-        parseInt(duration, 10) || 0,
-        is_recommended ? 1 : 0
-      ]
-    );
-    const id = result && result.insertId;
-    res.redirect(id ? '/videos/' + id : '/videos');
-  } catch (err) {
-    console.error('视频上传失败:', err);
-    res.status(500).json({ error: '上传失败' });
-  }
+// ============ 发布视频（本地上传 或 外链 URL，二选一）============
+router.post('/', (req, res) => {
+  if (!req.session.user) return res.redirect('/login');
+
+  videoUpload.single('video_file')(req, res, async (upErr) => {
+    const backErr = (msg) => res.redirect('/videos/new?error=' + encodeURIComponent(msg));
+
+    if (upErr) {
+      const msg = upErr.code === 'LIMIT_FILE_SIZE'
+        ? '视频超过 100MB 限制'
+        : (upErr.message || '上传失败');
+      console.error('视频上传失败:', msg);
+      return backErr(msg);
+    }
+
+    const { title, description, video_url, cover_url, category, duration, is_recommended } = req.body || {};
+    // 本地文件优先；未选文件时用外链
+    const fileUrl = req.file ? '/uploads/videos/' + req.file.filename : '';
+    const finalUrl = fileUrl || String(video_url || '').trim();
+
+    if (!title || !finalUrl) {
+      if (req.file) { try { require('fs').unlink(req.file.path, () => {}); } catch (e) { /* 忽略 */ } }
+      return backErr('标题必填，且需上传视频文件或填写视频地址');
+    }
+
+    try {
+      const [result] = await pool.query(
+        `INSERT INTO video_posts (user_id, title, description, video_url, cover_url, category, duration, is_recommended)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          req.session.user.id,
+          String(title).trim(),
+          String(description || '').trim(),
+          finalUrl,
+          String(cover_url || '').trim(),
+          category || 'campus',
+          parseInt(duration, 10) || 0,
+          is_recommended ? 1 : 0
+        ]
+      );
+      const id = result && result.insertId;
+      res.redirect(id ? '/videos/' + id : '/videos');
+    } catch (err) {
+      console.error('视频入库失败:', err);
+      if (req.file) { try { require('fs').unlink(req.file.path, () => {}); } catch (e) { /* 忽略 */ } }
+      backErr('上传失败，请重试');
+    }
+  });
 });
 
 // ============ 播放页 ============
@@ -148,7 +169,7 @@ router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const [rows] = await pool.query(
-      `SELECT vp.*, cu.username, cu.real_name, cu.avatar FROM video_posts vp
+      `SELECT vp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar FROM video_posts vp
        LEFT JOIN casdoor_users cu ON vp.user_id = cu.id
        WHERE vp.id = ? AND vp.is_deleted = 0 LIMIT 1`,
       [id]

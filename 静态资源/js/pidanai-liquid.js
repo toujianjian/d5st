@@ -3,6 +3,10 @@
   const liquidCanvases = document.querySelectorAll(".liquid-glass-canvas");
   if (!liquidCanvases.length) return;
 
+  // 移动端（小屏 / 触屏）不做 WebGL 液态玻璃动画：逐帧渲染非常耗 CPU/GPU，
+  // 手机端直接跳过（不依赖它的菜单/主题功能由 home-shell.js 负责）。
+  if (window.matchMedia("(max-width: 1024px), (pointer: coarse)").matches) return;
+
   const vertexSource = `
     attribute vec2 a_position;
     attribute vec2 a_texCoord;

@@ -38,6 +38,43 @@
     .d5st-cv-btn { width: 36px; height: 36px; }
     .d5st-slide-body { padding: 14px 16px 18px; }
   }
+
+  /* ===== 移动端：移除耗算力的 3D 首屏与自定义光标/线场背景 ===== */
+  @media (max-width: 1024px) {
+    .pdaim-line-field,
+    main.hero,
+    .hero-stage,
+    .scroll-hint,
+    .cursor-orb,
+    .cursor-pop,
+    .cursor-reveal,
+    .pdaim-fps { display: none !important; }
+    /* 去掉毛玻璃的开销（移动端 backdrop-filter 很吃 GPU） */
+    .site-header { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  }
+
+  /* 移动端快捷操作行：桌面端隐藏，仅手机显示 */
+  .mobile-auth-row { display: none; }
+  @media (max-width: 1024px) {
+    .mobile-auth-row {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin: 6px 0 20px;
+    }
+    .mobile-auth-row .ma-btn {
+      flex: 1 1 40%; min-width: 120px; min-height: 46px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 0 16px; border-radius: 999px;
+      text-decoration: none; font-size: 15px; font-weight: 600;
+      background: rgba(255,255,255,.72); color: var(--text-dark);
+      border: 1px solid rgba(211,47,47,.25);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mobile-auth-row .ma-btn.primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff; border-color: transparent;
+      box-shadow: 0 8px 20px rgba(211,47,47,.3);
+    }
+  }
 </style>
 
 <canvas class="pdaim-line-field" id="pdaimLineField" aria-hidden="true"></canvas>
@@ -61,7 +98,7 @@
     <nav class="nav-pills" id="primaryNav" aria-label="Sections">
       <a class="nav-pill is-active" data-liquid-glass href="/"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>首页</span></a>
       <a class="nav-pill" data-liquid-glass href="/forum"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>贴吧</span></a>
-      <a class="nav-pill" data-liquid-glass href="/videos"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>风采</span></a>
+      <a class="nav-pill" data-liquid-glass href="/videos"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>视频</span></a>
       <a class="nav-pill" data-liquid-glass href="/secret"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>保密号</span></a>
       <% if (typeof currentUser !== 'undefined' && currentUser) { %>
       <a class="nav-pill" data-liquid-glass href="/friends"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>好友</span></a>
@@ -77,7 +114,7 @@
     <div class="header-actions">
       <div class="auth-actions" aria-label="账户操作">
         <% if (typeof currentUser !== 'undefined' && currentUser) { %>
-          <a class="auth-button auth-login" data-liquid-glass href="/user"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span><%= currentUser.real_name || currentUser.username %></span></a>
+          <a class="auth-button auth-login" data-liquid-glass href="/user"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span><%= currentUser.nickname || currentUser.real_name || currentUser.username %></span></a>
           <a class="auth-button auth-register" data-liquid-glass href="/logout"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>退出</span></a>
         <% } else { %>
           <a class="auth-button auth-login" data-liquid-glass href="/login"><canvas class="liquid-glass-canvas" aria-hidden="true"></canvas><span>登录</span></a>
@@ -146,11 +183,11 @@
         </div>
       </section>
 
-      <!-- 校园风采（视频） -->
+      <!-- 校园视频 -->
       <section class="d5st-block">
         <div class="d5st-head reveal-on-scroll" data-reveal>
           <p class="section-kicker">Videos</p>
-          <h2>校园风采</h2>
+          <h2>视频</h2>
           <p>记录校园里的每一份精彩</p>
         </div>
         <div class="d5st-grid cols-4">
@@ -158,7 +195,7 @@
             <% videos.forEach(function (v) { %>
               <a class="d5st-card reveal-on-scroll" data-reveal href="/videos/<%= v.id %>">
                 <div class="d5st-thumb">
-                  <% if (v.cover_url) { %><img src="<%= v.cover_url %>" alt="" onerror="this.style.display='none'" /><% } else { %>🎬<% } %>
+                  <% if (v.cover_url) { %><img src="<%= v.cover_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /><% } else { %>🎬<% } %>
                   <% if (v.duration) { %><span class="d5st-dur"><%= Math.floor(v.duration / 60) %>:<%= String(v.duration % 60).padStart(2, '0') %></span><% } %>
                 </div>
                 <h3 class="d5st-title" style="font-size:14px;"><%= v.title %></h3>
@@ -185,7 +222,7 @@
             <a class="d5st-slide<%= i === 0 ? ' is-active' : '' %>" href="<%= b.link_url || 'javascript:void(0)' %>"<% if (b.link_url) { %> target="_blank" rel="noopener"<% } %>>
               <div class="d5st-slide-media">
                 <% if (b.image_path) { %>
-                  <img src="<%= b.image_path %>" alt="<%= b.title %>" onerror="this.style.display='none'" />
+                  <img src="<%= b.image_path %>" alt="<%= b.title %>" <%- i === 0 ? '' : 'loading="lazy" decoding="async" ' %>onerror="this.style.display='none'" />
                 <% } else { %>
                   <span class="d5st-slide-ph"><i class="fas fa-image"></i></span>
                 <% } %>
@@ -210,6 +247,23 @@
         </div>
       </section>
       <% } %>
+
+      <!-- 移动端快捷操作行（仅手机显示，位于精彩推荐轮播下方） -->
+      <div class="mobile-auth-row" aria-label="快捷操作">
+        <% if (typeof currentUser !== 'undefined' && currentUser) { %>
+          <a class="ma-btn primary" href="/user"><i class="fas fa-user"></i> <%= currentUser.nickname || currentUser.real_name || currentUser.username %></a>
+          <% if (currentUser.is_admin === 1) { %>
+          <a class="ma-btn" href="/admin"><i class="fas fa-cog"></i> 管理</a>
+          <% } %>
+          <a class="ma-btn" href="/videos"><i class="fas fa-play-circle"></i> 视频</a>
+          <a class="ma-btn" href="/logout"><i class="fas fa-sign-out-alt"></i> 退出</a>
+        <% } else { %>
+          <a class="ma-btn primary" href="/login"><i class="fas fa-sign-in-alt"></i> 登录</a>
+          <a class="ma-btn" href="/register"><i class="fas fa-user-plus"></i> 注册</a>
+          <a class="ma-btn" href="/videos"><i class="fas fa-play-circle"></i> 视频</a>
+          <a class="ma-btn" href="/forum"><i class="fas fa-comments"></i> 贴吧</a>
+        <% } %>
+      </div>
 
       <script>
         /* 精彩推荐轮播：自动播放 + 箭头 + 圆点 + 悬停暂停 + 触屏滑动 */

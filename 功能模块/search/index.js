@@ -12,14 +12,14 @@ router.get('/', async (req, res) => {
         await pool.query('INSERT INTO search_history (user_id, keyword) VALUES (?, ?)', [req.session.user.id, keyword]);
       }
       const [posts] = await pool.query(
-        `SELECT fp.*, cu.username, cu.real_name FROM forum_posts fp 
+        `SELECT fp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name FROM forum_posts fp 
          LEFT JOIN casdoor_users cu ON fp.user_id = cu.id
          WHERE fp.is_deleted = 0 AND (fp.content LIKE ? OR fp.tags LIKE ?)
          ORDER BY fp.created_at DESC LIMIT 30`,
         [`%${keyword}%`, `%${keyword}%`]
       );
       const [users] = await pool.query(
-        'SELECT id, username, real_name, avatar FROM casdoor_users WHERE username LIKE ? OR real_name LIKE ? LIMIT 20',
+        `SELECT id, username, COALESCE(NULLIF(nickname, ''), NULLIF(real_name, ''), username) AS real_name, avatar FROM casdoor_users WHERE username LIKE ? OR real_name LIKE ? LIMIT 20`,
         [`%${keyword}%`, `%${keyword}%`]
       );
       results = { posts, users };

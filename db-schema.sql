@@ -32,6 +32,15 @@ CREATE TABLE IF NOT EXISTS casdoor_users (
   UNIQUE KEY uniq_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Casdoor 用户映射';
 
+-- 用户头像（二进制存库，随 mysqldump 一起迁移，免去磁盘目录搬运）
+CREATE TABLE IF NOT EXISTS user_avatars (
+  user_id INT NOT NULL PRIMARY KEY,
+  mime VARCHAR(50) NOT NULL,
+  data LONGBLOB NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_user_avatars_user FOREIGN KEY (user_id) REFERENCES casdoor_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户头像（二进制）';
+
 -- ys 学生基础数据（用于注册验证）
 CREATE TABLE IF NOT EXISTS ys_students (
   id INT AUTO_INCREMENT PRIMARY KEY,

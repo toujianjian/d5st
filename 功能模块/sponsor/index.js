@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
   let sponsors = [];
   try {
     const [rows] = await pool.query(
-      `SELECT cu.real_name, cu.username, SUM(st.amount_yuan) as amount
+      `SELECT COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.username, SUM(st.amount_yuan) as amount
        FROM sponsor_transactions st
        JOIN casdoor_users cu ON st.user_id = cu.id
        WHERE st.status = 'success'

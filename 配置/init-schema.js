@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS video_posts (
 
 INSERT OR IGNORE INTO home_links (title, url, icon, sort_order) VALUES
 ('贴吧论坛', '/forum', 'fas fa-comments', 1),
-('校园风采', '/videos', 'fas fa-play', 2),
+('视频', '/videos', 'fas fa-play', 2),
 ('保密号', '/secret', 'fas fa-key', 3),
 ('留言板', '/messages/guestbook', 'fas fa-sticky-note', 4),
 ('个人中心', '/user', 'fas fa-user', 5),

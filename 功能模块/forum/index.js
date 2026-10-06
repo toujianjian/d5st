@@ -102,7 +102,7 @@ function buildOrder(sort) {
 }
 
 const POST_SELECT = `
-  SELECT fp.*, cu.username, cu.real_name, cu.avatar,
+  SELECT fp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar,
     (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = fp.id AND pc.is_deleted = 0) as comment_count,
     (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = fp.id) as like_count
   FROM forum_posts fp
@@ -141,7 +141,7 @@ async function buildSidebar(req) {
   let activeUsers = [];
   try {
     const [rows] = await pool.query(
-      `SELECT cu.id, cu.username, cu.real_name, cu.avatar, COUNT(fp.id) as post_count
+      `SELECT cu.id, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar, COUNT(fp.id) as post_count
        FROM casdoor_users cu
        JOIN forum_posts fp ON fp.user_id = cu.id AND fp.is_deleted = 0
        GROUP BY cu.id ORDER BY post_count DESC LIMIT 5`
@@ -319,7 +319,7 @@ router.get('/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const [rows] = await pool.query(
-      `SELECT fp.*, cu.username, cu.real_name, cu.avatar, b.name as board_name, b.slug as board_slug
+      `SELECT fp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar, b.name as board_name, b.slug as board_slug
        FROM forum_posts fp
        LEFT JOIN casdoor_users cu ON fp.user_id = cu.id
        LEFT JOIN forum_boards b ON fp.board_id = b.id
@@ -331,7 +331,7 @@ router.get('/:id', async (req, res) => {
     await pool.query('UPDATE forum_posts SET views = views + 1 WHERE id = ?', [id]);
 
     const [comments] = await pool.query(
-      `SELECT pc.*, cu.username, cu.real_name, cu.avatar FROM post_comments pc
+      `SELECT pc.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar FROM post_comments pc
        LEFT JOIN casdoor_users cu ON pc.user_id = cu.id
        WHERE pc.post_id = ? AND pc.is_deleted = 0
        ORDER BY pc.created_at ASC`,
@@ -461,7 +461,7 @@ router.post('/comment/:id', async (req, res) => {
 router.get('/comments/:id', async (req, res) => {
   try {
     const [comments] = await pool.query(
-      `SELECT pc.*, cu.username, cu.real_name, cu.avatar FROM post_comments pc
+      `SELECT pc.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar FROM post_comments pc
        LEFT JOIN casdoor_users cu ON pc.user_id = cu.id
        WHERE pc.post_id = ? AND pc.is_deleted = 0
        ORDER BY pc.created_at ASC`,
