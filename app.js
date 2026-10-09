@@ -27,6 +27,18 @@ app.use('/public', express.static(path.join(__dirname, '静态资源')));
 app.use('/public/webfonts', express.static(path.join(__dirname, '静态资源/font-awesome/webfonts')));
 // 用户上传的视频等文件：容器内 /app/uploads，由 docker-compose 挂宿主 ./uploads 持久化
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }));
+
+// 动态 HTML 一律不缓存。
+// 否则浏览器/边缘会把「游客版首页」缓存下来：用户登录成功后跳回首页，
+// 拿到的却是缓存里的未登录页面 —— 表现为右上角不显示昵称、按钮仍是「登录/注册」。
+app.use((req, res, next) => {
+  if (req.path.startsWith('/public') || req.path.startsWith('/uploads') || req.path.startsWith('/avatar')) {
+    return next();
+  }
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 

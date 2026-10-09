@@ -9,10 +9,16 @@
 	# Casdoor 部署在 /casdoor 子路径：
 	# 请求剥离 /casdoor 前缀后转发给后端（后端仍以根路径服务静态资源与 API）。
 	handle_path /casdoor* {
-		# Casdoor 前端产物是「原地打补丁」：文件名(hash)不变、内容会变。
-		# 若允许浏览器强缓存，旧文件会被长期复用（表现为登录页报
-		# `Unexpected token '<'`，即使服务端已修好）。故禁用强缓存、强制回源校验。
-		header Cache-Control "no-cache"
+		# 静态产物（js/css/字体/图片）的引用统一带 ?v=<补丁哈希>：
+		# 补丁脚本一改、或镜像里 Vite 产物的文件名一改，URL 就变，
+		# 因此可以安全地长期强缓存，避免登录时几十个分片反复跨洋回源校验（登录慢的主因）。
+		@asset path *.js *.css *.woff *.woff2 *.ttf *.otf *.svg *.png *.jpg *.jpeg *.gif *.ico *.map
+		header @asset Cache-Control "public, max-age=31536000, immutable"
+
+		# 其余（HTML 入口、/api/*）保持不缓存：避免复用旧产物、避免脏数据被缓存
+		@nonasset not path *.js *.css *.woff *.woff2 *.ttf *.otf *.svg *.png *.jpg *.jpeg *.gif *.ico *.map
+		header @nonasset Cache-Control "no-cache"
+
 		reverse_proxy casdoor:8000 {
 			header_up Host {host}
 			# 后端返回的相对路径重定向（如 Location: /login）需补回 /casdoor 前缀，
@@ -28,8 +34,9 @@
 	# 不占用 /assets，因此把 /assets/* 直接转发给 casdoor，
 	# 否则这些 chunk 会被 d5st 的认证中间件 302 到 /login，
 	# 进而在 OAuth 授权页加载时把 d5st 会话的 csrfState 反复覆盖，导致回调 CSRF 校验必失败。
+	# 这些 chunk 同样带 ?v= 版本号，可强缓存。
 	handle /assets/* {
-		header Cache-Control "no-cache"
+		header Cache-Control "public, max-age=31536000, immutable"
 		reverse_proxy casdoor:8000 {
 			header_up Host {host}
 		}

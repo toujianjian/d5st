@@ -261,7 +261,14 @@ router.get('/auth/callback', async (req, res) => {
 
     const nextUrl = req.session.nextUrl || '/';
     req.session.nextUrl = null;
-    res.redirect(nextUrl);
+    // 登录成功后的跳转附带一次性参数：避免浏览器 / CDN 边缘把「登录前缓存的游客版首页」
+    // 复用到登录后（表现为跳回首页右上角仍显示「登录/注册」、按钮不对）。
+    // 带 connect.sid 的请求本身不会被缓存，所以这里只是绕开缓存键。
+    const sep = nextUrl.includes('?') ? '&' : '?';
+    const target = nextUrl.includes('#')
+      ? nextUrl.replace('#', `${sep}_loggedin=${Date.now()}#`)
+      : `${nextUrl}${sep}_loggedin=${Date.now()}`;
+    res.redirect(target);
   } catch (err) {
     ERR(`Casdoor 回调处理失败: ${err.message}`);
     res.redirect('/login?error=auth_error');
