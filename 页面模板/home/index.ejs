@@ -163,6 +163,13 @@
     </main>
 
     <div class="d5st-content">
+      <% if (typeof isGuest !== 'undefined' && isGuest) { %>
+      <div class="guest-notice" style="display:flex;align-items:center;gap:8px;margin:0 0 18px;padding:10px 14px;border-radius:12px;background:rgba(211,47,47,.08);border:1px solid rgba(211,47,47,.22);color:var(--primary-dark);font-size:13px;">
+        <i class="fas fa-lock"></i>
+        <span>未登录仅显示<b>精选</b>帖子和视频。<a href="/login" style="color:var(--primary);font-weight:600;">登录</a>后可查看全部内容</span>
+      </div>
+      <% } %>
+
       <!-- 数据统计条（首屏常显，避免首屏下方空白造成"没有内容"的错觉） -->
       <section class="d5st-stats">
         <div class="d5st-stat"><span class="num" data-count="<%= (typeof stats !== 'undefined' && stats) ? stats.posts : 0 %>">0</span><span class="lbl">帖子</span></div>

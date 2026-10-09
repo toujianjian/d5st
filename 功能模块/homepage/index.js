@@ -25,18 +25,21 @@ router.get('/', async (req, res) => {
   try {
     const [banners] = await pool.query('SELECT * FROM home_banners WHERE is_active = 1 ORDER BY sort_order ASC');
     const [links] = await pool.query('SELECT * FROM home_links WHERE is_active = 1 ORDER BY sort_order ASC');
+    // 未登录访客只能看精选：帖子=置顶/精华，视频=后台「推荐」
+    const isGuest = !req.session.user;
+
     const [posts] = await pool.query(
       `SELECT fp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar,
         (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = fp.id AND pc.is_deleted = 0) as comment_count
        FROM forum_posts fp
        LEFT JOIN casdoor_users cu ON fp.user_id = cu.id
-       WHERE fp.is_deleted = 0
+       WHERE fp.is_deleted = 0 ${isGuest ? 'AND (fp.is_top = 1 OR fp.is_hot = 1)' : ''}
        ORDER BY fp.is_top DESC, fp.created_at DESC LIMIT 6`
     );
 
     // 首页视频预览
     const videos = await safeQuery(
-      `SELECT * FROM video_posts WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT 4`
+      `SELECT * FROM video_posts WHERE is_deleted = 0 ${isGuest ? 'AND is_recommended = 1' : ''} ORDER BY created_at DESC LIMIT 4`
     );
 
     const [settings] = await pool.query('SELECT * FROM system_settings');
@@ -63,6 +66,7 @@ router.get('/', async (req, res) => {
       })),
       videos,
       stats,
+      isGuest,
       siteSettings
     });
   } catch (err) {

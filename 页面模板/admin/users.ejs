@@ -1,0 +1,165 @@
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-logo">
+      <div class="admin-sidebar-logo-icon"><i class="fas fa-shield-halved"></i></div>
+      <div class="admin-sidebar-logo-text">
+        <div class="admin-sidebar-title">D5ST 管理后台</div>
+        <div class="admin-sidebar-sub">Admin Console</div>
+      </div>
+    </div>
+    <nav class="admin-nav">
+      <div class="admin-nav-group">概览</div>
+      <a href="/admin" class="admin-nav-item"><i class="fas fa-tachometer-alt"></i> 仪表盘</a>
+
+      <div class="admin-nav-group">用户</div>
+      <a href="/admin/users" class="admin-nav-item active"><i class="fas fa-users"></i> 用户管理</a>
+
+      <div class="admin-nav-group">内容</div>
+      <a href="/admin/forum" class="admin-nav-item"><i class="fas fa-file-alt"></i> 帖子管理</a>
+      <a href="/admin/comments" class="admin-nav-item"><i class="fas fa-comments"></i> 评论管理</a>
+      <a href="/admin/reports" class="admin-nav-item"><i class="fas fa-exclamation-triangle"></i> 举报</a>
+      <a href="/admin/videos" class="admin-nav-item"><i class="fas fa-play-circle"></i> 视频管理</a>
+      <a href="/admin/boards" class="admin-nav-item"><i class="fas fa-layer-group"></i> 版块管理</a>
+
+      <div class="admin-nav-group">互动</div>
+      <a href="/admin/notifications" class="admin-nav-item"><i class="fas fa-bell"></i> 通知</a>
+      <a href="/admin/popups" class="admin-nav-item"><i class="fas fa-bullhorn"></i> 弹窗</a>
+
+      <div class="admin-nav-group">首页</div>
+      <a href="/admin/home-banners" class="admin-nav-item"><i class="fas fa-image"></i> 首页配图</a>
+      <a href="/admin/home-links" class="admin-nav-item"><i class="fas fa-link"></i> 首页链接</a>
+
+      <div class="admin-nav-group">系统</div>
+      <a href="/admin/path-redirects" class="admin-nav-item"><i class="fas fa-random"></i> 路径重定向</a>
+      <a href="/admin/export-users" class="admin-nav-item"><i class="fas fa-file-export"></i> 导出用户</a>
+      <a href="/admin/export-all" class="admin-nav-item"><i class="fas fa-database"></i> 导出全部数据</a>
+      <a href="/admin/recycle-bin" class="admin-nav-item"><i class="fas fa-trash"></i> 回收站</a>
+      <a href="/admin/settings" class="admin-nav-item"><i class="fas fa-cog"></i> 设置</a>
+
+      <div class="admin-nav-group">内容安全</div>
+      <a href="/admin/sensitive-words" class="admin-nav-item"><i class="fas fa-ban"></i> 违禁词</a>
+      <a href="/admin/sensitive-logs" class="admin-nav-item"><i class="fas fa-history"></i> 拦截记录</a>
+    </nav>
+  </aside>
+
+  <div class="admin-content">
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-users"></i> 用户管理</div>
+        <div class="admin-header-sub">昵称 / 姓名 / 头像 / 年级班级学号 / 积分 —— 这些字段 Casdoor 没有，只能在这里维护</div>
+      </div>
+      <a href="/" class="admin-header-action"><i class="fas fa-external-link-alt"></i> 回到前台</a>
+    </div>
+
+    <% if (notice) { %>
+    <div class="admin-status-card">
+      <div class="admin-status-dot"></div>
+      <div><div class="admin-status-title"><%= notice %></div></div>
+    </div>
+    <% } %>
+    <% if (errorMsg) { %>
+    <div class="admin-status-card">
+      <div class="admin-status-dot" style="background:#f44336;box-shadow:0 0 0 4px rgba(244,67,54,.15)"></div>
+      <div><div class="admin-status-title"><%= errorMsg %></div></div>
+    </div>
+    <% } %>
+
+    <div class="card">
+      <form method="GET" action="/admin/users" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px;">
+        <input type="text" name="q" value="<%= q %>" class="form-input" style="max-width:300px;" placeholder="搜索 用户名 / 昵称 / 姓名 / 学号" />
+        <button type="submit" class="btn btn-primary">搜索</button>
+        <% if (q) { %><a href="/admin/users" class="btn btn-ghost">清空</a><% } %>
+        <span style="margin-left:auto;font-size:13px;color:var(--text-muted);">共 <%= total %> 人 · 第 <%= page %> / <%= totalPages %> 页</span>
+      </form>
+
+      <div style="overflow-x:auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="min-width:130px;">头像</th>
+              <th style="min-width:120px;">ID / 账号</th>
+              <th style="min-width:170px;">昵称 / 姓名</th>
+              <th style="min-width:150px;">年级 / 班级 / 学号</th>
+              <th style="min-width:80px;">积分</th>
+              <th style="min-width:70px;">管理员</th>
+              <th style="min-width:110px;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u) { %>
+            <tr id="u<%= u.id %>">
+              <td>
+                <%# 头像表单：上传 / 删除（只有文件控件在这两个 form 里） %>
+                <form id="af<%= u.id %>" method="POST" action="/admin/users/avatar/<%= u.id %>" enctype="multipart/form-data"></form>
+                <form id="pf<%= u.id %>" method="POST" action="/admin/users/edit/<%= u.id %>"></form>
+
+                <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">
+                  <div style="width:48px;height:48px;border-radius:50%;overflow:hidden;position:relative;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;">
+                    <% if (u.avatar) { %>
+                    <img src="<%= u.avatar %>" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'" />
+                    <% } %>
+                    <%= (u.nickname || u.real_name || u.username || 'U').charAt(0) %>
+                  </div>
+                  <input form="af<%= u.id %>" type="file" name="avatar" accept="image/jpeg,image/png,image/webp,image/gif" style="width:118px;font-size:11px;" />
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button form="af<%= u.id %>" type="submit" class="btn btn-primary btn-sm">上传</button>
+                    <% if (u.has_avatar) { %>
+                    <button type="submit" form="df<%= u.id %>" class="btn btn-danger btn-sm" onclick="return confirm('确定删除该用户的头像？')">删除</button>
+                    <% } %>
+                  </div>
+                  <% if (u.has_avatar) { %>
+                  <form id="df<%= u.id %>" method="POST" action="/admin/users/avatar/<%= u.id %>/delete"></form>
+                  <% } %>
+                </div>
+              </td>
+              <td>
+                <div style="font-weight:600;">#<%= u.id %></div>
+                <div style="font-size:12px;color:var(--text-muted);">@<%= u.username %></div>
+                <div style="font-size:12px;color:var(--text-muted);">发帖 <%= u.post_count || 0 %></div>
+              </td>
+              <td>
+                <input form="pf<%= u.id %>" type="text" name="nickname" value="<%= u.nickname || '' %>" class="form-input" style="margin-bottom:6px;" placeholder="昵称" maxlength="50" />
+                <input form="pf<%= u.id %>" type="text" name="real_name" value="<%= u.real_name || '' %>" class="form-input" placeholder="姓名" maxlength="50" />
+              </td>
+              <td>
+                <div style="display:flex;gap:6px;margin-bottom:6px;">
+                  <input form="pf<%= u.id %>" type="text" name="grade" value="<%= u.grade || '' %>" class="form-input" style="width:60px;" placeholder="年级" maxlength="20" />
+                  <input form="pf<%= u.id %>" type="text" name="class_name" value="<%= u.class_name || '' %>" class="form-input" style="width:60px;" placeholder="班级" maxlength="20" />
+                </div>
+                <input form="pf<%= u.id %>" type="text" name="student_no" value="<%= u.student_no || '' %>" class="form-input" placeholder="学号" maxlength="20" />
+              </td>
+              <td>
+                <input form="pf<%= u.id %>" type="number" name="points" value="<%= u.points || 0 %>" class="form-input" style="width:78px;" min="0" step="1" />
+              </td>
+              <td>
+                <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                  <input form="pf<%= u.id %>" type="checkbox" name="is_admin" value="1" <%= u.is_admin ? 'checked' : '' %> style="width:auto;accent-color:var(--primary);" />
+                  <%= u.is_admin ? '是' : '否' %>
+                </label>
+              </td>
+              <td>
+                <button form="pf<%= u.id %>" type="submit" class="btn btn-primary btn-sm">保存</button>
+                <% if (u.id === (currentUser && currentUser.id)) { %>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">（当前账号）</div>
+                <% } %>
+              </td>
+            </tr>
+            <% }); %>
+            <% if (users.length === 0) { %>
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:36px;">没有匹配的用户</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+
+      <% if (totalPages > 1) { %>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap;">
+        <% for (var p = 1; p <= totalPages; p++) { %>
+        <a href="/admin/users?page=<%= p %><%= q ? '&q=' + encodeURIComponent(q) : '' %>"
+           class="btn btn-sm <%= p === page ? 'btn-primary' : 'btn-ghost' %>"><%= p %></a>
+        <% } %>
+      </div>
+      <% } %>
+    </div>
+  </div>
+</div>

@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../../配置/db');
 const casdoor = require('../../配置/casdoor');
 const { reconcileCasdoorUsers } = require('../../配置/user-service');
+const { avatarUpload } = require('../../配置/upload');
 
 function requireAdmin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -784,6 +785,156 @@ router.get('/export-all', async (req, res) => {
   } catch (err) {
     console.error('导出全部数据失败:', err.message);
     res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+// ============================================================
+// 用户管理
+// ------------------------------------------------------------
+// 昵称 / 头像 / 年级 / 班级 / 学号 / 积分 / 管理员 —— 这些字段 Casdoor 里
+// 没有对应项（Casdoor 只认 username、displayName、avatar、email、phone），
+// 只能在本站维护。此前后台完全没有入口，管理员改不了，只能让用户自己去个人中心改。
+// ============================================================
+const USER_COLUMNS = 'id, username, nickname, real_name, avatar, email, phone, grade, class_name, student_no, points, is_admin, created_at';
+
+router.get('/users', async (req, res) => {
+  try {
+    const kw = String(req.query.q || '').trim();
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const PAGE_SIZE = 50;
+    const offset = (page - 1) * PAGE_SIZE;
+
+    let where = '';
+    const params = [];
+    if (kw) {
+      where = 'WHERE username LIKE ? OR nickname LIKE ? OR real_name LIKE ? OR student_no LIKE ?';
+      const like = '%' + kw + '%';
+      params.push(like, like, like, like);
+    }
+
+    const [countRows] = await pool.query(`SELECT COUNT(*) as cnt FROM casdoor_users ${where}`, params);
+    const total = (countRows[0] && countRows[0].cnt) || 0;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    const [users] = await pool.query(
+      `SELECT ${USER_COLUMNS},
+        (SELECT COUNT(*) FROM forum_posts fp WHERE fp.user_id = casdoor_users.id AND fp.is_deleted = 0) as post_count
+       FROM casdoor_users ${where}
+       ORDER BY id DESC LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
+      params
+    );
+
+    // 哪些用户在本站传过头像（user_avatars）
+    let avatarIds = new Set();
+    try {
+      const [rows] = await pool.query('SELECT user_id FROM user_avatars');
+      avatarIds = new Set(rows.map(r => r.user_id));
+    } catch (e) { /* 表可能不存在，忽略 */ }
+
+    res.render('admin/users', {
+      title: '用户管理',
+      users: users.map(u => ({ ...u, has_avatar: avatarIds.has(u.id) })),
+      q: kw,
+      page, totalPages, total,
+      notice: req.query.ok ? String(req.query.ok) : null,
+      errorMsg: req.query.error ? String(req.query.error) : null
+    });
+  } catch (err) {
+    console.error('用户管理加载失败:', err);
+    res.status(500).render('errors/500', { title: '加载失败' });
+  }
+});
+
+// 保存管理员修改的用户资料（本地字段）
+router.post('/users/edit/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.redirect('/admin/users?error=' + encodeURIComponent('参数错误'));
+
+  const b = req.body || {};
+  const nickname = String(b.nickname || '').trim() || null;
+  const realName = String(b.real_name || '').trim() || null;
+  const grade = String(b.grade || '').trim() || null;
+  const className = String(b.class_name || '').trim() || null;
+  const studentNo = String(b.student_no || '').trim() || null;
+  const points = Math.max(0, parseInt(b.points, 10) || 0);
+  let adminFlag = b.is_admin ? 1 : 0;
+
+  try {
+    // 先确认用户存在：否则 UPDATE 影响 0 行却仍提示「已保存」，会误导管理员
+    // （不能用 affectedRows 判断 —— 数据没变化时 MySQL 同样返回 0）
+    const [exists] = await pool.query('SELECT id FROM casdoor_users WHERE id = ? LIMIT 1', [id]);
+    if (!exists || exists.length === 0) {
+      return res.redirect('/admin/users?error=' + encodeURIComponent('用户不存在（id ' + id + '）'));
+    }
+
+    // 防呆：不能把最后一个管理员降权（否则没人能进后台了）
+    if (adminFlag === 0) {
+      const [cntRows] = await pool.query('SELECT COUNT(*) as cnt FROM casdoor_users WHERE is_admin = 1');
+      if (((cntRows[0] && cntRows[0].cnt) || 0) <= 1) adminFlag = 1;
+    }
+
+    await pool.query(
+      `UPDATE casdoor_users
+       SET nickname = ?, real_name = ?, grade = ?, class_name = ?, student_no = ?, points = ?, is_admin = ?
+       WHERE id = ?`,
+      [nickname, realName, grade, className, studentNo, points, adminFlag, id]
+    );
+
+    // 改到的是当前登录管理员自己时，同步刷新 session，避免顶栏还是旧值
+    if (req.session.user && req.session.user.id === id) {
+      req.session.user.nickname = nickname;
+      req.session.user.real_name = realName || req.session.user.username;
+      req.session.user.is_admin = adminFlag;
+    }
+
+    res.redirect('/admin/users?ok=' + encodeURIComponent('已保存') + '#u' + id);
+  } catch (err) {
+    console.error('用户资料保存失败:', err);
+    res.redirect('/admin/users?error=' + encodeURIComponent('保存失败') + '#u' + id);
+  }
+});
+
+// 管理员代传头像（与个人中心同一套：存 user_avatars 表 + avatar 指向本地输出地址）
+router.post('/users/avatar/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.redirect('/admin/users?error=' + encodeURIComponent('参数错误'));
+
+  avatarUpload.single('avatar')(req, res, async (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? '头像不能超过 3MB' : (err.message || '上传失败');
+      return res.redirect('/admin/users?error=' + encodeURIComponent(msg) + '#u' + id);
+    }
+    if (!req.file) {
+      return res.redirect('/admin/users?error=' + encodeURIComponent('请先选择图片文件') + '#u' + id);
+    }
+    try {
+      await pool.query(
+        `INSERT INTO user_avatars (user_id, mime, data) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE mime = VALUES(mime), data = VALUES(data), updated_at = CURRENT_TIMESTAMP`,
+        [id, req.file.mimetype, req.file.buffer]
+      );
+      await pool.query('UPDATE casdoor_users SET avatar = ? WHERE id = ?', ['/avatar/' + id, id]);
+      if (req.session.user && req.session.user.id === id) req.session.user.avatar = '/avatar/' + id;
+      res.redirect('/admin/users?ok=' + encodeURIComponent('头像已更新') + '#u' + id);
+    } catch (e) {
+      console.error('管理员保存头像失败:', e);
+      res.redirect('/admin/users?error=' + encodeURIComponent('头像保存失败') + '#u' + id);
+    }
+  });
+});
+
+// 删除用户的本地头像（只清本站上传的，不动 Casdoor 自带的外链头像）
+router.post('/users/avatar/:id/delete', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.redirect('/admin/users?error=' + encodeURIComponent('参数错误'));
+  try {
+    await pool.query('DELETE FROM user_avatars WHERE user_id = ?', [id]);
+    await pool.query("UPDATE casdoor_users SET avatar = NULL WHERE id = ? AND avatar LIKE '/avatar/%'", [id]);
+    if (req.session.user && req.session.user.id === id) req.session.user.avatar = null;
+    res.redirect('/admin/users?ok=' + encodeURIComponent('头像已删除') + '#u' + id);
+  } catch (e) {
+    console.error('删除头像失败:', e);
+    res.redirect('/admin/users?error=' + encodeURIComponent('删除失败') + '#u' + id);
   }
 });
 

@@ -76,9 +76,13 @@ async function getBoards() {
 }
 
 // 构造帖子查询条件
-function buildWhere({ boardId, category, tag }) {
+function buildWhere({ boardId, category, tag, onlyFeatured }) {
   let where = 'WHERE fp.is_deleted = 0';
   const params = [];
+  // 未登录访客只能看「精选」= 后台标记的置顶 / 精华帖
+  if (onlyFeatured) {
+    where += ' AND (fp.is_top = 1 OR fp.is_hot = 1)';
+  }
   if (boardId) {
     where += ' AND fp.board_id = ?';
     params.push(boardId);
@@ -183,7 +187,9 @@ router.get('/', async (req, res) => {
       }
     }
 
-    const { where, params } = buildWhere({ boardId, category, tag });
+    // 未登录访客只看精选（置顶/精华）
+    const isGuest = !req.session.user;
+    const { where, params } = buildWhere({ boardId, category, tag, onlyFeatured: isGuest });
 
     const [totalRows] = await pool.query(
       `SELECT COUNT(*) as cnt FROM forum_posts fp ${where}`, params
@@ -208,6 +214,7 @@ router.get('/', async (req, res) => {
       activeTag: tag,
       page, totalPages, total,
       postTypes: POST_TYPES,
+      isGuest,
       ...sidebar
     });
   } catch (err) {
@@ -328,6 +335,12 @@ router.get('/:id', async (req, res) => {
     );
     if (!rows || rows.length === 0) return res.status(404).render('errors/404', { title: '帖子不存在' });
     const post = rows[0];
+
+    // 未登录访客只能看精选帖（后台标记的置顶/精华），其余引导登录
+    if (!req.session.user && !post.is_top && !post.is_hot) {
+      return res.redirect('/login?next=' + encodeURIComponent('/forum/' + id));
+    }
+
     await pool.query('UPDATE forum_posts SET views = views + 1 WHERE id = ?', [id]);
 
     const [comments] = await pool.query(

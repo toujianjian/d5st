@@ -68,6 +68,11 @@ router.get('/', async (req, res) => {
       where += ' AND vp.category = ?';
       params.push(category);
     }
+    // 未登录访客只能看精选（后台「推荐」）
+    const isGuest = !req.session.user;
+    if (isGuest) {
+      where += ' AND vp.is_recommended = 1';
+    }
 
     const [totalRows] = await pool.query(
       `SELECT COUNT(*) as cnt FROM video_posts vp ${where}`, params
@@ -100,6 +105,7 @@ router.get('/', async (req, res) => {
       categoryStats,
       categories: CATEGORIES,
       activeCategory: category || 'all',
+      isGuest,
       page, totalPages, total
     });
   } catch (err) {
@@ -176,6 +182,12 @@ router.get('/:id', async (req, res) => {
     );
     if (!rows || rows.length === 0) return res.status(404).render('errors/404', { title: '视频不存在' });
     const video = rows[0];
+
+    // 未登录访客只能看精选视频（后台「推荐」），其余引导登录
+    if (!req.session.user && !video.is_recommended) {
+      return res.redirect('/login?next=' + encodeURIComponent('/videos/' + id));
+    }
+
     await pool.query('UPDATE video_posts SET views = views + 1 WHERE id = ?', [id]);
 
     // 相关推荐（同分类 + 兜底最新）
