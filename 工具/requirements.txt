@@ -1,0 +1,4 @@
+# 静态资源构建脚本依赖（仅开发/构建时用，不影响运行时）
+# 安装：python -m pip install -r 工具/requirements.txt
+fonttools>=4.40
+brotli>=1.0

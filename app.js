@@ -20,11 +20,24 @@ app.use(expressLayouts);
 // 模板里可直接调用：formatPoints(1200) → '1.2k'（见 配置/level.js）
 app.locals.formatPoints = level.formatPoints;
 
-app.use('/public', express.static(path.join(__dirname, '静态资源')));
-// Font Awesome 的 all.min.css 内部以 ../webfonts/ 引用字体（相对 CSS 自身），
+// 带内容指纹的静态资源（如 bundle-app.b011993136.css、fa-solid-900.0b172f4669.woff2）
+// 内容一变文件名就变，因此可以安全地长缓存一年；
+// 其余未指纹化的资源保持 1 小时，改了图片/样式也能较快生效。
+// 指纹由 _fa_build.py 生成，命名约定：<名字>.<10位十六进制>.<扩展名>
+const FINGERPRINTED_ASSET = /\.[0-9a-f]{10}\.(?:css|js|woff2?|ttf|otf|eot|png|jpe?g|gif|svg|webp|ico)$/i;
+function staticCacheHeaders(res, filePath) {
+  if (FINGERPRINTED_ASSET.test(filePath)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  } else {
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+  }
+}
+
+app.use('/public', express.static(path.join(__dirname, '静态资源'), { setHeaders: staticCacheHeaders }));
+// Font Awesome 的 CSS 内部以 ../webfonts/ 引用字体（相对 CSS 自身），
 // 解析后是 /public/webfonts/，但字体实际放在 /public/font-awesome/webfonts/ 下，
 // 会导致所有图标 404。这里补一条映射，不改动原有目录结构。
-app.use('/public/webfonts', express.static(path.join(__dirname, '静态资源/font-awesome/webfonts')));
+app.use('/public/webfonts', express.static(path.join(__dirname, '静态资源/font-awesome/webfonts'), { setHeaders: staticCacheHeaders }));
 // 用户上传的视频等文件：容器内 /app/uploads，由 docker-compose 挂宿主 ./uploads 持久化
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }));
 
