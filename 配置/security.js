@@ -32,7 +32,6 @@ function securityHeaders(req, res, next) {
   res.setHeader('X-XSS-Protection', '0'); // 旧版浏览器 XSS 过滤器本身可被利用，显式关闭
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
 
-  const isDev = process.env.NODE_ENV !== 'production';
   // 上传的视频走 blob:/self，Casdoor 子路径同源，故 script-src 保留 'unsafe-inline'
   const csp = [
     "default-src 'self'",
@@ -50,9 +49,12 @@ function securityHeaders(req, res, next) {
   ].join('; ');
   res.setHeader('Content-Security-Policy', csp);
 
-  // 生产环境 + HTTPS 时启用 HSTS（用 APP_URL 判断是否 https，避免本地 http 调试被锁死）
-  const appUrl = process.env.APP_URL || '';
-  if (!isDev && appUrl.startsWith('https://')) {
+  // HSTS 默认**关闭**，必须显式 ENABLE_HSTS=1 才发送。
+  // 原因：HSTS 一旦下发，浏览器会在 max-age 内强制 HTTPS 且不允许跳过证书警告。
+  // 若站点同时存在「证书不覆盖的域名」（例如 cert 只签了 s1.example.com，
+  // 但 server_name 里还有 www.example.com），开启 HSTS 会把访问那些域名的用户
+  // 永久锁在证书错误页。这类判断必须由部署者确认后再打开。
+  if (process.env.ENABLE_HSTS === '1') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   next();
@@ -88,6 +90,17 @@ function timingSafeEqualStr(a, b) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
+// 判断本次请求是否真的走 HTTPS。
+// 不用 APP_URL 判断：站点可能同时通过域名(HTTPS)和 内网/IP(HTTP) 访问，
+// 若一律按 APP_URL 打 secure，走 HTTP 的客户端根本存不下 cookie，
+// 表现为「页面能打开，但任何表单提交都 403」。
+// trust proxy 已开启，req.secure 会读取 X-Forwarded-Proto。
+function isSecureRequest(req) {
+  if (req.secure) return true;
+  const proto = String(req.get('x-forwarded-proto') || '').split(',')[0].trim().toLowerCase();
+  return proto === 'https';
+}
+
 // 签发/续期 token：每次请求保证 cookie 存在（过期自动补）
 function ensureCsrfToken(req, res) {
   const cookies = parseCookies(req.headers.cookie);
@@ -99,7 +112,7 @@ function ensureCsrfToken(req, res) {
       sameSite: 'lax',
       path: '/',
       maxAge: 1000 * 60 * 60 * 24 * 7,
-      secure: (process.env.APP_URL || '').startsWith('https://')
+      secure: isSecureRequest(req)
     });
   }
   req.csrfToken = token;

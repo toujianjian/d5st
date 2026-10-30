@@ -328,7 +328,7 @@ docker compose run --rm -p 35555:35555 app npm run dev
 | 防护 | 实现 | 说明 |
 |------|------|------|
 | CSRF | 双提交 Cookie（`csrf_token`） | 所有写操作必须带 `X-CSRF-Token` 头或 `_csrf` 字段；前端 `main.js` 自动回填，**新增表单/接口无需手工处理** |
-| 安全响应头 | CSP / `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` | HTTPS 部署时自动加 HSTS |
+| 安全响应头 | CSP / `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` | HSTS 默认关闭，需显式 `ENABLE_HSTS=1`（证书未覆盖全部域名时开启会把用户锁在证书错误页） |
 | 限流 | 内存滑动窗口 | 登录验证码 3 次/分、发帖 10 次/10 分、评论 20 次/分、私信 30 次/分、上传 5 次/30 分、后台 300 次/分 |
 | 参数校验 | `requireId()` | 路由 `:id` 必须是正整数，`1abc` / `1e3` / `0x10` / `-1` 一律 404，避免类型混淆与慢查询 |
 | 开放重定向 | `safeRedirect()` | `/login?next=`、`/auth/login?next=` 只接受站内相对路径，`//evil.com`、`javascript:` 全部丢弃 |
