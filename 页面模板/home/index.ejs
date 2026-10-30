@@ -29,20 +29,58 @@
   .d5st-cv-btn.prev { left: 14px; }
   .d5st-cv-btn.next { right: 14px; }
   .d5st-dots { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; gap: 8px; justify-content: center; }
+  /* 无障碍：触控目标至少 24×24（WCAG 2.5.8 / Lighthouse target-size）。
+     视觉圆点仍是 9px，用 padding + background-clip 把可点区域撑到 25px。 */
   .d5st-dot {
-    width: 9px; height: 9px; padding: 0; border: none; border-radius: 50%; cursor: pointer;
-    background: rgba(255,255,255,.65); box-shadow: 0 0 0 1px rgba(0,0,0,.18); transition: all .25s;
+    width: 9px; height: 9px; padding: 8px; box-sizing: content-box;
+    background-color: rgba(255,255,255,.65); background-clip: content-box;
+    border: none; border-radius: 50%; cursor: pointer;
+    /* 用负偏移 outline 画视觉圆环（落在 content box 边缘），
+       避免 box-shadow 按 25px 外框画成大圆 */
+    outline: 1px solid rgba(0,0,0,.18); outline-offset: -8px;
+    transition: all .25s;
+    -webkit-tap-highlight-color: transparent;
   }
-  .d5st-dot.is-active { width: 22px; border-radius: 999px; background: #fff; }
+  .d5st-dot.is-active {
+    width: 22px; border-radius: 999px;
+    background-color: #fff;
+  }
+
+  /* CLS 治理：FontAwesome 用 font-display:block，字体到达前图标宽度为 0，
+     到达后撑开会把按钮行顶高（Lighthouse 实测 CLS 0.047 全来自这里）。
+     给图标预留 1em 固定宽度，字体加载前后布局不变。 */
+  .mobile-auth-row .ma-btn i,
+  .d5st-cv-btn i,
+  .d5st-head i,
+  .d5st-meta i,
+  .d5st-link-icon i {
+    display: inline-block;
+    width: 1em;
+    flex: none;
+    text-align: center;
+  }
   @media (max-width: 720px) {
     .d5st-cv-btn { width: 36px; height: 36px; }
     .d5st-slide-body { padding: 14px 16px 18px; }
   }
 
+  /* 性能：只对「页面最底部、首屏绝不可见」的区块启用 content-visibility。
+     整段 .d5st-block 都启用会导致占位高度(contain-intrinsic-size)与真实高度
+     不一致，下面内容在渲染瞬间被顶动 —— 实测 CLS 会从 0 变成 0.047。
+     只保留最后一个区块，既省一点布局开销，又不产生可见位移。 */
+  .d5st-content > section.d5st-block:last-of-type {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 420px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .d5st-track { transition: none !important; }
+    .reveal-on-scroll { opacity: 1 !important; transform: none !important; }
+  }
+
   /* ===== 移动端：移除耗算力的 3D 首屏与自定义光标/线场背景 ===== */
   @media (max-width: 1024px) {
     .pdaim-line-field,
-    main.hero,
+    .hero,
     .hero-stage,
     .scroll-hint,
     .cursor-orb,
@@ -65,7 +103,11 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       padding: 0 16px; border-radius: 999px;
       text-decoration: none; font-size: 15px; font-weight: 600;
-      background: rgba(255,255,255,.72); color: var(--text-dark);
+      /* 无障碍：颜色写死不跟随主题变量。
+         暗色主题下 --text-dark 会被改成浅色(#e0e6ed)，配半透明白底
+         实际对比度只有 1.96:1（Lighthouse 判定不合格）。
+         这里用不透明白底 + 深色文字，对比度 ≈ 13:1。 */
+      background: #ffffff; color: #2d2d2d;
       border: 1px solid rgba(211,47,47,.25);
       -webkit-tap-highlight-color: transparent;
     }
@@ -148,7 +190,8 @@
   </header>
 
   <div class="pdaim-route-root" data-pdaim-route-root>
-    <main class="hero route-page" data-route-page="overview" data-route-index="0" id="about">
+    <%# 用 div 而非 main：landmark 由 layout-home.ejs 统一提供（此处移动端会被隐藏） %>
+    <div class="hero route-page" data-route-page="overview" data-route-index="0" id="about">
       <section class="hero-stage" aria-labelledby="heroTitle">
         <div class="hero-copy hero-copy-base js-tilt">
           <p class="eyebrow">校园社区 · 实时连接 · 极致体验</p>
@@ -160,7 +203,7 @@
         </div>
       </section>
       <p class="scroll-hint">探索极致的响应速度 · 向下滚动解锁更多</p>
-    </main>
+    </div>
 
     <div class="d5st-content">
       <% if (typeof isGuest !== 'undefined' && isGuest) { %>

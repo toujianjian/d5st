@@ -550,6 +550,10 @@
      只保留主题切换、汉堡菜单、滚动揭示与数字统计，显著降低手机 CPU 占用。
      （注意：汉堡菜单与主题切换在本文件下方绑定，不能整体禁用本脚本。） */
   const liteMode = window.matchMedia("(max-width: 1024px), (pointer: coarse)").matches;
+  // 尊重系统「减少动态效果」：开启时只保留静态外观，不跑逐帧动画
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // 首屏必需的最小初始化：同步执行，保证布局不闪
   setPointerVars(cursorX, cursorY);
   setCursorScale(0.035);
   cursorReveal && cursorReveal.style.setProperty("--cursor-opacity", "0");
@@ -557,9 +561,13 @@
   setPageCursorAvailability();
   syncDocWidth();
   updateRevealItems();
-  updateBackgroundTransition();
-  startCountUp();
-  if (!liteMode) {
+
+  // 其余为装饰性/可延后工作：放到首帧之后执行，
+  // 避免与首次绘制抢主线程（这是 TBT 偏高的主因）。
+  function startDeferredWork() {
+    updateBackgroundTransition();
+    startCountUp();
+    if (liteMode || reduceMotion) return;
     startFpsMeter();
     startLineField();
     updateScrollCursorEffect();
@@ -567,5 +575,11 @@
       cursorLoopStarted = true;
       requestAnimationFrame(animateCursor);
     }
+  }
+
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(startDeferredWork, { timeout: 1200 });
+  } else {
+    setTimeout(startDeferredWork, 120);
   }
 })();

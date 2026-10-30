@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
+const { requireId, rateLimit, cleanShort } = require('../../配置/security');
 
 // MySQL 用 INSERT IGNORE，SQLite 用 INSERT OR IGNORE
 const IGNORE = pool.isMysql ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
@@ -173,7 +174,7 @@ router.get('/status/:id', requireLogin, async (req, res) => {
 });
 
 // 发送好友请求
-router.post('/request/:id', requireLogin, async (req, res) => {
+router.post('/request/:id', requireLogin, requireId('id'), rateLimit({ name: 'friend-req', window: 10 * 60 * 1000, max: 20, keyBy: 'user' }), async (req, res) => {
   const me = req.session.user.id;
   const target = parseInt(req.params.id, 10);
   if (isNaN(target) || target === me) return res.status(400).json({ error: '非法操作' });
@@ -192,7 +193,7 @@ router.post('/request/:id', requireLogin, async (req, res) => {
       return res.json({ status: 'friend' });
     }
 
-    const msg = (req.body && req.body.message ? String(req.body.message) : '').slice(0, 255) || null;
+    const msg = cleanShort(req.body && req.body.message, 255) || null;
     const [existing] = await pool.query(
       'SELECT id, status FROM friend_requests WHERE from_user_id = ? AND to_user_id = ?',
       [me, target]
@@ -217,7 +218,7 @@ router.post('/request/:id', requireLogin, async (req, res) => {
 });
 
 // 接受好友请求
-router.post('/accept/:id', requireLogin, async (req, res) => {
+router.post('/accept/:id', requireLogin, requireId('id'), async (req, res) => {
   const me = req.session.user.id;
   try {
     const r = await acceptRequest(req.params.id, me);
@@ -230,7 +231,7 @@ router.post('/accept/:id', requireLogin, async (req, res) => {
 });
 
 // 拒绝好友请求
-router.post('/reject/:id', requireLogin, async (req, res) => {
+router.post('/reject/:id', requireLogin, requireId('id'), async (req, res) => {
   const me = req.session.user.id;
   try {
     const [rows] = await pool.query(
@@ -249,7 +250,7 @@ router.post('/reject/:id', requireLogin, async (req, res) => {
 });
 
 // 删除好友（双向解除）
-router.post('/remove/:id', requireLogin, async (req, res) => {
+router.post('/remove/:id', requireLogin, requireId('id'), async (req, res) => {
   const me = req.session.user.id;
   const target = parseInt(req.params.id, 10);
   if (isNaN(target)) return res.status(400).json({ error: '非法操作' });

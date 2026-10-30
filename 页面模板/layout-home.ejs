@@ -92,7 +92,13 @@
     </style>
   </head>
   <body>
+    <%# 无障碍：Lighthouse 要求文档有唯一 main landmark。
+        首页的 3D 首屏 <main class="hero"> 在移动端被 display:none 隐藏，
+        隐藏后整页就没有 main 了（屏幕阅读器无法跳转到主内容）。
+        因此把 landmark 提到布局层，页面内部改用普通容器。 %>
+    <main id="main-content">
     <%- body %>
+    </main>
 
     <script>
       /* 首页弹窗支持：首页使用 layout-home，此前不含弹窗逻辑，
@@ -117,7 +123,9 @@
           title.textContent = popup.title || '';
           var content = document.createElement('div');
           content.className = 'popup-content';
-          content.innerHTML = popup.content || '';
+          // 安全：弹窗正文按纯文本渲染。此前用 innerHTML，后台账号一旦被盗
+          // 或被写入 <img onerror=...> 就是全站存储型 XSS。
+          content.textContent = popup.content || '';
           var btn = document.createElement('button');
           btn.className = 'popup-btn';
           btn.textContent = '知道了';

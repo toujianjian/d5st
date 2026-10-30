@@ -33,7 +33,7 @@
       --bg-card: rgba(255, 255, 255, 0.7);
       --text-dark: #2d2d2d;
       --text-light: #666;
-      --text-muted: #999;
+      --text-muted: #6b7280;
       --shadow-soft: 0 8px 32px rgba(211, 47, 47, 0.1);
       --shadow-hover: 0 12px 48px rgba(211, 47, 47, 0.2);
       --glass-bg: rgba(255, 255, 255, 0.25);
@@ -595,11 +595,15 @@
   </aside>
 
   <%# 移动端：侧栏贴边窄条（点击展开）与遮罩 %>
-  <button class="mobile-sidebar-edge" type="button" id="sidebarEdge" aria-label="展开侧栏" aria-expanded="false"><i class="fas fa-chevron-right"></i></button>
+  <button class="mobile-sidebar-edge" type="button" id="sidebarEdge" aria-label="展开侧栏" aria-expanded="false"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
   <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <div class="main-wrapper" id="mainWrapper">
-    <%- body %>
+    <%# 无障碍：提供唯一的 main landmark，屏幕阅读器可直接跳到主内容。
+        页面模板内部不要再写 <main>，否则会出现重复 landmark。 %>
+    <main id="main-content">
+      <%- body %>
+    </main>
   </div>
 
   <script>
@@ -867,7 +871,7 @@
         <div class="notification-empty"><i class="fas fa-bell-slash"></i><p>暂无通知</p></div>
       </div>
     </div>
-    <button class="notification-btn" id="notificationBtn" type="button" aria-label="通知"><i class="fas fa-bell"></i></button>
+    <button class="notification-btn" id="notificationBtn" type="button" aria-label="通知"><i class="fas fa-bell" aria-hidden="true"></i></button>
   </div>
 
   <script>

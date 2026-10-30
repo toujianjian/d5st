@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
 const { scan, logHit } = require('../sensitive-check');
+const { rateLimit, requireId, cleanShort, cleanText } = require('../../配置/security');
 
 router.get('/', async (req, res) => {
   if (!req.session.user) return res.redirect('/login');
@@ -54,7 +55,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/chat/:userId', async (req, res) => {
+router.get('/chat/:userId', requireId('userId'), async (req, res) => {
   if (!req.session.user) return res.redirect('/login');
   const myId = req.session.user.id;
   const otherId = req.params.userId;
@@ -86,17 +87,26 @@ router.get('/chat/:userId', async (req, res) => {
   }
 });
 
-router.post('/send/:userId', async (req, res) => {
+router.post('/send/:userId',
+  requireId('userId'),
+  rateLimit({ name: 'msg-send', window: 60 * 1000, max: 30, keyBy: 'user' }),
+  async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const myId = req.session.user.id;
   const receiverId = req.params.userId;
+  if (String(receiverId) === String(myId)) {
+    return res.status(400).json({ error: '不能给自己发私信' });
+  }
   const { content } = req.body;
-  if (!content || content.trim().length < 1) {
+  const raw = cleanText(content, 5000).trim();
+  if (!raw) {
     return res.status(400).json({ error: '内容不能为空' });
   }
-  const raw = content.trim();
   const { filtered, matched } = scan(raw);
   try {
+    // 校验接收者存在，避免向 messages 写入指向不存在用户的脏数据
+    const [rcv] = await pool.query('SELECT id FROM casdoor_users WHERE id = ? LIMIT 1', [receiverId]);
+    if (!rcv || rcv.length === 0) return res.status(404).json({ error: '用户不存在' });
     const [result] = await pool.query(
       'INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)',
       [myId, receiverId, filtered]
@@ -133,13 +143,16 @@ router.get('/guestbook', async (req, res) => {
   }
 });
 
-router.post('/guestbook', async (req, res) => {
+router.post('/guestbook', rateLimit({ name: 'guestbook', window: 10 * 60 * 1000, max: 10 }), async (req, res) => {
   const { content, author_name } = req.body;
-  if (!content || !content.trim()) return res.redirect('/messages/guestbook');
-  const raw = content.trim();
+  const raw = cleanText(content, 2000).trim();
+  if (!raw) return res.redirect('/messages/guestbook');
   const { filtered, matched } = scan(raw);
   const authorId = req.session.user?.id || null;
-  const name = authorId ? (req.session.user.nickname || req.session.user.real_name || req.session.user.username) : (author_name || '匿名用户');
+  // 未登录留言：昵称也必须裁剪，避免超长/控制字符入库
+  const name = authorId
+    ? (req.session.user.nickname || req.session.user.real_name || req.session.user.username)
+    : (cleanShort(author_name, 50) || '匿名用户');
   try {
     const [result] = await pool.query('INSERT INTO guestbook (author_id, author_name, content) VALUES (?, ?, ?)', [authorId, name, filtered]);
     let gid = result && result.insertId;

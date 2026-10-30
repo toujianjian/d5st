@@ -78,6 +78,80 @@ async function runMigrations() {
 }
 
 // ============================================================
+// SQLite 幂等迁移
+// ------------------------------------------------------------
+// 与上面 MySQL 版同样的目的，但 SQLite 没有 information_schema，
+// 用 PRAGMA table_info 探测列。历史 d5st.db 里 video_posts 缺
+// is_recommended、forum_posts 缺 board_id/post_type/cover_image，
+// 不补的话本地开发模式下 /videos 和 /forum 直接 500。
+// ============================================================
+// SQLite 侧的列定义（SQLite 的 ALTER TABLE ADD COLUMN 限制更多：
+// 不能加 NOT NULL 且无默认值的列，也不能加 UNIQUE 列）
+const SQLITE_REQUIRED_COLUMNS = {
+  forum_posts: {
+    title: 'TEXT',
+    category: "TEXT DEFAULT 'general'",
+    board_id: 'INTEGER',
+    post_type: "TEXT NOT NULL DEFAULT 'normal'",
+    cover_image: 'TEXT',
+    is_top: 'INTEGER NOT NULL DEFAULT 0',
+    is_hot: 'INTEGER NOT NULL DEFAULT 0',
+    updated_at: 'TEXT'
+  },
+  post_comments: {
+    parent_id: 'INTEGER'
+  },
+  video_posts: {
+    duration: 'INTEGER NOT NULL DEFAULT 0',
+    is_recommended: 'INTEGER NOT NULL DEFAULT 0'
+  },
+  home_banners: {
+    description: 'TEXT'
+  },
+  casdoor_users: {
+    nickname: 'TEXT'
+  }
+};
+
+async function sqliteColumnExists(table, column) {
+  try {
+    const [rows] = await pool.query(`PRAGMA table_info(\`${table}\`)`);
+    return rows.some(r => r.name === column);
+  } catch (e) {
+    return false;
+  }
+}
+
+async function sqliteTableExists(table) {
+  try {
+    const [rows] = await pool.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1", [table]
+    );
+    return rows && rows.length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function runSqliteMigrations() {
+  let changed = 0;
+  for (const [table, columns] of Object.entries(SQLITE_REQUIRED_COLUMNS)) {
+    if (!await sqliteTableExists(table)) continue;
+    for (const [column, ddl] of Object.entries(columns)) {
+      if (await sqliteColumnExists(table, column)) continue;
+      try {
+        await pool.exec(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${ddl}`);
+        console.log(`[DB] SQLite 补列 ${table}.${column}`);
+        changed++;
+      } catch (err) {
+        console.error(`[DB] SQLite 补列失败 ${table}.${column}:`, err.message);
+      }
+    }
+  }
+  if (changed > 0) console.log(`[DB] SQLite 迁移完成，补充 ${changed} 个字段`);
+}
+
+// ============================================================
 // 编码自愈
 // 历史库由 docker-entrypoint-initdb.d 以 latin1 客户端执行 db-schema.sql，
 // 脚本里 INSERT 的中文被写成「双重编码」（如 系统管理员 -> ç³»ç»Ÿç®¡ç†å'˜）。
@@ -297,8 +371,11 @@ async function initDatabase() {
       // 保证首页「常用链接」默认项存在（该区域已完全由 home_links 驱动）
       await ensureHomeLinks();
     } else {
+      // SQLite 模式：先执行建表脚本（CREATE TABLE IF NOT EXISTS 建新表），
+      // 再补历史库里缺失的列（建表脚本不会改已存在的表）。
       await pool.exec(initSchema);
       console.log('[DB] SQLite 数据库初始化完成');
+      await runSqliteMigrations();
     }
     initialized = true;
   } catch (err) {

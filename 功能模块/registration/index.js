@@ -3,6 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const casdoor = require('../../配置/casdoor');
 const userService = require('../../配置/user-service');
+const { safeRedirect, rateLimit, cleanShort } = require('../../配置/security');
 
 const LOG = (msg) => console.log(`[Auth] ${msg}`);
 const ERR = (msg) => console.warn(`[Auth] ${msg}`);
@@ -48,12 +49,13 @@ router.get('/login', (req, res) => {
   if (req.session.user) return res.redirect('/');
   const state = genState();
   req.session.csrfState = state;
-  req.session.nextUrl = req.query.next || '/';
+  // 开放重定向防护：只接受站内相对路径，其余一律回首页
+  req.session.nextUrl = safeRedirect(req.query.next, '/');
   const authUrl = casdoor.getAuthUrl({ state });
   res.render('registration/login', {
     title: '登录 D5ST',
     authUrl,
-    error: req.query.error,
+    error: cleanShort(req.query.error, 64) || null,
     endpoint: casdoor.C.endpoint,
     nextUrl: req.session.nextUrl,
     defaultAdminUser: process.env.DEFAULT_ADMIN_USER || 'd5stadmin'
@@ -88,10 +90,18 @@ router.get('/forgot-password', (req, res) => {
 });
 
 // 请求密码重置验证码（走 Casdoor send-verification-code）
-router.post('/forgot-password/request', async (req, res) => {
+// 限流：验证码接口是最典型的短信/邮件轰炸目标，按 IP 限制每分钟 3 次。
+router.post('/forgot-password/request',
+  rateLimit({ name: 'forgot', window: 60 * 1000, max: 3 }),
+  async (req, res) => {
   const { email, name } = req.body || {};
   if (!email) {
     return res.status(400).json({ success: false, msg: '请填写注册邮箱，验证码将发送到该邮箱' });
+  }
+  // 邮箱格式与长度校验：避免把超长/畸形字符串直接转给 Casdoor
+  const emailStr = String(email).trim();
+  if (emailStr.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(emailStr)) {
+    return res.status(400).json({ success: false, msg: '邮箱格式不正确' });
   }
   try {
     await casdoor.sendVerificationCode({
@@ -99,10 +109,10 @@ router.post('/forgot-password/request', async (req, res) => {
       // 找回密码：Casdoor 走 login 流程，会校验该邮箱对应用户是否已存在
       method: 'login',
       type: 'email',
-      dest: email,
-      name
+      dest: emailStr,
+      name: cleanShort(name, 100) || undefined
     });
-    await logAuthEvent('Send verification code', name || email, '发送密码重置验证码', req);
+    await logAuthEvent('Send verification code', name || emailStr, '发送密码重置验证码', req);
     res.json({ success: true, msg: '验证码已发送，请查收邮件/短信' });
   } catch (err) {
     ERR(`发送验证码失败: ${err.message}`);
@@ -117,7 +127,8 @@ router.get('/auth/login', async (req, res) => {
   // 关键修复：OAuth state 同时写入独立 httpOnly cookie，避免写入 session 后在
   // MemoryStore 并发读写竞态中被旧值覆盖（子路径下同源更易触发），导致回调 CSRF 校验失败。
   res.cookie('oauth_state', state, { httpOnly: true, sameSite: 'lax', path: '/' });
-  req.session.nextUrl = req.query.next || '/';
+  // 开放重定向防护：next 只能是站内相对路径
+  req.session.nextUrl = safeRedirect(req.query.next, '/');
 
   const available = await casdoor.isAvailable();
   if (!available) {
@@ -141,11 +152,23 @@ router.get('/auth/login', async (req, res) => {
 
 // 开发演示登录 —— 仅在 ENABLE_DEV_LOGIN=1 时可用
 // 用于 Casdoor 未启动时验证前端功能（跳过 OAuth）
-router.get('/auth/dev-login', async (req, res) => {
+// 安全说明：生产环境必须关闭（ENABLE_DEV_LOGIN 未设为 1），
+// 否则任何人可免密登录并在 ?admin=1 时直接提权为管理员。
+router.get('/auth/dev-login', rateLimit({ name: 'devlogin', window: 60 * 1000, max: 10 }), async (req, res) => {
   if (process.env.ENABLE_DEV_LOGIN !== '1') {
     return res.redirect('/login?error=dev_login_disabled');
   }
-  const name = (req.query.username || 'dev_user').slice(0, 30);
+  if (process.env.NODE_ENV === 'production') {
+    // 双保险：即使误配 ENABLE_DEV_LOGIN，生产环境也拒绝
+    console.error('[Auth] 生产环境检测到 ENABLE_DEV_LOGIN=1，已强制拒绝 dev-login 请求');
+    return res.redirect('/login?error=dev_login_disabled');
+  }
+  // 用户名白名单字符集：避免注入任意用户名（含路径/控制字符）创建账号
+  const rawName = String(req.query.username || 'dev_user').slice(0, 30);
+  if (!/^[A-Za-z0-9_.-]+$/.test(rawName)) {
+    return res.redirect('/login?error=dev_login_error');
+  }
+  const name = rawName;
   const isAdmin = req.query.admin === '1' ? 1 : 0;
   const casdoorPayload = {
     id: 'dev-' + name,
@@ -180,7 +203,7 @@ router.get('/auth/dev-login', async (req, res) => {
       loginAt: Date.now()
     };
     LOG(`开发登录: ${name} (admin=${isAdmin})`);
-    res.redirect(req.session.nextUrl || '/');
+    res.redirect(safeRedirect(req.session.nextUrl, '/'));
   } catch (err) {
     ERR(`开发登录失败: ${err.message}`);
     res.redirect('/login?error=dev_login_error');
@@ -259,7 +282,9 @@ router.get('/auth/callback', async (req, res) => {
     // 登录后安排一次「防抖」用户对账（1 分钟后执行，只正向不删除）
     try { require('../../配置/casdoor-sync').scheduleSync(casdoor); } catch (e) { /* 忽略 */ }
 
-    const nextUrl = req.session.nextUrl || '/';
+    // 二次校验：即使 session 里的 nextUrl 被污染（历史数据 / 旧会话），
+    // 跳转前仍过一次白名单，杜绝开放重定向。
+    const nextUrl = safeRedirect(req.session.nextUrl, '/');
     req.session.nextUrl = null;
     // 登录成功后的跳转附带一次性参数：避免浏览器 / CDN 边缘把「登录前缓存的游客版首页」
     // 复用到登录后（表现为跳回首页右上角仍显示「登录/注册」、按钮不对）。

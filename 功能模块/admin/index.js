@@ -4,6 +4,7 @@ const pool = require('../../配置/db');
 const casdoor = require('../../配置/casdoor');
 const { reconcileCasdoorUsers } = require('../../配置/user-service');
 const { avatarUpload } = require('../../配置/upload');
+const { requireId, rateLimit, cleanShort, cleanText, parseId, parsePage } = require('../../配置/security');
 
 function requireAdmin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -12,6 +13,9 @@ function requireAdmin(req, res, next) {
 }
 
 router.use(requireAdmin);
+
+// 后台整体限流：管理员也是人，但被拖库/爆破时这层能兜住
+router.use(rateLimit({ name: 'admin', window: 60 * 1000, max: 300, keyBy: 'user' }));
 
 router.get('/', async (req, res) => {
   try {
@@ -66,7 +70,7 @@ router.get('/forum', async (req, res) => {
   }
 });
 
-router.post('/forum/delete/:id', async (req, res) => {
+router.post('/forum/delete/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM forum_posts WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: '帖子不存在' });
@@ -107,7 +111,7 @@ router.get('/comments', async (req, res) => {
   }
 });
 
-router.post('/comments/delete/:id', async (req, res) => {
+router.post('/comments/delete/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM post_comments WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: '评论不存在' });
@@ -119,7 +123,7 @@ router.post('/comments/delete/:id', async (req, res) => {
   }
 });
 
-router.post('/forum/toggle-top/:id', async (req, res) => {
+router.post('/forum/toggle-top/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT is_top FROM forum_posts WHERE id = ?', [req.params.id]);
     if (!rows || rows.length === 0) return res.status(404).json({ error: '帖子不存在' });
@@ -131,7 +135,7 @@ router.post('/forum/toggle-top/:id', async (req, res) => {
   }
 });
 
-router.post('/forum/toggle-hot/:id', async (req, res) => {
+router.post('/forum/toggle-hot/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT is_hot FROM forum_posts WHERE id = ?', [req.params.id]);
     if (!rows || rows.length === 0) return res.status(404).json({ error: '帖子不存在' });
@@ -158,10 +162,13 @@ router.get('/reports', async (req, res) => {
   }
 });
 
-router.post('/reports/:id/handle', async (req, res) => {
+router.post('/reports/:id/handle', requireId('id'), async (req, res) => {
   const { action } = req.body;
+  // 状态必须是枚举值，否则任意字符串会污染报表统计
+  const ALLOWED = ['pending', 'resolved', 'rejected', 'ignored'];
+  const status = ALLOWED.includes(action) ? action : 'resolved';
   try {
-    await pool.query('UPDATE reports SET status = ?, handled_at = CURRENT_TIMESTAMP WHERE id = ?', [action || 'resolved', req.params.id]);
+    await pool.query('UPDATE reports SET status = ?, handled_at = CURRENT_TIMESTAMP WHERE id = ?', [status, req.params.id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: '处理失败' });
@@ -182,7 +189,7 @@ router.get('/videos', async (req, res) => {
   }
 });
 
-router.post('/videos/delete/:id', async (req, res) => {
+router.post('/videos/delete/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM video_posts WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: '视频不存在' });
@@ -194,7 +201,7 @@ router.post('/videos/delete/:id', async (req, res) => {
   }
 });
 
-router.post('/videos/toggle-recommend/:id', async (req, res) => {
+router.post('/videos/toggle-recommend/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT is_recommended FROM video_posts WHERE id = ?', [req.params.id]);
     if (!rows || rows.length === 0) return res.status(404).json({ error: '视频不存在' });
@@ -222,11 +229,15 @@ router.get('/boards', async (req, res) => {
 
 router.post('/boards', async (req, res) => {
   const { name, slug, icon, description, sort_order } = req.body;
-  if (!name || !slug) return res.redirect('/admin/boards?error=missing');
+  const nameVal = cleanShort(name, 50);
+  // slug 只允许 url-safe 字符：它会拼进 /forum?board=<slug>，且作为唯一键
+  const slugVal = cleanShort(slug, 50).toLowerCase();
+  if (!nameVal || !slugVal) return res.redirect('/admin/boards?error=missing');
+  if (!/^[a-z0-9_-]{1,50}$/.test(slugVal)) return res.redirect('/admin/boards?error=bad_slug');
   try {
     await pool.query(
       `INSERT INTO forum_boards (name, slug, icon, description, sort_order) VALUES (?, ?, ?, ?, ?)`,
-      [name.trim(), slug.trim(), (icon || '💬').trim(), (description || '').trim(), parseInt(sort_order, 10) || 0]
+      [nameVal, slugVal, cleanShort(icon, 10) || '💬', cleanText(description, 500).trim(), parseInt(sort_order, 10) || 0]
     );
     res.redirect('/admin/boards');
   } catch (err) {
@@ -234,7 +245,7 @@ router.post('/boards', async (req, res) => {
   }
 });
 
-router.post('/boards/toggle/:id', async (req, res) => {
+router.post('/boards/toggle/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT is_active FROM forum_boards WHERE id = ?', [req.params.id]);
     if (!rows || rows.length === 0) return res.status(404).json({ error: '版块不存在' });
@@ -246,7 +257,7 @@ router.post('/boards/toggle/:id', async (req, res) => {
   }
 });
 
-router.post('/boards/delete/:id', async (req, res) => {
+router.post('/boards/delete/:id', requireId('id'), async (req, res) => {
   try {
     // 先解绑该版块下的帖子，再删除版块，避免帖子变成孤儿数据
     await pool.query('UPDATE forum_posts SET board_id = NULL WHERE board_id = ?', [req.params.id]);
@@ -264,11 +275,19 @@ router.get('/notifications', async (req, res) => {
 
 router.post('/notifications', async (req, res) => {
   const { title, content, action_url, action_text, start_time, end_time } = req.body;
+  const titleVal = cleanShort(title, 200);
+  const contentVal = cleanText(content, 5000).trim();
+  if (!titleVal || !contentVal) return res.redirect('/admin/notifications?error=missing');
+  // 跳转地址只允许站内路径或 http(s)，阻断 javascript: 伪协议 XSS
+  const actionUrl = cleanShort(action_url, 1000) || null;
+  if (actionUrl && !/^(\/[^\s]*|https?:\/\/[^\s]+)$/i.test(actionUrl)) {
+    return res.redirect('/admin/notifications?error=bad_url');
+  }
   try {
     await pool.query(
       `INSERT INTO global_notifications (title, content, action_url, action_text, start_time, end_time)
        VALUES (?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))`,
-      [title, content, action_url || null, action_text || null, start_time || null, end_time || null]
+      [titleVal, contentVal, actionUrl, cleanShort(action_text, 50) || null, cleanShort(start_time, 32) || null, cleanShort(end_time, 32) || null]
     );
     res.redirect('/admin/notifications');
   } catch (err) {
@@ -277,7 +296,7 @@ router.post('/notifications', async (req, res) => {
 });
 
 // 启用 / 停用全局通知
-router.post('/notifications/toggle/:id', async (req, res) => {
+router.post('/notifications/toggle/:id', requireId('id'), async (req, res) => {
   try {
     await pool.query('UPDATE global_notifications SET is_active = 1 - is_active WHERE id = ?', [req.params.id]);
     res.redirect('/admin/notifications');
@@ -287,7 +306,7 @@ router.post('/notifications/toggle/:id', async (req, res) => {
 });
 
 // 删除全局通知
-router.post('/notifications/delete/:id', async (req, res) => {
+router.post('/notifications/delete/:id', requireId('id'), async (req, res) => {
   try {
     await pool.query('DELETE FROM global_notifications WHERE id = ?', [req.params.id]);
     res.redirect('/admin/notifications');
@@ -315,6 +334,8 @@ const POPUP_PAGES = [
   { key: 'forgot-password', label: '找回密码' }
 ];
 const POPUP_PAGE_LABELS = POPUP_PAGES.reduce((m, p) => { m[p.key] = p.label; return m; }, {});
+// 弹窗类型枚举（前端按 type 决定样式，任意字符串会导致样式失效）
+const POPUP_TYPES = ['info', 'success', 'warning', 'danger', 'announcement'];
 
 // 把勾选框提交的值规范成入库字符串。
 // 勾选「全部页面」或一个都没勾 → all（避免出现永远不显示的弹窗）
@@ -338,11 +359,14 @@ router.get('/popups', async (req, res) => {
 
 router.post('/popups', async (req, res) => {
   const { title, content, type, target_pages, show_once, start_time, end_time, sort_order } = req.body;
+  const titleVal = cleanShort(title, 200);
+  const contentVal = cleanText(content, 5000).trim();
+  if (!titleVal || !contentVal) return res.redirect('/admin/popups?error=missing');
   try {
     await pool.query(
       `INSERT INTO popups (title, content, type, target_pages, show_once, start_time, end_time, sort_order)
        VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?)`,
-      [title, content, type || 'info', normalizeTargetPages(target_pages), show_once ? 1 : 0, start_time || null, end_time || null, sort_order || 0]
+      [titleVal, contentVal, POPUP_TYPES.includes(type) ? type : 'info', normalizeTargetPages(target_pages), show_once ? 1 : 0, cleanShort(start_time, 32) || null, cleanShort(end_time, 32) || null, parseInt(sort_order, 10) || 0]
     );
     res.redirect('/admin/popups');
   } catch (err) {
@@ -350,7 +374,7 @@ router.post('/popups', async (req, res) => {
   }
 });
 
-router.get('/popups/edit/:id', async (req, res) => {
+router.get('/popups/edit/:id', requireId('id'), async (req, res) => {
   const [popups] = await pool.query('SELECT * FROM popups WHERE id = ?', [req.params.id]);
   if (popups.length === 0) return res.redirect('/admin/popups');
   res.render('admin/popups-edit', {
@@ -361,12 +385,15 @@ router.get('/popups/edit/:id', async (req, res) => {
   });
 });
 
-router.post('/popups/edit/:id', async (req, res) => {
+router.post('/popups/edit/:id', requireId('id'), async (req, res) => {
   const { title, content, type, target_pages, show_once, start_time, end_time, sort_order, is_active } = req.body;
+  const titleVal = cleanShort(title, 200);
+  const contentVal = cleanText(content, 5000).trim();
+  if (!titleVal || !contentVal) return res.redirect('/admin/popups?error=missing');
   try {
     await pool.query(
       `UPDATE popups SET title=?, content=?, type=?, target_pages=?, show_once=?, start_time=NULLIF(?, ''), end_time=NULLIF(?, ''), sort_order=?, is_active=? WHERE id=?`,
-      [title, content, type || 'info', normalizeTargetPages(target_pages), show_once ? 1 : 0, start_time || null, end_time || null, sort_order || 0, is_active ? 1 : 0, req.params.id]
+      [titleVal, contentVal, POPUP_TYPES.includes(type) ? type : 'info', normalizeTargetPages(target_pages), show_once ? 1 : 0, cleanShort(start_time, 32) || null, cleanShort(end_time, 32) || null, parseInt(sort_order, 10) || 0, is_active ? 1 : 0, req.params.id]
     );
     res.redirect('/admin/popups');
   } catch (err) {
@@ -375,7 +402,7 @@ router.post('/popups/edit/:id', async (req, res) => {
 });
 
 // 删除弹窗（此前没有该路由，后台列表也没有删除按钮，弹窗建了就删不掉）
-router.post('/popups/delete/:id', async (req, res) => {
+router.post('/popups/delete/:id', requireId('id'), async (req, res) => {
   const id = req.params.id;
   try {
     // SQLite 未建外键级联，先清理关闭记录，避免残留脏数据（MySQL 侧有 CASCADE，冗余无害）
@@ -397,15 +424,22 @@ router.get('/home-links', async (req, res) => {
 
 router.post('/home-links', async (req, res) => {
   const { title, url, icon, sort_order } = req.body;
+  const titleVal = cleanShort(title, 100);
+  const urlVal = cleanShort(url, 1000);
+  if (!titleVal || !urlVal) return res.redirect('/admin/home-links?error=missing');
+  // 首页链接会渲染成 <a href="...">，必须限制协议，否则 javascript: 可造成 XSS
+  if (!/^(\/[^\s]*|https?:\/\/[^\s]+|mailto:[^\s]+)$/i.test(urlVal)) {
+    return res.redirect('/admin/home-links?error=bad_url');
+  }
   try {
-    await pool.query('INSERT INTO home_links (title, url, icon, sort_order) VALUES (?, ?, ?, ?)', [title, url, icon || null, sort_order || 0]);
+    await pool.query('INSERT INTO home_links (title, url, icon, sort_order) VALUES (?, ?, ?, ?)', [titleVal, urlVal, cleanShort(icon, 50) || null, parseInt(sort_order, 10) || 0]);
     res.redirect('/admin/home-links');
   } catch (err) {
     res.redirect('/admin/home-links?error=create_failed');
   }
 });
 
-router.post('/home-links/delete/:id', async (req, res) => {
+router.post('/home-links/delete/:id', requireId('id'), async (req, res) => {
   try {
     await pool.query('DELETE FROM home_links WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -421,15 +455,26 @@ router.get('/home-banners', async (req, res) => {
 
 router.post('/home-banners', async (req, res) => {
   const { title, image_path, link_url, sort_order } = req.body;
+  const titleVal = cleanShort(title, 100);
+  const imageVal = cleanShort(image_path, 1000);
+  const linkVal = cleanShort(link_url, 1000) || null;
+  if (!titleVal || !imageVal) return res.redirect('/admin/home-banners?error=missing');
+  // 图片与跳转都只接受站内路径 / http(s)，避免 javascript: 与 data: 注入
+  if (!/^(\/[^\s]*|https?:\/\/[^\s]+)$/i.test(imageVal)) {
+    return res.redirect('/admin/home-banners?error=bad_image');
+  }
+  if (linkVal && !/^(\/[^\s]*|https?:\/\/[^\s]+)$/i.test(linkVal)) {
+    return res.redirect('/admin/home-banners?error=bad_url');
+  }
   try {
-    await pool.query('INSERT INTO home_banners (title, image_path, link_url, sort_order) VALUES (?, ?, ?, ?)', [title, image_path, link_url || null, sort_order || 0]);
+    await pool.query('INSERT INTO home_banners (title, image_path, link_url, sort_order) VALUES (?, ?, ?, ?)', [titleVal, imageVal, linkVal, parseInt(sort_order, 10) || 0]);
     res.redirect('/admin/home-banners');
   } catch (err) {
     res.redirect('/admin/home-banners?error=create_failed');
   }
 });
 
-router.post('/home-banners/delete/:id', async (req, res) => {
+router.post('/home-banners/delete/:id', requireId('id'), async (req, res) => {
   try {
     await pool.query('DELETE FROM home_banners WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -445,15 +490,25 @@ router.get('/path-redirects', async (req, res) => {
 
 router.post('/path-redirects', async (req, res) => {
   const { path, redirect_url, path_desc } = req.body;
+  const pathVal = cleanShort(path, 500);
+  const urlVal = cleanShort(redirect_url, 1000);
+  // 校验：源路径必须以 / 开头；目标必须是站内路径或 http(s) 绝对地址。
+  // 不校验的话，管理员（或被盗号）可配置 javascript: 造成存储型 XSS，
+  // 或配置 //evil.com 做站点级开放重定向。
+  if (!pathVal || !urlVal) return res.redirect('/admin/path-redirects?error=missing');
+  if (!/^\/[^\s]*$/.test(pathVal)) return res.redirect('/admin/path-redirects?error=bad_path');
+  if (!/^(\/[^\s]*|https?:\/\/[^\s]+)$/i.test(urlVal)) {
+    return res.redirect('/admin/path-redirects?error=bad_url');
+  }
   try {
-    await pool.query('INSERT INTO path_redirects (path, redirect_url, path_desc) VALUES (?, ?, ?)', [path, redirect_url, path_desc || null]);
+    await pool.query('INSERT INTO path_redirects (path, redirect_url, path_desc) VALUES (?, ?, ?)', [pathVal, urlVal, cleanShort(path_desc, 200) || null]);
     res.redirect('/admin/path-redirects');
   } catch (err) {
     res.redirect('/admin/path-redirects?error=create_failed');
   }
 });
 
-router.post('/path-redirects/delete/:id', async (req, res) => {
+router.post('/path-redirects/delete/:id', requireId('id'), async (req, res) => {
   try {
     await pool.query('DELETE FROM path_redirects WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -472,7 +527,7 @@ router.get('/recycle-bin', async (req, res) => {
 });
 
 // 回收站：恢复已删除的帖子/视频/评论
-router.post('/recycle-bin/restore/:id', async (req, res) => {
+router.post('/recycle-bin/restore/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM deleted_items WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: '记录不存在' });
@@ -495,7 +550,7 @@ router.post('/recycle-bin/restore/:id', async (req, res) => {
 // 回收站：永久删除（真正删除原始记录及其标签关联，不可恢复）
 // 说明：原实现只删 deleted_items 行，原始帖子仍停留在 is_deleted=1 的软删状态，
 //       其标签关联（post_tags，旧库无外键级联）会继续残留并污染「热门话题」。
-router.post('/recycle-bin/purge/:id', async (req, res) => {
+router.post('/recycle-bin/purge/:id', requireId('id'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM deleted_items WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: '记录不存在' });
@@ -564,7 +619,7 @@ router.post('/sensitive-words', async (req, res) => {
 });
 
 // 删除违禁词
-router.post('/sensitive-words/delete/:id', async (req, res) => {
+router.post('/sensitive-words/delete/:id', requireId('id'), async (req, res) => {
   try {
     await pool.query('DELETE FROM sensitive_words WHERE id = ?', [req.params.id]);
     await sensitiveWord.reload();
@@ -799,8 +854,8 @@ const USER_COLUMNS = 'id, username, nickname, real_name, avatar, email, phone, g
 
 router.get('/users', async (req, res) => {
   try {
-    const kw = String(req.query.q || '').trim();
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const kw = cleanShort(req.query.q, 100);
+    const page = parsePage(req.query.page);
     const PAGE_SIZE = 50;
     const offset = (page - 1) * PAGE_SIZE;
 
@@ -846,7 +901,7 @@ router.get('/users', async (req, res) => {
 });
 
 // 保存管理员修改的用户资料（本地字段）
-router.post('/users/edit/:id', async (req, res) => {
+router.post('/users/edit/:id', requireId('id'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.redirect('/admin/users?error=' + encodeURIComponent('参数错误'));
 
@@ -895,7 +950,7 @@ router.post('/users/edit/:id', async (req, res) => {
 });
 
 // 管理员代传头像（与个人中心同一套：存 user_avatars 表 + avatar 指向本地输出地址）
-router.post('/users/avatar/:id', (req, res) => {
+router.post('/users/avatar/:id', requireId('id'), (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.redirect('/admin/users?error=' + encodeURIComponent('参数错误'));
 
@@ -924,7 +979,7 @@ router.post('/users/avatar/:id', (req, res) => {
 });
 
 // 删除用户的本地头像（只清本站上传的，不动 Casdoor 自带的外链头像）
-router.post('/users/avatar/:id/delete', async (req, res) => {
+router.post('/users/avatar/:id/delete', requireId('id'), async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) return res.redirect('/admin/users?error=' + encodeURIComponent('参数错误'));
   try {
@@ -964,6 +1019,20 @@ router.get('/export-users', async (req, res) => {
   }
 });
 
+// 允许在后台「系统设置」里出现的键（白名单）。
+// 之前直接遍历 req.body 的任意键写入 system_settings，攻击者（或 CSRF）
+// 可写入任意配置键污染站点行为；这里限定为已知键。
+const ALLOWED_SETTING_KEYS = new Set([
+  'site_name',
+  'site_title',
+  'default_points',
+  'sponsor_enabled',
+  'register_enabled',
+  'notice_content',
+  'footer_text',
+  'icp_number'
+]);
+
 router.get('/settings', async (req, res) => {
   try {
     const [settings] = await pool.query('SELECT * FROM system_settings');
@@ -975,14 +1044,20 @@ router.get('/settings', async (req, res) => {
 
 router.post('/settings', async (req, res) => {
   try {
-    for (const [key, value] of Object.entries(req.body)) {
+    for (const [key, value] of Object.entries(req.body || {})) {
+      if (key === '_csrf') continue;
+      if (!ALLOWED_SETTING_KEYS.has(key)) {
+        console.warn('[admin/settings] 拒绝未知配置键:', key);
+        continue;
+      }
+      const safeValue = String(value == null ? '' : value).slice(0, 2000);
       const [existing] = await pool.query(
         'SELECT id FROM system_settings WHERE setting_key = ?', [key]
       );
       if (existing && existing.length > 0) {
-        await pool.query('UPDATE system_settings SET setting_value = ? WHERE setting_key = ?', [value, key]);
+        await pool.query('UPDATE system_settings SET setting_value = ? WHERE setting_key = ?', [safeValue, key]);
       } else {
-        await pool.query('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)', [key, value]);
+        await pool.query('INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?)', [key, safeValue]);
       }
     }
     res.redirect('/admin/settings');

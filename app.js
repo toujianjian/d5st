@@ -7,10 +7,14 @@ const initDatabase = require('./配置/init-db');
 const casdoor = require('./配置/casdoor');
 const level = require('./配置/level');
 const { initCasdoorWithRetry } = require('./配置/casdoor-init');
+const security = require('./配置/security');
 const CASDOOR_CONFIG = casdoor.C;
 
 const app = express();
 const PORT = process.env.PORT || 35555;
+
+// 反向代理后面才能拿到真实客户端 IP（限流按 IP 计数，必须正确）
+app.set('trust proxy', 1);
 
 app.set('views', path.join(__dirname, '页面模板'));
 app.set('view engine', 'ejs');
@@ -55,7 +59,55 @@ app.use((req, res, next) => {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.set('trust proxy', 1);
+// 安全响应头放在最前面：连 404/500 也要带上
+app.use(security.securityHeaders);
+
+// ============================================================
+// 启动期安全自检
+// ------------------------------------------------------------
+// 只告警不退出：避免因为一个弱配置把整站拦死。
+// 但这些项一旦漏配就是真实风险，必须在日志里吼出来。
+// ============================================================
+const WEAK_SECRETS = new Set([
+  'd5st-dev-secret-change-me',
+  'd5st_session_secret_change_in_production',
+  'secret',
+  'changeme',
+  ''
+]);
+function runSecuritySelfCheck() {
+  const warns = [];
+  const secret = process.env.SESSION_SECRET || '';
+
+  if (WEAK_SECRETS.has(secret) || secret.length < 32) {
+    warns.push('SESSION_SECRET 过弱或未设置（当前长度 ' + secret.length + '）—— 攻击者可伪造会话，' +
+      '请用 openssl rand -hex 32 生成后写入环境变量');
+  }
+  if (process.env.ENABLE_DEV_LOGIN === '1') {
+    if (process.env.NODE_ENV === 'production') {
+      warns.push('ENABLE_DEV_LOGIN=1 且 NODE_ENV=production —— 免密登录后门已开启，' +
+        '生产环境必须删除该变量（代码层已额外拦截，但仍应关闭）');
+    } else {
+      console.warn('[安全] ENABLE_DEV_LOGIN=1（仅开发用）：任何人可免密登录，上线前务必关闭');
+    }
+  }
+  const appUrl = process.env.APP_URL || '';
+  if (!appUrl) {
+    warns.push('APP_URL 未设置 —— OAuth 回调与 robots/sitemap 里的绝对地址会不正确');
+  } else if (appUrl.startsWith('http://') && process.env.NODE_ENV === 'production') {
+    warns.push('APP_URL 是 http:// —— 生产建议启用 HTTPS（否则会话 cookie 无法设置 secure）');
+  }
+  if (process.env.NODE_ENV === 'production' && process.env.USE_MYSQL !== '1') {
+    warns.push('生产环境未启用 USE_MYSQL=1 —— 当前使用的是本地 SQLite，不适合多实例/高并发');
+  }
+  if (warns.length) {
+    console.warn('\n========== 安全自检未通过项（' + warns.length + '） ==========');
+    warns.forEach((w, i) => console.warn(`  ${i + 1}. ${w}`));
+    console.warn('=====================================================\n');
+  } else {
+    console.log('[安全] 启动自检通过（会话密钥、开发后门、APP_URL 均已正确配置）');
+  }
+}
 
 app.use(
   session({
@@ -70,6 +122,10 @@ app.use(
     }
   })
 );
+
+// CSRF 防护（双提交 Cookie）。必须在 session 之后、所有业务路由之前。
+// 只拦写操作（POST/PUT/PATCH/DELETE），GET/HEAD 放行。
+app.use(security.csrfProtection);
 
 // 统一的日期格式化：MySQL 返回的是 Date 对象，直接 String() 会得到
 // 「Sat Sep 26 2026 11:32:00 GMT+0800」这种英文长串，页面很难看。
@@ -164,6 +220,8 @@ const publicPaths = [
   '/api/popups',
   '/api/health',
   '/rss.xml',
+  '/robots.txt',
+  '/sitemap.xml',
   '/public',
   '/forum',
   '/videos',
@@ -193,6 +251,11 @@ app.use(async (req, res, next) => {
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   if (req.path.startsWith('/public/')) return next();
+  // 上传的视频/图片是静态文件，无需登录即可播放（页面本身已有访问控制），
+  // 否则 <video src="/uploads/..."> 在未登录时会被 302 到 /login，播放器直接坏掉。
+  if (req.path.startsWith('/uploads/')) return next();
+  if (req.path.startsWith('/avatar/')) return next();
+  if (req.path.startsWith('/casdoor')) return next();
   
   const isPublic = publicPaths.some(p => 
     p === '' ? req.path === '/' : (req.path === p || req.path.startsWith(p + '/'))
@@ -340,6 +403,65 @@ app.post('/api/notifications/:id/read', async (req, res) => {
   }
 });
 
+// robots.txt
+// 说明：必须返回 text/plain，且内容里不能有 YAML/HTML —— 否则 Lighthouse 判为
+// 「robots.txt is not valid」。同时把后台/接口/用户私有页挡在爬虫之外。
+app.get('/robots.txt', (req, res) => {
+  const siteUrl = process.env.APP_URL || '';
+  const lines = [
+    'User-agent: *',
+    'Allow: /$',
+    'Allow: /forum',
+    'Allow: /videos',
+    'Allow: /search',
+    'Allow: /secret',
+    'Allow: /sponsor',
+    'Allow: /messages/guestbook',
+    '',
+    '# 用户私有内容与后台不收录',
+    'Disallow: /admin',
+    'Disallow: /api/',
+    'Disallow: /user',
+    'Disallow: /messages',
+    'Disallow: /friends',
+    'Disallow: /auth/',
+    'Disallow: /login',
+    'Disallow: /register',
+    'Disallow: /forgot-password',
+    'Disallow: /avatar/',
+    'Disallow: /uploads/',
+    'Disallow: /casdoor'
+  ];
+  if (siteUrl) lines.push('', 'Sitemap: ' + siteUrl.replace(/\/$/, '') + '/sitemap.xml');
+  res.type('text/plain; charset=utf-8').send(lines.join('\n') + '\n');
+});
+
+// 简易 sitemap：公开可索引的静态入口 + 最新帖子/视频
+app.get('/sitemap.xml', async (req, res) => {
+  try {
+    const siteUrl = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/$/, '');
+    const esc = s => String(s).replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
+    const [posts] = await pool.query(
+      'SELECT id, created_at FROM forum_posts WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT 500'
+    ).catch(() => [[]]);
+    const [videos] = await pool.query(
+      'SELECT id, created_at FROM video_posts WHERE is_deleted = 0 ORDER BY created_at DESC LIMIT 500'
+    ).catch(() => [[]]);
+    const statics = ['/', '/forum', '/videos', '/search', '/secret', '/sponsor', '/messages/guestbook'];
+    const urlTag = (loc, lastmod) =>
+      `<url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${esc(String(lastmod).slice(0, 10))}</lastmod>` : ''}</url>`;
+    const urls = [
+      ...statics.map(p => urlTag(siteUrl + p)),
+      ...posts.map(p => urlTag(siteUrl + '/forum/' + p.id, p.created_at)),
+      ...videos.map(v => urlTag(siteUrl + '/videos/' + v.id, v.created_at))
+    ].join('');
+    res.type('application/xml; charset=utf-8')
+      .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}</urlset>`);
+  } catch (err) {
+    res.status(500).send('sitemap 生成失败');
+  }
+});
+
 // RSS 2.0 订阅（madblog 整合点）
 app.get('/rss.xml', async (req, res) => {
   try {
@@ -395,6 +517,25 @@ app.use((err, req, res, next) => {
   res.status(500).render('errors/500', { title: '服务器错误', error: process.env.NODE_ENV === 'development' ? err.message : undefined });
 });
 
+// ============================================================
+// 进程级兜底
+// ------------------------------------------------------------
+// Express 4 不会自动捕获 async 路由里抛出的 rejection，
+// 一旦某处 await 失败且没有 try/catch，Node 默认行为是直接退出进程
+// （一次畸形请求就能让整站下线）。这里把未捕获异常记录下来但不退出，
+// 保证单个请求的故障不会演变成全站不可用。
+// ============================================================
+process.on('unhandledRejection', (reason) => {
+  console.error('[未捕获的 Promise 异常]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[未捕获的异常]', err && err.stack ? err.stack : err);
+  // 内存耗尽等无法恢复的错误仍需退出，交给容器/进程管理器重启
+  if (err && (err.code === 'ENOMEM' || err.name === 'RangeError')) {
+    process.exit(1);
+  }
+});
+
 async function startServer() {
   try {
     await initDatabase();
@@ -421,6 +562,7 @@ async function startServer() {
       console.log(`D5ST 服务运行中: http://localhost:${PORT}`);
       console.log(`Casdoor 端点: ${CASDOOR_CONFIG.endpoint}`);
       console.log(`Casdoor 组织: ${CASDOOR_CONFIG.organization} / 应用: ${CASDOOR_CONFIG.application}`);
+      runSecuritySelfCheck();
     });
   } catch (err) {
     console.error('启动失败:', err);

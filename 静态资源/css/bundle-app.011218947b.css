@@ -2444,6 +2444,7 @@ body.page-body.night-mode {
   --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.45);
   --text-dark: #e0e6ed;
   --text-light: rgba(224, 230, 237, 0.75);
+  --text-muted: #9aa5b1;
 }
 
 /* 左下角「首页」悬浮按钮：深色玻璃 + 浅色文字 */

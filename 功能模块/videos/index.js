@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
 const { videoUpload } = require('../../配置/upload');
+const { rateLimit, requireId, cleanShort, cleanText, parsePage } = require('../../配置/security');
 
 // 分类定义（meyho 走马灯分类导航）
 const CATEGORIES = {
@@ -60,7 +61,7 @@ async function getRecommended(limit = 5) {
 router.get('/', async (req, res) => {
   try {
     const category = req.query.category || '';
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const page = parsePage(req.query.page);
 
     let where = 'WHERE vp.is_deleted = 0';
     const params = [];
@@ -84,8 +85,8 @@ router.get('/', async (req, res) => {
     const [videos] = await pool.query(
       `SELECT vp.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar FROM video_posts vp
        LEFT JOIN casdoor_users cu ON vp.user_id = cu.id
-       ${where} ORDER BY vp.created_at DESC LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
-      params
+       ${where} ORDER BY vp.created_at DESC LIMIT ? OFFSET ?`,
+      params.concat([PAGE_SIZE, offset])
     );
 
     const [recommended, categoryStats] = await Promise.all([
@@ -121,7 +122,7 @@ router.get('/new', (req, res) => {
 });
 
 // ============ 发布视频（本地上传 或 外链 URL，二选一）============
-router.post('/', (req, res) => {
+router.post('/', rateLimit({ name: 'video-create', window: 30 * 60 * 1000, max: 5, keyBy: 'user' }), (req, res) => {
   if (!req.session.user) return res.redirect('/login');
 
   videoUpload.single('video_file')(req, res, async (upErr) => {
@@ -135,14 +136,23 @@ router.post('/', (req, res) => {
       return backErr(msg);
     }
 
-    const { title, description, video_url, cover_url, category, duration, is_recommended } = req.body || {};
+    const { title, description, video_url, cover_url, category, duration } = req.body || {};
     // 本地文件优先；未选文件时用外链
     const fileUrl = req.file ? '/uploads/videos/' + req.file.filename : '';
-    const finalUrl = fileUrl || String(video_url || '').trim();
+    const finalUrl = fileUrl || cleanShort(video_url, 1000);
 
-    if (!title || !finalUrl) {
+    if (!cleanShort(title, 200) || !finalUrl) {
       if (req.file) { try { require('fs').unlink(req.file.path, () => {}); } catch (e) { /* 忽略 */ } }
       return backErr('标题必填，且需上传视频文件或填写视频地址');
+    }
+
+    // 外链必须 http(s)，否则 javascript: / data: 会变成存储型 XSS 载体
+    if (!fileUrl && !/^https?:\/\//i.test(finalUrl)) {
+      return backErr('视频地址必须是 http(s) 链接');
+    }
+    const coverVal = cleanShort(cover_url, 1000);
+    if (coverVal && !/^(https?:\/\/|\/)/i.test(coverVal)) {
+      return backErr('封面地址必须是 http(s) 链接或站内路径');
     }
 
     try {
@@ -151,13 +161,15 @@ router.post('/', (req, res) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           req.session.user.id,
-          String(title).trim(),
-          String(description || '').trim(),
+          cleanShort(title, 200),
+          cleanText(description, 5000).trim(),
           finalUrl,
-          String(cover_url || '').trim(),
-          category || 'campus',
-          parseInt(duration, 10) || 0,
-          is_recommended ? 1 : 0
+          coverVal,
+          CATEGORIES[category] ? category : 'campus',
+          Math.max(0, parseInt(duration, 10) || 0),
+          // 普通用户上传的视频不能自我推荐（此前 is_recommended 直接取自表单，
+          // 任何人都能把自己的视频标记成「精选」，从而被游客看到）
+          0
         ]
       );
       const id = result && result.insertId;
@@ -171,7 +183,7 @@ router.post('/', (req, res) => {
 });
 
 // ============ 播放页 ============
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireId('id'), async (req, res) => {
   try {
     const id = req.params.id;
     const [rows] = await pool.query(

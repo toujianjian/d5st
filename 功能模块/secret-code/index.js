@@ -1,12 +1,18 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const pool = require('../../配置/db');
+const { rateLimit, cleanShort } = require('../../配置/security');
 
+// 保密号用密码学安全随机数生成。
+// 原实现用 Math.random()，其输出可被预测（V8 的 xorshift128+ 在拿到少量样本后
+// 可反推内部状态），等于给「猜别人保密号」留了口子。这里改用 crypto.randomInt。
+// 字符集去掉易混淆的 I / O / 0 / 1。
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generateSecretCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += CODE_CHARS.charAt(crypto.randomInt(0, CODE_CHARS.length));
   }
   return code;
 }
@@ -23,15 +29,20 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/generate', async (req, res) => {
+// 限流：保密号是「重新生成」语义，正常用户不会一秒点十次
+router.post('/generate', rateLimit({ name: 'secret-gen', window: 60 * 1000, max: 10, keyBy: 'user' }), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   try {
     const code = generateSecretCode();
-    // 表上有 UNIQUE KEY (user_id)，一个用户只允许一个保密号。
-    // 用 upsert 让「重新生成」幂等，避免第二次生成撞唯一键后直接 500。
+    // user_id 上有唯一键（一个用户一个保密号），用 upsert 让「重新生成」幂等。
+    // 注意方言：MySQL 是 ON DUPLICATE KEY UPDATE，SQLite 是 ON CONFLICT。
+    // 原实现只有 MySQL 语法，本地 SQLite 模式下必然 500（near "DUPLICATE"）。
     await pool.query(
-      `INSERT INTO user_secrets (user_id, secret_code) VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE secret_code = VALUES(secret_code), created_at = CURRENT_TIMESTAMP`,
+      pool.isMysql
+        ? `INSERT INTO user_secrets (user_id, secret_code) VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE secret_code = VALUES(secret_code), created_at = CURRENT_TIMESTAMP`
+        : `INSERT INTO user_secrets (user_id, secret_code) VALUES (?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET secret_code = excluded.secret_code, created_at = datetime('now','localtime')`,
       [req.session.user.id, code]
     );
     res.json({ success: true, code });
@@ -42,7 +53,8 @@ router.post('/generate', async (req, res) => {
 });
 
 router.get('/show', async (req, res) => {
-  const code = req.query.code || '';
+  // 限制长度并统一大写，避免超长字符串打到数据库
+  const code = cleanShort(req.query.code, 32).toUpperCase();
   try {
     const [users] = await pool.query(
       `SELECT cu.id, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.nickname, cu.avatar, us.secret_code, us.created_at

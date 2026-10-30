@@ -52,11 +52,27 @@ CREATE TABLE IF NOT EXISTS forum_posts (
   content TEXT NOT NULL,
   category TEXT DEFAULT 'general',
   tags TEXT,
+  board_id INTEGER,
+  post_type TEXT NOT NULL DEFAULT 'normal',
+  cover_image TEXT,
   views INTEGER NOT NULL DEFAULT 0,
   is_top INTEGER NOT NULL DEFAULT 0,
   is_hot INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  updated_at TEXT,
   is_deleted INTEGER NOT NULL DEFAULT 0
+);
+
+-- 论坛版块（圈子）。早期 SQLite schema 漏建此表，导致 /forum 与帖子详情 500。
+CREATE TABLE IF NOT EXISTS forum_boards (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  description TEXT,
+  icon TEXT DEFAULT '💬',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 CREATE TABLE IF NOT EXISTS user_medals (
@@ -291,8 +307,57 @@ CREATE TABLE IF NOT EXISTS video_posts (
   duration INTEGER DEFAULT 0,
   views INTEGER NOT NULL DEFAULT 0,
   category TEXT DEFAULT 'campus',
+  is_recommended INTEGER NOT NULL DEFAULT 0,
   is_deleted INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- 用户积分/经验（签到与发帖奖励）
+CREATE TABLE IF NOT EXISTS user_points (
+  user_id INTEGER PRIMARY KEY,
+  points INTEGER NOT NULL DEFAULT 0,
+  exp INTEGER NOT NULL DEFAULT 0,
+  level INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- 每日签到（uniq(user_id, checkin_date) 保证一天只能签一次）
+CREATE TABLE IF NOT EXISTS user_checkins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  checkin_date TEXT NOT NULL,
+  points INTEGER NOT NULL DEFAULT 10,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  UNIQUE(user_id, checkin_date)
+);
+
+-- 违禁词词库（DFA 过滤）
+CREATE TABLE IF NOT EXISTS sensitive_words (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  word TEXT NOT NULL UNIQUE,
+  category TEXT NOT NULL DEFAULT 'default',
+  is_disabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- 违禁词命中审计
+CREATE TABLE IF NOT EXISTS sensitive_word_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  username TEXT,
+  content_type TEXT NOT NULL,
+  content_id INTEGER,
+  matched_words TEXT NOT NULL,
+  raw_content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- 本站上传头像（二进制随库迁移）
+CREATE TABLE IF NOT EXISTS user_avatars (
+  user_id INTEGER PRIMARY KEY,
+  mime TEXT NOT NULL,
+  data BLOB NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
 INSERT OR IGNORE INTO home_links (title, url, icon, sort_order) VALUES

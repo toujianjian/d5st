@@ -196,6 +196,33 @@ node 测试/verify-features.js   # 好友/发帖删帖/私信/赞助等 13 项
 node 测试/test-export-all.js   # 全库 CSV 导出 21 项（需管理员账号）
 ```
 
+#### 安全与冒烟回归（本次新增）
+
+三个零依赖脚本，默认打到 `http://localhost:35555`，用 `TEST_URL` 覆盖：
+
+```bash
+# 1) 安全回归：响应头 / CSRF / SQL 注入 / 开放重定向 / 参数校验 / XSS / 越权 / 限流
+node 测试/test-security.js
+
+# 2) 功能冒烟：页面可达性、模板渲染、发帖→评论→点赞→删除全链路、畸形输入
+node 测试/test-smoke.js
+
+# 3) 真实 OAuth 登录 E2E（Playwright，需要 Casdoor 已启动）
+#    注意 BASE 要和 APP_URL 的 host 一致，否则 cookie 域不同会导致「登录后仍显示未登录」
+BASE=http://localhost:35545 node 测试/test-e2e-login.js
+```
+
+打 Docker 全栈时：
+
+```bash
+TEST_URL=http://127.0.0.1:35545 node 测试/test-security.js
+TEST_URL=http://127.0.0.1:35545 node 测试/test-smoke.js
+BASE=http://localhost:35545      node 测试/test-e2e-login.js
+```
+
+> 说明：`test-security.js` / `test-smoke.js` 的「登录后」用例依赖 `ENABLE_DEV_LOGIN=1`。
+> 生产（`NODE_ENV=production`）下代码会强制拒绝 dev-login，这些用例会自动跳过并标记 SKIP。
+
 ## 管理后台
 
 登录后访问 `/admin`（需管理员权限，设置方法见上文「授予 / 取消管理员权限」）。
@@ -293,6 +320,25 @@ docker compose run --rm -p 35555:35555 app npm run dev
 - 建议在前端配置 HTTPS 反向代理（Nginx / Traefik）
 - Casdoor 管理后台默认口令（`admin` / `123`）请在首次登录后立即修改，并同步 `.env`
 
+### 已内置的安全防护（`配置/security.js`）
+
+启动时会跑一次安全自检，把「弱密钥 / 开发后门开着 / 没配 APP_URL / 生产用 SQLite」这类问题打进日志。
+各层防护如下：
+
+| 防护 | 实现 | 说明 |
+|------|------|------|
+| CSRF | 双提交 Cookie（`csrf_token`） | 所有写操作必须带 `X-CSRF-Token` 头或 `_csrf` 字段；前端 `main.js` 自动回填，**新增表单/接口无需手工处理** |
+| 安全响应头 | CSP / `X-Content-Type-Options` / `X-Frame-Options` / `Referrer-Policy` / `Permissions-Policy` | HTTPS 部署时自动加 HSTS |
+| 限流 | 内存滑动窗口 | 登录验证码 3 次/分、发帖 10 次/10 分、评论 20 次/分、私信 30 次/分、上传 5 次/30 分、后台 300 次/分 |
+| 参数校验 | `requireId()` | 路由 `:id` 必须是正整数，`1abc` / `1e3` / `0x10` / `-1` 一律 404，避免类型混淆与慢查询 |
+| 开放重定向 | `safeRedirect()` | `/login?next=`、`/auth/login?next=` 只接受站内相对路径，`//evil.com`、`javascript:` 全部丢弃 |
+| 输入清洗 | `cleanText()` / `cleanShort()` | 剥除 C0 控制字符 + 按列宽裁剪，避免超长输入把接口打成 500 |
+| XSS | 输出转义 + 协议白名单 | 模板统一 `<%= %>`；弹窗正文改 `textContent`；视频/封面/首页链接/重定向目标只允许 `http(s)` 与站内路径 |
+| 进程兜底 | `unhandledRejection` / `uncaughtException` | Express 4 不捕获 async 路由异常，一次畸形请求原本会让整个进程退出，现在只记日志不退出 |
+
+**权限边界**：普通用户上传的视频不再能自我标记「精选」（`is_recommended` 强制 0，只能后台设置）；
+后台「系统设置」只接受白名单键；回收站恢复只允许映射表里列出的类型。
+
 ### 高危：`ENABLE_DEV_LOGIN` 开发登录后门
 
 `.env` 中的 `ENABLE_DEV_LOGIN=1` 会开启一个**免密开发登录入口** `GET /auth/dev-login`（仅用于本地自动化测试），**绝不能留在生产环境**。
@@ -321,8 +367,9 @@ docker compose run --rm -p 35555:35555 app npm run dev
 `app.js` 使用 `express-session`，当前 cookie 仅配置了 `httpOnly: true` 与 2 小时 `maxAge`。以下生产隐患需在部署前自行处理（均为代码层配置，需改 `app.js` 的 `session(...)` 调用）：
 
 - **`SESSION_SECRET` 必须改**：代码 fallback 为 `d5st-dev-secret-change-me`、`.env.example` 占位为 `d5st_session_secret_change_in_production`。若部署者未改，攻击者可伪造 session。生产请设置强随机值（如 `openssl rand -hex 32`）。
-- **缺 `secure`**：cookie 未设 `secure`。HTTPS 部署时建议 `secure: process.env.NODE_ENV === 'production'`，避免会话 cookie 在非安全通道传输（中间人风险）。
-- **缺 `sameSite`**：建议显式 `sameSite: 'lax'`（敏感操作可用 `'strict'`），收紧跨站 CSRF 面。
+  > 已加启动自检：使用弱密钥时日志会打印告警（但不退出进程，避免把站拦死）。
+- **`sameSite`**：已显式设为 `'lax'`（配合双提交 Cookie 的 CSRF 防护）。
+- **`secure`**：仍依赖 `APP_URL` 是否为 `https://`。启用 HTTPS 后会自动为 CSRF Cookie 设置 `secure`；会话 Cookie 建议同样按 `NODE_ENV === 'production'` 打开（需确认站点已全站 HTTPS，否则登录会失效）。
 - **默认 MemoryStore**：未配置 `store`，session 存进程内存。单实例本地无碍，但容器重启会全员掉登录、多副本不共享、长期运行有内存增长。生产建议改接 MySQL（如 `express-mysql-session`）。
 
 ## 许可证

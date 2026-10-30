@@ -2435,6 +2435,9 @@ body.page-body.night-mode {
   --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.45);
   --text-dark: #e0e6ed;
   --text-light: rgba(224, 230, 237, 0.75);
+  /* 夜间把「次要文字」提亮：浅色主题下 #6b7280 才够对比度，
+     但在深色底上会看不见，必须换浅灰。 */
+  --text-muted: #9aa5b1;
 }
 
 /* 左下角「首页」悬浮按钮：深色玻璃 + 浅色文字 */

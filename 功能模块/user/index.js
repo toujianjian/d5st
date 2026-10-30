@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require('../../配置/db');
 const level = require('../../配置/level');
 const { avatarUpload } = require('../../配置/upload');
+const { requireId, rateLimit, cleanShort } = require('../../配置/security');
 
 function requireLogin(req, res, next) {
   if (!req.session.user) return res.redirect('/login');
@@ -48,7 +49,7 @@ router.get('/', requireLogin, async (req, res) => {
 });
 
 // 上传/更新头像（二进制存 user_avatars 表；并把 casdoor_users.avatar 指向本地输出地址）
-router.post('/avatar', requireLogin, (req, res) => {
+router.post('/avatar', requireLogin, rateLimit({ name: 'avatar', window: 10 * 60 * 1000, max: 10, keyBy: 'user' }), (req, res) => {
   avatarUpload.single('avatar')(req, res, async (err) => {
     if (err) {
       const msg = err.code === 'LIMIT_FILE_SIZE' ? '头像不能超过 3MB' : (err.message || '上传失败');
@@ -145,7 +146,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 // 关注 / 取消关注（API）
-router.post('/:id/follow', requireLogin, async (req, res) => {
+router.post('/:id/follow', requireLogin, requireId('id'), rateLimit({ name: 'follow', window: 60 * 1000, max: 60, keyBy: 'user' }), async (req, res) => {
   const targetId = parseInt(req.params.id, 10);
   if (isNaN(targetId) || targetId === req.session.user.id) {
     return res.status(400).json({ error: '非法操作' });
@@ -215,16 +216,22 @@ router.get('/edit', requireLogin, async (req, res) => {
 
 router.post('/edit', requireLogin, async (req, res) => {
   const { nickname, grade, class_name, student_no } = req.body;
+  // 长度上限与列宽对齐，避免超长输入导致 500；
+  // 昵称还用于顶栏/帖子作者展示，统一裁剪控制字符。
+  const nicknameVal = cleanShort(nickname, 32) || null;
+  const gradeVal = cleanShort(grade, 16) || null;
+  const classVal = cleanShort(class_name, 32) || null;
+  const studentNoVal = cleanShort(student_no, 32) || null;
   try {
     await pool.query(
       'UPDATE casdoor_users SET nickname = ?, grade = ?, class_name = ?, student_no = ? WHERE id = ?',
-      [nickname || null, grade || null, class_name || null, student_no || null, req.session.user.id]
+      [nicknameVal, gradeVal, classVal, studentNoVal, req.session.user.id]
     );
     // 同步刷新 session，否则顶栏/侧栏等用 session 渲染的地方仍显示旧昵称
-    req.session.user.nickname = nickname || null;
-    req.session.user.grade = grade || null;
-    req.session.user.class_name = class_name || null;
-    req.session.user.student_no = student_no || null;
+    req.session.user.nickname = nicknameVal;
+    req.session.user.grade = gradeVal;
+    req.session.user.class_name = classVal;
+    req.session.user.student_no = studentNoVal;
     res.redirect('/user');
   } catch (err) {
     res.redirect('/user/edit?error=update_failed');

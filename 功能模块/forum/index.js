@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../../配置/db');
 const { scan, logHit } = require('../sensitive-check');
+const { rateLimit, requireId, cleanShort, cleanText, parsePage } = require('../../配置/security');
 
 // 分类文案（兼容旧数据）
 const CATEGORY_LABELS = {
@@ -20,6 +21,12 @@ const PAGE_SIZE = 10;
 
 // MySQL 用 INSERT IGNORE，SQLite 用 INSERT OR IGNORE
 const IGNORE = pool.isMysql ? 'INSERT IGNORE' : 'INSERT OR IGNORE';
+// 方言差异：MySQL 的 ON DUPLICATE KEY UPDATE / CURDATE() 在 SQLite 下不可用，
+// 本地开发（SQLite）会用整条语句报错，所以按驱动分支。
+const IS_MYSQL = pool.isMysql;
+const TODAY = IS_MYSQL ? 'CURDATE()' : "date('now','localtime')";
+// 取刚插入行的自增 id（SQLite 用 last_insert_rowid()）
+const LAST_ID_SQL = IS_MYSQL ? 'SELECT LAST_INSERT_ID() as id' : 'SELECT last_insert_rowid() as id';
 
 function parseTags(str) {
   if (!str) return [];
@@ -99,10 +106,14 @@ function buildWhere({ boardId, category, tag, onlyFeatured }) {
 }
 
 function buildOrder(sort) {
-  // 置顶始终优先（对应后台「置顶」管理）
-  if (sort === 'hot') return 'fp.is_top DESC, like_count DESC, fp.created_at DESC';
-  if (sort === 'essence') return 'fp.is_top DESC, fp.is_hot DESC, fp.created_at DESC';
-  return 'fp.is_top DESC, fp.created_at DESC';
+  // 白名单：sort 来自 query，绝不能直接拼进 SQL。
+  // 之前虽已用 if 分支兜底，这里改为显式映射表，杜绝后续加分支时误拼。
+  const ORDERS = {
+    newest: 'fp.is_top DESC, fp.created_at DESC',
+    hot: 'fp.is_top DESC, like_count DESC, fp.created_at DESC',
+    essence: 'fp.is_top DESC, fp.is_hot DESC, fp.created_at DESC'
+  };
+  return ORDERS[sort] || ORDERS.newest;
 }
 
 const POST_SELECT = `
@@ -158,7 +169,7 @@ async function buildSidebar(req) {
   if (req.session.user) {
     try {
       const [rows] = await pool.query(
-        'SELECT 1 FROM user_checkins WHERE user_id = ? AND checkin_date = CURDATE() LIMIT 1',
+        `SELECT 1 FROM user_checkins WHERE user_id = ? AND checkin_date = ${TODAY} LIMIT 1`,
         [req.session.user.id]
       );
       checkedIn = rows && rows.length > 0;
@@ -175,7 +186,7 @@ router.get('/', async (req, res) => {
     const category = req.query.category || '';
     const sort = req.query.sort || 'newest';
     const tag = req.query.tag || '';
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const page = parsePage(req.query.page);
 
     let board = null;
     let boardId = null;
@@ -199,8 +210,8 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * PAGE_SIZE;
 
     const [posts] = await pool.query(
-      `${POST_SELECT} ${where} ORDER BY ${buildOrder(sort)} LIMIT ${PAGE_SIZE} OFFSET ${offset}`,
-      params
+      `${POST_SELECT} ${where} ORDER BY ${buildOrder(sort)} LIMIT ? OFFSET ?`,
+      params.concat([PAGE_SIZE, offset])
     );
 
     const sidebar = await buildSidebar(req);
@@ -236,21 +247,27 @@ router.get('/new', async (req, res) => {
 });
 
 // ============ 发布 ============
-router.post('/', async (req, res) => {
+// 限流：每用户 10 分钟最多 10 帖，防刷屏/灌水
+router.post('/', rateLimit({ name: 'post-create', window: 10 * 60 * 1000, max: 10, keyBy: 'user' }), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const { title, content, category, tags, post_type, cover_image, board_id } = req.body;
-  if (!content || content.trim().length < 2) {
+  // 统一裁剪长度并剥除控制字符（数据库列宽有限，超长会直接 500）
+  const contentRaw = cleanText(content, 20000);
+  if (!contentRaw || contentRaw.trim().length < 2) {
     return res.status(400).json({ error: '内容不能为空（至少 2 字）' });
   }
-  const titleVal = (title && title.trim()) ? title.trim() : content.trim().slice(0, 30);
-  const catVal = (category || 'general').trim();
-  const tagsVal = tags ? String(tags).trim() : null;
+  const titleRaw = cleanShort(title, 200);
+  const titleVal = titleRaw || contentRaw.trim().slice(0, 30);
+  // 分类必须是已知值，否则列表页筛选与样式都会错乱
+  const catVal = CATEGORY_LABELS[category] ? category : 'general';
+  const tagsVal = tags ? cleanShort(tags, 500) : null;
   const typeVal = POST_TYPES[post_type] ? post_type : 'normal';
-  const coverVal = (cover_image && cover_image.trim()) ? cover_image.trim() : null;
-  const boardVal = board_id ? Number(board_id) : null;
+  const coverVal = (cover_image && String(cover_image).trim()) ? cleanShort(cover_image, 500) : null;
+  const boardNum = board_id ? parseInt(board_id, 10) : null;
+  const boardVal = Number.isSafeInteger(boardNum) && boardNum > 0 ? boardNum : null;
   // 敏感词：标题与正文都扫描，命中则屏蔽并留记录
   const tScan = scan(titleVal);
-  const cScan = scan(content.trim());
+  const cScan = scan(contentRaw.trim());
   const matched = [...new Set([...tScan.matched, ...cScan.matched])];
   const safeTitle = tScan.filtered;
   const safeContent = cScan.filtered;
@@ -262,7 +279,7 @@ router.post('/', async (req, res) => {
     );
     let postId = result && result.insertId;
     if (!postId) {
-      const [r] = await pool.query('SELECT LAST_INSERT_ID() as id');
+      const [r] = await pool.query(LAST_ID_SQL);
       postId = r[0].id;
     }
     if (tagsVal) await syncPostTags(postId, tagsVal);
@@ -274,14 +291,17 @@ router.post('/', async (req, res) => {
         contentType: 'post',
         contentId: postId,
         matched,
-        rawContent: `标题：${titleVal}\n正文：${content.trim()}`
+        rawContent: `标题：${titleVal}\n正文：${contentRaw.trim()}`
       });
     }
     // 发帖奖励积分（linfeng 积分体系）
     try {
       await pool.query(
-        `INSERT INTO user_points (user_id, points, exp) VALUES (?, 5, 5)
-         ON DUPLICATE KEY UPDATE points = points + 5, exp = exp + 5`,
+        IS_MYSQL
+          ? `INSERT INTO user_points (user_id, points, exp) VALUES (?, 5, 5)
+             ON DUPLICATE KEY UPDATE points = points + 5, exp = exp + 5`
+          : `INSERT INTO user_points (user_id, points, exp) VALUES (?, 5, 5)
+             ON CONFLICT(user_id) DO UPDATE SET points = points + 5, exp = exp + 5`,
         [req.session.user.id]
       );
       await pool.query('UPDATE casdoor_users SET points = points + 5 WHERE id = ?', [req.session.user.id]);
@@ -299,30 +319,34 @@ router.post('/checkin', async (req, res) => {
   const userId = req.session.user.id;
   try {
     const [done] = await pool.query(
-      'SELECT 1 FROM user_checkins WHERE user_id = ? AND checkin_date = CURDATE() LIMIT 1',
+      `SELECT 1 FROM user_checkins WHERE user_id = ? AND checkin_date = ${TODAY} LIMIT 1`,
       [userId]
     );
     if (done && done.length > 0) {
       return res.json({ success: false, msg: '今天已经签到过了' });
     }
     await pool.query(
-      'INSERT INTO user_checkins (user_id, checkin_date, points) VALUES (?, CURDATE(), 10)',
+      `INSERT INTO user_checkins (user_id, checkin_date, points) VALUES (?, ${TODAY}, 10)`,
       [userId]
     );
     await pool.query(
-      `INSERT INTO user_points (user_id, points, exp) VALUES (?, 10, 10)
-       ON DUPLICATE KEY UPDATE points = points + 10, exp = exp + 10`,
+      IS_MYSQL
+        ? `INSERT INTO user_points (user_id, points, exp) VALUES (?, 10, 10)
+           ON DUPLICATE KEY UPDATE points = points + 10, exp = exp + 10`
+        : `INSERT INTO user_points (user_id, points, exp) VALUES (?, 10, 10)
+           ON CONFLICT(user_id) DO UPDATE SET points = points + 10, exp = exp + 10`,
       [userId]
     );
     await pool.query('UPDATE casdoor_users SET points = points + 10 WHERE id = ?', [userId]);
     res.json({ success: true, points: 10, msg: '签到成功，积分 +10' });
   } catch (err) {
+    console.error('签到失败:', err.message);
     res.status(500).json({ error: '签到失败' });
   }
 });
 
 // ============ 帖子详情 ============
-router.get('/:id', async (req, res) => {
+router.get('/:id', requireId('id'), async (req, res) => {
   try {
     const id = req.params.id;
     const [rows] = await pool.query(
@@ -416,11 +440,14 @@ router.get('/:id', async (req, res) => {
 });
 
 // ============ 点赞 / 取消 ============
-router.post('/like/:id', async (req, res) => {
+router.post('/like/:id', requireId('id'), rateLimit({ name: 'like', window: 60 * 1000, max: 60, keyBy: 'user' }), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const postId = req.params.id;
   const userId = req.session.user.id;
   try {
+    // 先确认帖子存在且未删除，避免给任意 id 刷点赞记录（脏数据/枚举）
+    const [p] = await pool.query('SELECT id FROM forum_posts WHERE id = ? AND is_deleted = 0 LIMIT 1', [postId]);
+    if (!p || p.length === 0) return res.status(404).json({ error: '帖子不存在' });
     const [existing] = await pool.query(
       'SELECT * FROM post_likes WHERE post_id = ? AND user_id = ?', [postId, userId]
     );
@@ -436,23 +463,38 @@ router.post('/like/:id', async (req, res) => {
 });
 
 // ============ 评论 ============
-router.post('/comment/:id', async (req, res) => {
+router.post('/comment/:id', requireId('id'), rateLimit({ name: 'comment', window: 60 * 1000, max: 20, keyBy: 'user' }), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const postId = req.params.id;
   const { content, parent_id } = req.body;
-  if (!content || content.trim().length < 1) {
+  const raw = cleanText(content, 5000).trim();
+  if (!raw) {
     return res.status(400).json({ error: '评论内容不能为空' });
   }
-  const raw = content.trim();
   const { filtered, matched } = scan(raw);
+  // parent_id 必须是正整数，且确实属于同一帖子（防止跨帖引用与类型混淆）
+  let parentVal = null;
+  if (parent_id !== undefined && parent_id !== null && parent_id !== '') {
+    const p = parseInt(parent_id, 10);
+    if (Number.isSafeInteger(p) && p > 0) {
+      const [pc] = await pool.query(
+        'SELECT id FROM post_comments WHERE id = ? AND post_id = ? LIMIT 1', [p, postId]
+      );
+      if (pc && pc.length > 0) parentVal = p;
+    }
+  }
   try {
+    const [postRows] = await pool.query(
+      'SELECT id FROM forum_posts WHERE id = ? AND is_deleted = 0 LIMIT 1', [postId]
+    );
+    if (!postRows || postRows.length === 0) return res.status(404).json({ error: '帖子不存在' });
     const [result] = await pool.query(
       'INSERT INTO post_comments (post_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)',
-      [postId, req.session.user.id, filtered, parent_id ? Number(parent_id) : null]
+      [postId, req.session.user.id, filtered, parentVal]
     );
     let commentId = result && result.insertId;
     if (!commentId) {
-      const [r] = await pool.query('SELECT LAST_INSERT_ID() as id');
+      const [r] = await pool.query(LAST_ID_SQL);
       commentId = r[0].id;
     }
     if (matched.length) {
@@ -471,7 +513,7 @@ router.post('/comment/:id', async (req, res) => {
   }
 });
 
-router.get('/comments/:id', async (req, res) => {
+router.get('/comments/:id', requireId('id'), async (req, res) => {
   try {
     const [comments] = await pool.query(
       `SELECT pc.*, cu.username, COALESCE(NULLIF(cu.nickname,''), NULLIF(cu.real_name,''), cu.username) AS real_name, cu.avatar FROM post_comments pc
@@ -487,13 +529,25 @@ router.get('/comments/:id', async (req, res) => {
 });
 
 // ============ 举报 ============
-router.post('/report/:id', async (req, res) => {
+router.post('/report/:id', requireId('id'), rateLimit({ name: 'report', window: 60 * 60 * 1000, max: 20, keyBy: 'user' }), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const { reason } = req.body;
+  const reasonVal = cleanShort(reason, 500) || '';
   try {
+    // 校验目标帖子存在，避免向 reports 灌入指向不存在帖子的脏记录
+    const [p] = await pool.query(
+      'SELECT id FROM forum_posts WHERE id = ? AND is_deleted = 0 LIMIT 1', [req.params.id]
+    );
+    if (!p || p.length === 0) return res.status(404).json({ error: '帖子不存在' });
+    // 同一用户对同一帖子重复举报无意义，直接幂等返回
+    const [dup] = await pool.query(
+      'SELECT id FROM reports WHERE post_id = ? AND reporter_id = ? LIMIT 1',
+      [req.params.id, req.session.user.id]
+    );
+    if (dup && dup.length > 0) return res.json({ success: true, duplicate: true });
     await pool.query(
       'INSERT INTO reports (post_id, reporter_id, reason) VALUES (?, ?, ?)',
-      [req.params.id, req.session.user.id, reason || '']
+      [req.params.id, req.session.user.id, reasonVal]
     );
     res.json({ success: true });
   } catch (err) {
@@ -502,7 +556,7 @@ router.post('/report/:id', async (req, res) => {
 });
 
 // ============ 删除自己的帖子（软删除，进回收站） ============
-router.post('/delete/:id', async (req, res) => {
+router.post('/delete/:id', requireId('id'), async (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: '请先登录' });
   const id = req.params.id;
   try {
