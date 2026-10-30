@@ -164,9 +164,46 @@ function sweep(now) {
   }
 }
 
+// 是否内网/回环地址（用于判断「我是不是在反向代理后面」）
+function isPrivatePeer(addr) {
+  if (!addr) return false;
+  const a = addr.replace(/^::ffff:/, '');
+  if (a === '::1' || a === '127.0.0.1') return true;
+  if (/^127\./.test(a)) return true;
+  if (/^10\./.test(a)) return true;
+  if (/^192\.168\./.test(a)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(a)) return true;
+  if (/^fc|^fd/i.test(a)) return true; // IPv6 ULA
+  return false;
+}
+
+const IP_RE = /^[0-9a-fA-F:.]{3,45}$/;
+
+/**
+ * 取限流用的客户端标识。
+ *
+ * 为什么要自己算而不直接用 req.ip：
+ * 生产链路是 nginx(TLS) → Caddy → app，Caddy 的 reverse_proxy 会用
+ * 「它自己看到的对端」覆盖 X-Forwarded-For，导致 app 里所有用户的 req.ip
+ * 都是 127.0.0.1 —— 于是「按 IP 限流」退化成「全站共享一个桶」
+ * （例如留言板 10 次/10 分钟会变成全站额度，正常用户会被别人拖累）。
+ *
+ * 策略：
+ *   - 直连对端是内网/回环 → 说明我们在代理后面，信任代理写入的头
+ *     优先 X-Real-IP（nginx 用 $remote_addr 写入，最权威），
+ *     其次 X-Forwarded-For 首段；
+ *   - 直连对端是公网 IP → 说明有人在绕过代理直连，此时**不信任**任何
+ *     可伪造的头，直接用对端地址（否则攻击者随便填个 X-Real-IP 就能绕过限流）。
+ */
 function clientKey(req) {
-  // trust proxy 已开启，req.ip 取 X-Forwarded-For 首段
-  return req.ip || req.connection?.remoteAddress || 'unknown';
+  const peer = req.socket?.remoteAddress || req.connection?.remoteAddress || '';
+  if (isPrivatePeer(peer)) {
+    const real = String(req.get('x-real-ip') || '').trim();
+    if (IP_RE.test(real)) return real;
+    const xff = String(req.get('x-forwarded-for') || '').split(',')[0].trim();
+    if (IP_RE.test(xff)) return xff;
+  }
+  return peer || 'unknown';
 }
 
 /**
