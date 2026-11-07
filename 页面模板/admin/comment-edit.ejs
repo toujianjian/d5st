@@ -1,0 +1,38 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-pen"></i> 编辑评论 #<%= comment.id %></div>
+        <div class="admin-header-sub">
+          所属帖子：
+          <a href="/forum/<%= comment.post_id %>" target="_blank" style="color:var(--primary);">#<%= comment.post_id %></a>
+        </div>
+      </div>
+      <a class="btn btn-ghost" href="/admin/comments"><i class="fas fa-arrow-left"></i> 返回列表</a>
+    </div>
+
+    <div class="card">
+      <form method="POST" action="/admin/comments/edit/<%= comment.id %>">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label class="form-label">评论内容</label>
+            <textarea class="form-input" name="content" rows="8" required><%= comment.content || '' %></textarea>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;color:#d32f2f;">
+            <input type="checkbox" name="is_deleted" value="1" <%= comment.is_deleted ? 'checked' : '' %> /> 标记为已删除
+          </label>
+          <div>
+            <button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> 保存</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

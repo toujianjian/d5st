@@ -1,0 +1,62 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-book"></i> 留言板管理</div>
+        <div class="admin-header-sub">共 <%= total %> 条留言 · 游客与登录用户都可以留言，这里可审核删除</div>
+      </div>
+      <form method="GET" action="/admin/guestbook" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= q || '' %>" placeholder="搜索内容 / 昵称"
+               style="padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);" />
+        <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> 搜索</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <% if (!messages || messages.length === 0) { %>
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">暂无留言</div>
+      <% } else { %>
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>留言者</th><th>内容</th><th>时间</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <% messages.forEach(function(m) { %>
+              <tr>
+                <td><%= m.id %></td>
+                <td>
+                  <%= m.author_name || '匿名用户' %>
+                  <% if (m.username) { %><br><span style="font-size:12px;color:var(--text-muted);">@<%= m.username %></span><% } %>
+                </td>
+                <td style="max-width:420px;white-space:pre-wrap;word-break:break-word;"><%= m.content %></td>
+                <td style="white-space:nowrap;"><%= fmtDate(m.created_at) %></td>
+                <td>
+                  <form method="POST" action="/admin/guestbook/delete/<%= m.id %>" style="display:inline;margin:0;"
+                        onsubmit="return confirm('确定删除这条留言？')">
+                    <button class="btn btn-danger btn-sm" type="submit">删除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <% if (totalPages > 1) { %>
+      <div class="card" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <% for (var i = 1; i <= totalPages; i++) { if (totalPages > 12 && Math.abs(i - page) > 3 && i !== 1 && i !== totalPages) continue; %>
+          <a class="btn btn-sm <%= i === page ? 'btn-primary' : 'btn-ghost' %>"
+             href="/admin/guestbook?page=<%= i %><%= q ? '&q=' + encodeURIComponent(q) : '' %>"><%= i %></a>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>

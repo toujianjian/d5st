@@ -1,0 +1,63 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-envelope"></i> 私信管理</div>
+        <div class="admin-header-sub">
+          共 <%= stat.total || 0 %> 条 · 未读 <%= stat.unread || 0 %> 条
+        </div>
+      </div>
+      <form method="GET" action="/admin/messages" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= q || '' %>" placeholder="搜索私信内容"
+               style="padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);" />
+        <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> 搜索</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <% if (!messages || messages.length === 0) { %>
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">暂无私信</div>
+      <% } else { %>
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>发件人</th><th>收件人</th><th>内容</th><th>状态</th><th>时间</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <% messages.forEach(function(m) { %>
+              <tr>
+                <td><%= m.id %></td>
+                <td><%= m.sender_show || m.sender_name || ('#' + m.sender_id) %></td>
+                <td><%= m.receiver_show || m.receiver_name || ('#' + m.receiver_id) %></td>
+                <td style="max-width:360px;white-space:pre-wrap;word-break:break-word;"><%= m.content %></td>
+                <td><%= m.is_read ? '已读' : '<span style="color:var(--primary);">未读</span>' %></td>
+                <td style="white-space:nowrap;"><%= fmtDate(m.created_at) %></td>
+                <td>
+                  <form method="POST" action="/admin/messages/delete/<%= m.id %>" style="display:inline;margin:0;"
+                        onsubmit="return confirm('确定删除这条私信？')">
+                    <button class="btn btn-danger btn-sm" type="submit">删除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <% if (totalPages > 1) { %>
+      <div class="card" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <% for (var i = 1; i <= totalPages; i++) { if (totalPages > 12 && Math.abs(i - page) > 3 && i !== 1 && i !== totalPages) continue; %>
+          <a class="btn btn-sm <%= i === page ? 'btn-primary' : 'btn-ghost' %>"
+             href="/admin/messages?page=<%= i %><%= q ? '&q=' + encodeURIComponent(q) : '' %>"><%= i %></a>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>

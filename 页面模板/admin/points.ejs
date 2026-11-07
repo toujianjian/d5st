@@ -1,0 +1,97 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-star"></i> 积分与签到</div>
+        <div class="admin-header-sub">共 <%= total %> 位用户 · 调整积分会同步 casdoor_users 与 user_points</div>
+      </div>
+      <form method="GET" action="/admin/points" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= q || '' %>" placeholder="搜索用户名 / 昵称"
+               style="padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);" />
+        <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> 搜索</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-adjust"></i> 调整积分</div>
+      <form method="POST" action="/admin/points/adjust" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label class="form-label">用户 ID</label>
+          <input class="form-input" type="number" name="user_id" min="1" required />
+        </div>
+        <div>
+          <label class="form-label">调整值（可负）</label>
+          <input class="form-input" type="number" name="delta" placeholder="如 50 或 -20" required />
+        </div>
+        <button class="btn btn-primary" type="submit"><i class="fas fa-check"></i> 应用</button>
+      </form>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:8px;">积分为负数时会自动按 0 处理，不会出现负分。</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-users"></i> 用户积分</div>
+      <% if (!users || users.length === 0) { %>
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">没有匹配的用户</div>
+      <% } else { %>
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>用户</th><th>积分</th><th>签到天数</th><th>最近签到</th></tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u) { %>
+              <tr>
+                <td><%= u.id %></td>
+                <td>
+                  <a href="/user/<%= u.id %>" target="_blank" style="color:var(--primary);text-decoration:none;">
+                    <%= u.user_show || u.username %>
+                  </a>
+                </td>
+                <td><strong><%= u.points || 0 %></strong></td>
+                <td><%= u.checkin_days || 0 %></td>
+                <td style="white-space:nowrap;"><%= u.last_checkin ? String(u.last_checkin).slice(0, 10) : '-' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-calendar-check"></i> 最近签到流水（30 条）</div>
+      <% if (!checkins || checkins.length === 0) { %>
+        <div style="padding:24px;text-align:center;color:var(--text-muted);">暂无签到记录</div>
+      <% } else { %>
+        <table class="table">
+          <thead><tr><th>ID</th><th>用户</th><th>签到日期</th><th>获得积分</th><th>记录时间</th></tr></thead>
+          <tbody>
+            <% checkins.forEach(function(c) { %>
+              <tr>
+                <td><%= c.id %></td>
+                <td><%= c.username || ('#' + c.user_id) %></td>
+                <td><%= String(c.checkin_date || '').slice(0, 10) %></td>
+                <td><%= c.points %></td>
+                <td style="white-space:nowrap;"><%= fmtDate(c.created_at) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <% if (totalPages > 1) { %>
+      <div class="card" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <% for (var i = 1; i <= totalPages; i++) { if (totalPages > 12 && Math.abs(i - page) > 3 && i !== 1 && i !== totalPages) continue; %>
+          <a class="btn btn-sm <%= i === page ? 'btn-primary' : 'btn-ghost' %>"
+             href="/admin/points?page=<%= i %><%= q ? '&q=' + encodeURIComponent(q) : '' %>"><%= i %></a>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>

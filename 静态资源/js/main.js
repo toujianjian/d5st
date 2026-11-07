@@ -210,8 +210,28 @@
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
+  // ============================================================
+  // 后台表格：统一套一层横向滚动容器
+  // ------------------------------------------------------------
+  // 后台 20 个页面里只有少数自带 overflow-x 容器，其余表格
+  // 最小内容宽度约 1800px，在手机(390px)上被裁掉且无法滚动 ——
+  // 表现为「置顶/精华/删除」等右侧按钮完全点不到。
+  // 这里在渲染后统一包一层 .table-scroll，CSS 见 admin/_style.ejs。
+  // ============================================================
+  function wrapAdminTables(root) {
+    (root || document).querySelectorAll('.admin-content table').forEach(function(table) {
+      // 已经被包过（或自己就是滚动容器）就跳过
+      if (table.closest('.table-scroll')) return;
+      var wrap = document.createElement('div');
+      wrap.className = 'table-scroll';
+      table.parentNode.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     injectAllFormTokens(document);
+    wrapAdminTables(document);
     loadPopups();
     initForumFeatures();
     initChat();

@@ -30,30 +30,43 @@
     box-shadow: 4px 0 24px rgba(211, 47, 47, 0.25);
     display: flex; flex-direction: column;
     min-height: calc(100vh - 60px);
+    /* 导航项多了以后不能让侧栏自己撑宽，也不能把内容区挤变形 */
+    min-width: 0; overflow: hidden;
   }
   .admin-sidebar-logo {
-    padding: 0 24px 24px;
+    padding: 0 24px 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     display: flex; align-items: center; gap: 12px;
+    color: #fff; text-decoration: none;
   }
+  .admin-sidebar-logo:hover { opacity: .9; }
   .admin-sidebar-logo-icon {
     width: 40px; height: 40px; border-radius: 12px;
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.2);
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+    font-size: 18px; flex: none;
   }
-  .admin-sidebar-logo-text { display: flex; flex-direction: column; }
+  .admin-sidebar-logo-text { display: flex; flex-direction: column; min-width: 0; }
   .admin-sidebar-title {
     font-size: 16px; font-weight: 700; letter-spacing: 0.5px;
     font-family: 'Noto Serif SC', serif;
   }
   .admin-sidebar-sub { font-size: 11px; opacity: 0.75; margin-top: 2px; }
 
+  /* 底部「返回站点」：与导航列表分开，滚动时始终可见 */
+  .admin-sidebar-foot {
+    padding: 10px 12px 0;
+    margin-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
   .admin-nav {
     display: flex; flex-direction: column; gap: 2px;
-    padding: 0 12px; flex: 1; overflow-y: auto;
+    padding: 0 12px; flex: 1;
+    overflow-y: auto; overflow-x: hidden;
+    min-width: 0;
   }
   .admin-nav-group {
     font-size: 11px; font-weight: 600;
@@ -83,26 +96,12 @@
   }
 
   /* 旧版侧栏写法：<h3>分组</h3> + 纯 <a> 链接 */
-  .admin-sidebar h3 {
-    font-size: 11px; font-weight: 600;
-    color: rgba(255, 255, 255, 0.6);
-    padding: 14px 24px 6px;
-    margin: 0;
-    text-transform: uppercase; letter-spacing: 1px;
-  }
-  .admin-sidebar > a {
-    display: block;
-    padding: 9px 24px;
-    color: rgba(255, 255, 255, 0.85);
-    text-decoration: none;
-    font-size: 13px; font-weight: 500;
-    transition: background 0.2s, color 0.2s, padding-left 0.2s;
-  }
-  .admin-sidebar > a:hover {
-    background: rgba(255, 255, 255, 0.15);
-    color: #fff;
-    padding-left: 28px;
-  }
+  /* 说明：原先后台每个页面手写裸 <h3> + <a> 侧栏，所以这里有
+     `.admin-sidebar h3` / `.admin-sidebar > a` 两条兜底样式。
+     现在侧栏统一由 admin/_nav.ejs 渲染（.admin-nav / .admin-nav-item），
+     这两条已无使用场景，且 `.admin-sidebar > a`（特异性 0,1,1）会压掉
+     `.admin-sidebar-logo`（0,1,0）的 `display:none`，导致移动端 logo 不隐藏。
+     故删除。 */
 
   /* ---------- 内容区 ---------- */
   .admin-content {
@@ -326,6 +325,20 @@
   .admin-content .badge-success { background: rgba(76, 175, 80, 0.12); color: #2e7d32; }
   .admin-content .badge-danger { background: rgba(211, 47, 47, 0.12); color: #c62828; }
   .admin-content .badge-warning { background: rgba(255, 152, 0, 0.14); color: #e65100; }
+  /* 中性徽标：新增的标签/名册等页面用到（原来只定义了 success/danger/warning） */
+  .admin-content .badge-default { background: rgba(0, 0, 0, 0.06); color: var(--text-muted); }
+
+  /* ---------- 卡片标题 ----------
+     新页面（留言板/私信/赞助/标签/勋章/积分/保密号/名册）沿用了 .card-title，
+     此前只有个别页面自带定义，这里统一到公共样式。 */
+  .admin-content .card-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 15px; font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 14px;
+  }
+  .admin-content .card-title i { color: var(--primary); }
+
 
   /* ---------- 表格 ---------- */
   .admin-content table,
@@ -350,18 +363,106 @@
   @media (max-width: 1024px) {
     .admin-stats { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* ---- 平板/手机：后台整体重排 ----
+     原实现的问题（实测 iPhone 390px）：
+       1) 侧栏 width:100% 后有 19 个菜单项竖排，把整个首屏吃满，
+          每进一个页面都要先滚过整段菜单；
+       2) 表格最小内容宽度约 1843px，被裁在 390px 视口里且不能横向滚动，
+          右侧「置顶 / 精华 / 删除」按钮根本点不到；
+       3) flex 项默认 min-width:auto，表格的最小宽度会一路把
+          main → .admin-layout → .admin-sidebar 全部顶宽到 1800px+。
+     处理方式：
+       - 打断 min-width 传递链（下面的 min-width:0 一组）
+       - 表格交给 main.js 统一包一层 .table-scroll（横向滚动容器） */
+
+  /* 打断 flex/grid 项的 min-width:auto 传递，防止表格把祖先撑宽 */
+  body.admin-mode .main-wrapper,
+  body.admin-mode main,
+  .admin-layout,
+  .admin-sidebar,
+  .admin-content,
+  .admin-content > * { min-width: 0; }
+
+  /* 表格横向滚动容器（main.js 会自动给每张后台表格套上） */
+  .table-scroll {
+    width: 100%; max-width: 100%;
+    overflow-x: auto; overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+  }
+  .table-scroll::-webkit-scrollbar { height: 6px; }
+  .table-scroll::-webkit-scrollbar-thumb { background: rgba(211,47,47,.35); border-radius: 3px; }
+  .table-scroll table { min-width: max-content; }
+
   @media (max-width: 768px) {
-    .admin-layout { flex-direction: column; }
+    .admin-layout { flex-direction: column; min-height: auto; }
+
+    /* 侧栏：紧凑顶部条 + 横向滑动菜单，不再占满首屏 */
     .admin-sidebar {
       width: 100%; min-height: auto;
-      border-radius: 20px 20px 0 0;
-      padding: 20px 0;
+      border-radius: 0 0 20px 20px;
+      padding: 8px 0 10px;
+      position: sticky; top: 0; z-index: 400;
     }
-    .admin-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+    .admin-sidebar-logo { display: none; }
+    .admin-nav {
+      flex-direction: row; flex-wrap: nowrap;
+      gap: 6px; padding: 0 12px;
+      overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .admin-nav::-webkit-scrollbar { display: none; }
     .admin-nav-group { display: none; }
-    .admin-sidebar h3 { display: none; }
-    .admin-content { padding: 20px 16px; }
-    .admin-stats { grid-template-columns: 1fr 1fr; }
-    .admin-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .admin-nav-item {
+      flex: 0 0 auto; white-space: nowrap;
+      padding: 8px 14px; font-size: 13px;
+    }
+    .admin-nav-item i { width: auto; }
+    .admin-nav-item:hover { transform: none; }
+
+    /* 内容区 */
+    .admin-content { padding: 16px 12px; }
+    .admin-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .admin-header h1, .admin-header .admin-title { font-size: 1.15rem; line-height: 1.35; }
+    .admin-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .admin-stat { padding: 14px 12px; }
+    .admin-stat .value, .admin-stat-value { font-size: 1.4rem; }
+
+    /* 表格文字不换行，靠 .table-scroll 横滑，保证操作按钮可点 */
+    .admin-content th, .admin-content td {
+      white-space: nowrap;
+      padding: 10px 12px;
+    }
+    .admin-content { font-size: 13px; }
+    /* 表格里的按钮在手机上容易点错，撑到 36px 高 */
+    .admin-content .btn-sm, .admin-content .btn { min-height: 36px; padding: 6px 12px; }
+
+    /* 表单：输入框占满一行（16px 字号可避免 iOS 聚焦自动放大） */
+    .admin-content input[type="text"],
+    .admin-content input[type="url"],
+    .admin-content input[type="number"],
+    .admin-content input[type="date"],
+    .admin-content input[type="datetime-local"],
+    .admin-content input[name="q"],
+    .admin-content select,
+    .admin-content textarea { width: 100% !important; max-width: 100%; font-size: 16px; }
+
+    .admin-content form { max-width: 100%; }
+
+    /* 顶部搜索行：输入框与按钮同排，输入框吃掉剩余宽度，
+       避免按钮被挤到下一行（原先 input 固定 240px + 100% 覆盖导致换行） */
+    .admin-header form {
+      width: 100%;
+      display: flex; gap: 8px; flex-wrap: nowrap; align-items: center;
+    }
+    .admin-header form input[type="text"] { flex: 1 1 auto; width: auto !important; min-width: 0; }
+    .admin-header form .btn { flex: 0 0 auto; white-space: nowrap; }
+  }
+
+  /* 超窄屏（≤400px）：统计卡单列 */
+  @media (max-width: 400px) {
+    .admin-stats { grid-template-columns: 1fr; }
   }
 </style>

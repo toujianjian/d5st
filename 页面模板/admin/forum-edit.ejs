@@ -1,0 +1,68 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-pen"></i> 编辑帖子 #<%= post.id %></div>
+        <div class="admin-header-sub">
+          <a href="/forum/<%= post.id %>" target="_blank" style="color:var(--primary);">在站点中查看 →</a>
+        </div>
+      </div>
+      <a class="btn btn-ghost" href="/admin/forum"><i class="fas fa-arrow-left"></i> 返回列表</a>
+    </div>
+
+    <div class="card">
+      <form method="POST" action="/admin/forum/edit/<%= post.id %>">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label class="form-label">标题</label>
+            <input class="form-input" type="text" name="title" value="<%= post.title || '' %>" maxlength="200" />
+          </div>
+          <div>
+            <label class="form-label">正文</label>
+            <textarea class="form-input" name="content" rows="14" required><%= post.content || '' %></textarea>
+          </div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;">
+            <div style="flex:1 1 180px;">
+              <label class="form-label">分类</label>
+              <input class="form-input" type="text" name="category" value="<%= post.category || 'general' %>" />
+            </div>
+            <div style="flex:1 1 180px;">
+              <label class="form-label">标签（逗号分隔）</label>
+              <input class="form-input" type="text" name="tags" value="<%= post.tags || '' %>" />
+            </div>
+            <div style="flex:1 1 180px;">
+              <label class="form-label">所属版块</label>
+              <select class="form-input" name="board_id">
+                <option value="">（无）</option>
+                <% (boards || []).forEach(function(b) { %>
+                  <option value="<%= b.id %>" <%= String(post.board_id) === String(b.id) ? 'selected' : '' %>><%= b.name %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" name="is_top" value="1" <%= post.is_top ? 'checked' : '' %> /> 置顶
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" name="is_hot" value="1" <%= post.is_hot ? 'checked' : '' %> /> 精华
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;color:#d32f2f;">
+              <input type="checkbox" name="is_deleted" value="1" <%= post.is_deleted ? 'checked' : '' %> /> 标记为已删除
+            </label>
+          </div>
+          <div>
+            <button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> 保存</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

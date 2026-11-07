@@ -1,0 +1,73 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-id-card"></i> 学生名册</div>
+        <div class="admin-header-sub">共 <%= total %> 名学生 · 用于注册时校验真实姓名与学号</div>
+      </div>
+      <form method="GET" action="/admin/students" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= q || '' %>" placeholder="搜索姓名 / 学号 / 班级"
+               style="padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);" />
+        <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> 搜索</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-file-import"></i> 批量导入（CSV）</div>
+      <form method="POST" action="/admin/students/import">
+        <textarea class="form-input" name="csv" rows="6" required
+          placeholder="每行一条，逗号或制表符分隔：年级,班级,学号,姓名,钉钉ID&#10;高一,1班,2026001,张三,ding_xxx&#10;高一,1班,2026002,李四,"></textarea>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" type="submit"><i class="fas fa-upload"></i> 导入</button>
+          <span style="font-size:12px;color:var(--text-muted);">学号已存在则更新，不会重复插入；表头行会被自动跳过。</span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <% if (!students || students.length === 0) { %>
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">名册为空，请先导入</div>
+      <% } else { %>
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>年级</th><th>班级</th><th>学号</th><th>姓名</th><th>钉钉 ID</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <% students.forEach(function(s) { %>
+              <tr>
+                <td><%= s.id %></td>
+                <td><%= s.grade || '-' %></td>
+                <td><%= s.class_name || '-' %></td>
+                <td><%= s.student_no || '-' %></td>
+                <td><%= s.real_name || '-' %></td>
+                <td><%= s.ding_id || '-' %></td>
+                <td>
+                  <form method="POST" action="/admin/students/delete/<%= s.id %>" style="display:inline;margin:0;"
+                        onsubmit="return confirm('从名册中删除该学生？')">
+                    <button class="btn btn-danger btn-sm" type="submit">删除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+
+    <% if (totalPages > 1) { %>
+      <div class="card" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <% for (var i = 1; i <= totalPages; i++) { if (totalPages > 12 && Math.abs(i - page) > 3 && i !== 1 && i !== totalPages) continue; %>
+          <a class="btn btn-sm <%= i === page ? 'btn-primary' : 'btn-ghost' %>"
+             href="/admin/students?page=<%= i %><%= q ? '&q=' + encodeURIComponent(q) : '' %>"><%= i %></a>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+</div>

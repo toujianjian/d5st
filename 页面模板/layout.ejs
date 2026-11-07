@@ -430,6 +430,9 @@
     body.admin-mode .user-sidebar { display: none; }
     body.admin-mode .main-wrapper { margin-left: 0; }
     body.admin-mode .notification-ball { display: none; }
+    /* 后台自己已有完整侧栏导航，再显示「展开侧栏」按钮只会压住内容 */
+    body.admin-mode .mobile-sidebar-edge,
+    body.admin-mode .sidebar-backdrop { display: none !important; }
     /* ===== 移动端侧栏：收成贴边窄条，点击展开浮层（电脑端不受影响） ===== */
     .mobile-sidebar-edge { display: none; }
     .sidebar-backdrop { display: none; }

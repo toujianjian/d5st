@@ -20,46 +20,7 @@
 </style>
 
 <div class="admin-layout">
-  <aside class="admin-sidebar">
-    <div class="admin-sidebar-logo">
-      <div class="admin-sidebar-logo-icon"><i class="fas fa-shield-alt"></i></div>
-      <div class="admin-sidebar-logo-text">
-        <div class="admin-sidebar-title">D5ST 后台</div>
-        <div class="admin-sidebar-sub">Admin Console</div>
-      </div>
-    </div>
-    <nav class="admin-nav">
-      <div class="admin-nav-group">概览</div>
-      <a href="/admin" class="admin-nav-item"><i class="fas fa-tachometer-alt"></i> 仪表盘</a>
-
-      <div class="admin-nav-group">内容</div>
-      <a href="/admin/forum" class="admin-nav-item"><i class="fas fa-file-alt"></i> 帖子管理</a>
-      <a href="/admin/comments" class="admin-nav-item"><i class="fas fa-comments"></i> 评论管理</a>
-      <a href="/admin/reports" class="admin-nav-item"><i class="fas fa-exclamation-triangle"></i> 举报</a>
-      <a href="/admin/videos" class="admin-nav-item"><i class="fas fa-play-circle"></i> 视频管理</a>
-      <a href="/admin/boards" class="admin-nav-item"><i class="fas fa-layer-group"></i> 版块管理</a>
-      <a href="/admin/users" class="admin-nav-item"><i class="fas fa-users"></i> 用户管理</a>
-
-      <div class="admin-nav-group">互动</div>
-      <a href="/admin/notifications" class="admin-nav-item"><i class="fas fa-bell"></i> 通知</a>
-      <a href="/admin/popups" class="admin-nav-item"><i class="fas fa-bullhorn"></i> 弹窗</a>
-
-      <div class="admin-nav-group">内容安全</div>
-      <a href="/admin/sensitive-words" class="admin-nav-item"><i class="fas fa-ban"></i> 违禁词</a>
-      <a href="/admin/sensitive-logs" class="admin-nav-item active"><i class="fas fa-history"></i> 拦截记录</a>
-
-      <div class="admin-nav-group">首页</div>
-      <a href="/admin/home-banners" class="admin-nav-item"><i class="fas fa-image"></i> 首页配图</a>
-      <a href="/admin/home-links" class="admin-nav-item"><i class="fas fa-link"></i> 首页链接</a>
-
-      <div class="admin-nav-group">系统</div>
-      <a href="/admin/path-redirects" class="admin-nav-item"><i class="fas fa-random"></i> 路径重定向</a>
-      <a href="/admin/export-users" class="admin-nav-item"><i class="fas fa-file-export"></i> 导出用户</a>
-      <a href="/admin/export-all" class="admin-nav-item"><i class="fas fa-database"></i> 导出全部数据</a>
-      <a href="/admin/recycle-bin" class="admin-nav-item"><i class="fas fa-trash"></i> 回收站</a>
-      <a href="/admin/settings" class="admin-nav-item"><i class="fas fa-cog"></i> 设置</a>
-    </nav>
-  </aside>
+  <%- include('_nav') %>
 
   <div class="admin-content">
     <div class="admin-header">

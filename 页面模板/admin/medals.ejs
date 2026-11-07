@@ -1,0 +1,76 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-medal"></i> 勋章管理</div>
+        <div class="admin-header-sub">共 <%= medals.length %> 条授予记录 · 同一用户同一类型只会有一条（重复授予会更新名称）</div>
+      </div>
+      <form method="GET" action="/admin/medals" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= q || '' %>" placeholder="搜索用户 / 勋章"
+               style="padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);" />
+        <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> 搜索</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-plus-circle"></i> 授予勋章</div>
+      <form method="POST" action="/admin/medals/grant" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label class="form-label">用户 ID</label>
+          <input class="form-input" type="number" name="user_id" min="1" required />
+        </div>
+        <div>
+          <label class="form-label">勋章类型（英文标识）</label>
+          <input class="form-input" type="text" name="medal_type" placeholder="如 moyu_champion" required />
+        </div>
+        <div>
+          <label class="form-label">显示名称</label>
+          <input class="form-input" type="text" name="medal_name" placeholder="如 摸鱼冠军" required />
+        </div>
+        <button class="btn btn-primary" type="submit"><i class="fas fa-award"></i> 授予</button>
+      </form>
+      <% if (types && types.length) { %>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:10px;">
+          已有类型：
+          <% types.slice(0, 8).forEach(function(t, i) { %>#<%= t.medal_type %>（<%= t.medal_name %> · <%= t.cnt %>）<%= i < Math.min(types.length, 8) - 1 ? ' · ' : '' %><% }); %>
+        </div>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <% if (!medals || medals.length === 0) { %>
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">暂无勋章记录</div>
+      <% } else { %>
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>用户</th><th>类型</th><th>名称</th><th>获得时间</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <% medals.forEach(function(m) { %>
+              <tr>
+                <td><%= m.id %></td>
+                <td><%= m.user_show || m.username || ('#' + m.user_id) %></td>
+                <td><%= m.medal_type %></td>
+                <td><%= m.medal_name %></td>
+                <td style="white-space:nowrap;"><%= fmtDate(m.earned_at) %></td>
+                <td>
+                  <form method="POST" action="/admin/medals/delete/<%= m.id %>" style="display:inline;margin:0;"
+                        onsubmit="return confirm('撤销这枚勋章？')">
+                    <button class="btn btn-danger btn-sm" type="submit">撤销</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+</div>

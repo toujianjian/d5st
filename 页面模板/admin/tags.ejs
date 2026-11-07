@@ -1,0 +1,74 @@
+<div class="admin-layout">
+  <%- include('_nav') %>
+  <div class="admin-content">
+    <% if (typeof notice !== 'undefined' && notice) { %>
+      <div class="card" style="background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.18);">
+        <div style="font-size:14px;color:var(--primary-dark);"><i class="fas fa-info-circle"></i> <%= notice %></div>
+      </div>
+    <% } %>
+
+    <div class="admin-header">
+      <div>
+        <div class="admin-header-title"><i class="fas fa-tags"></i> 标签管理</div>
+        <div class="admin-header-sub">共 <%= tags.length %> 个标签 · 「使用中」= 仍被未删除的帖子引用</div>
+      </div>
+      <form method="GET" action="/admin/tags" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" name="q" value="<%= q || '' %>" placeholder="搜索标签"
+               style="padding:8px 12px;border-radius:10px;border:1px solid rgba(0,0,0,.12);" />
+        <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> 搜索</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="fas fa-code-branch"></i> 合并标签</div>
+      <form method="POST" action="/admin/tags/merge" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+        <div>
+          <label class="form-label">源标签 ID</label>
+          <input class="form-input" type="number" name="from_id" min="1" placeholder="要删掉的" required />
+        </div>
+        <div>
+          <label class="form-label">目标标签 ID</label>
+          <input class="form-input" type="number" name="to_id" min="1" placeholder="保留的" required />
+        </div>
+        <button class="btn btn-primary" type="submit"><i class="fas fa-compress-arrows-alt"></i> 合并</button>
+      </form>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+        合并会把源标签的帖子关联全部转到目标标签，然后删除源标签。适合清理「前端 / 前端开发」这类重复标签。
+      </div>
+    </div>
+
+    <div class="card">
+      <% if (!tags || tags.length === 0) { %>
+        <div style="padding:32px;text-align:center;color:var(--text-muted);">暂无标签</div>
+      <% } else { %>
+        <table class="table">
+          <thead>
+            <tr><th>ID</th><th>标签</th><th>使用中</th><th>创建时间</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <% tags.forEach(function(t) { %>
+              <tr>
+                <td><%= t.id %></td>
+                <td>#<%= t.name %></td>
+                <td>
+                  <% if (t.used_count > 0) { %>
+                    <span class="badge badge-success"><%= t.used_count %> 篇</span>
+                  <% } else { %>
+                    <span class="badge badge-default">0</span>
+                  <% } %>
+                </td>
+                <td style="white-space:nowrap;"><%= fmtDate(t.created_at) %></td>
+                <td>
+                  <form method="POST" action="/admin/tags/delete/<%= t.id %>" style="display:inline;margin:0;"
+                        onsubmit="return confirm('删除标签「<%= t.name %>」及其全部关联？')">
+                    <button class="btn btn-danger btn-sm" type="submit">删除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+</div>

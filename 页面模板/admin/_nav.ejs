@@ -1,0 +1,87 @@
+<%#
+  后台统一侧边栏
+  ------------------------------------------------------------
+  之前 19 个后台模板各自手写一份 <aside class="admin-sidebar">
+  （裸 <h3> + <a>，没有 nav class），导致：
+    1) 加一个新入口要改 19 个文件，漏改就进不去；
+    2) 样式无法统一，移动端媒体查询匹配不到（没有 .admin-nav 这些类），
+       手机上 19 个菜单项竖排把首屏吃满。
+  现在统一渲染这里，active 由 currentPath 自动判断。
+
+  变量：currentPath（layout.ejs 注入）、res.locals 里的 admin 计数（可选）
+%>
+<%
+  const _p = (typeof currentPath !== 'undefined' && currentPath) || '/admin';
+  const NAV = [
+    { group: '概览' },
+    { href: '/admin',           icon: 'fa-chart-pie',      label: '仪表盘' },
+
+    { group: '内容管理' },
+    { href: '/admin/forum',     icon: 'fa-file-alt',       label: '帖子管理' },
+    { href: '/admin/comments',  icon: 'fa-comments',       label: '评论管理' },
+    { href: '/admin/reports',   icon: 'fa-flag',           label: '举报管理' },
+    { href: '/admin/videos',    icon: 'fa-video',          label: '视频管理' },
+    { href: '/admin/boards',    icon: 'fa-layer-group',    label: '版块管理' },
+    { href: '/admin/tags',      icon: 'fa-tags',           label: '标签管理' },
+
+    { group: '社区互动' },
+    { href: '/admin/guestbook', icon: 'fa-book',           label: '留言板' },
+    { href: '/admin/messages',  icon: 'fa-envelope',       label: '私信' },
+    { href: '/admin/sponsors',  icon: 'fa-hand-holding-heart', label: '赞助记录' },
+
+    { group: '用户' },
+    { href: '/admin/users',     icon: 'fa-users',          label: '用户管理' },
+    { href: '/admin/medals',    icon: 'fa-medal',          label: '勋章' },
+    { href: '/admin/points',    icon: 'fa-star',           label: '积分与签到' },
+    { href: '/admin/secrets',   icon: 'fa-key',            label: '保密号' },
+    { href: '/admin/students',  icon: 'fa-id-card',        label: '学生名册' },
+
+    { group: '通知与首页' },
+    { href: '/admin/notifications', icon: 'fa-bullhorn',   label: '全局通知' },
+    { href: '/admin/popups',    icon: 'fa-window-restore', label: '弹窗管理' },
+    { href: '/admin/home-links',    icon: 'fa-link',       label: '首页链接' },
+    { href: '/admin/home-banners',  icon: 'fa-images',     label: '首页横幅' },
+
+    { group: '内容安全' },
+    { href: '/admin/sensitive-words', icon: 'fa-shield-alt', label: '违禁词' },
+    { href: '/admin/sensitive-logs',  icon: 'fa-history',    label: '拦截记录' },
+
+    { group: '系统' },
+    { href: '/admin/path-redirects', icon: 'fa-directions', label: '路径重定向' },
+    { href: '/admin/recycle-bin',    icon: 'fa-trash-restore', label: '回收站' },
+    { href: '/admin/export-users',   icon: 'fa-file-csv',    label: '导出用户' },
+    { href: '/admin/export-all',     icon: 'fa-database',    label: '导出全部数据' },
+    { href: '/admin/settings',       icon: 'fa-cog',         label: '系统设置' }
+  ];
+
+  // active 判定：完全相等，或当前路径以该入口 + '/' 开头（避免 /admin 匹配所有）
+  function navActive(href) {
+    if (href === '/admin') return _p === '/admin' || _p === '/admin/';
+    return _p === href || _p.indexOf(href + '/') === 0 ||
+      // 二级页面归属（例如 /admin/popups/edit/3 高亮「弹窗管理」）
+      _p.indexOf(href + '/') === 0 || _p.indexOf(href + '?') === 0;
+  }
+%>
+<aside class="admin-sidebar">
+  <a class="admin-sidebar-logo" href="/admin">
+    <span class="admin-sidebar-logo-icon"><i class="fas fa-shield-alt"></i></span>
+    <span class="admin-sidebar-logo-text">
+      <span class="admin-sidebar-title">管理后台</span>
+      <span class="admin-sidebar-sub">D5ST Console</span>
+    </span>
+  </a>
+  <nav class="admin-nav" aria-label="后台导航">
+    <% NAV.forEach(function(item) { %>
+      <% if (item.group) { %>
+        <div class="admin-nav-group"><%= item.group %></div>
+      <% } else { %>
+        <a class="admin-nav-item<%= navActive(item.href) ? ' active' : '' %>" href="<%= item.href %>">
+          <i class="fas <%= item.icon %>" aria-hidden="true"></i><span><%= item.label %></span>
+        </a>
+      <% } %>
+    <% }); %>
+  </nav>
+  <div class="admin-sidebar-foot">
+    <a class="admin-nav-item" href="/"><i class="fas fa-home" aria-hidden="true"></i><span>返回站点</span></a>
+  </div>
+</aside>
