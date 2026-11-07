@@ -24,7 +24,24 @@ function assert(c, m) { if (!c) throw new Error(m); }
   console.log(' 站点:', BASE, '| 用户:', USER);
   console.log('============================================\n');
 
-  const browser = await chromium.launch({ headless: true });
+  // 浏览器可执行文件：优先用 CHROME_PATH，其次常见的 Playwright 缓存与系统 Edge。
+  // 避免 Playwright 缓存被清理后脚本直接跑不起来。
+  const fsMod = require('fs');
+  const pathMod = require('path');
+  const candidates = [
+    process.env.CHROME_PATH,
+    pathMod.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'ms-playwright', 'chromium-1243', 'chrome-win64', 'chrome.exe'),
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
+  ].filter(Boolean);
+  const exe = candidates.find(p => { try { return fsMod.existsSync(p); } catch (e) { return false; } });
+  if (!exe) {
+    console.error('找不到可用浏览器，请设置 CHROME_PATH');
+    process.exit(2);
+  }
+  console.log('浏览器:', exe);
+
+  const browser = await chromium.launch({ headless: true, executablePath: exe });
   const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
 
