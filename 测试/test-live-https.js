@@ -1,9 +1,18 @@
 // 公网 HTTPS 链路验证（不产生任何写入副作用）
 // 目的：确认 CSRF 在 HTTPS 下可用 —— cookie 带 Secure、写操作能通过校验，
 //       同时确认 HSTS 未开启（避免证书不匹配域名被锁死）。
+//
+// 用法：BASE=https://你的域名 node 测试/test-live-https.js
+// 注意：这里**不设默认域名**。测试脚本不应该内置任何具体站点地址，
+//       否则会随仓库泄露部署信息，别人克隆后也会误打到你自己的站点。
 const https = require('https');
 
-const BASE = process.env.BASE || 'https://s1.d5st.cn';
+const BASE = process.env.BASE;
+if (!BASE) {
+  console.error('请通过环境变量指定目标站点，例如：');
+  console.error('  BASE=https://your-domain.example node 测试/test-live-https.js');
+  process.exit(2);
+}
 const jar = new Map();
 const cookieMeta = new Map();
 
