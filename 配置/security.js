@@ -57,6 +57,30 @@ function securityHeaders(req, res, next) {
   if (process.env.ENABLE_HSTS === '1') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
+
+  // ------------------------------------------------------------
+  // CDN / 反向代理适配
+  // ------------------------------------------------------------
+  // Vary 必须声明 Accept-Encoding：否则 CDN 可能把 gzip 响应发给不支持压缩的
+  // 客户端，或反之把未压缩的版本缓存下来长期复用。
+  // Cookie 不放进 Vary —— 会导致按用户碎片化缓存，命中率跌到 0。
+  res.setHeader('Vary', 'Accept-Encoding');
+
+  // 告诉 CDN 按哪些请求头区分缓存。只对可能被缓存的路径有意义，
+  // 动态页面本身是 no-store，这条主要是防止边缘把带 cookie 的响应
+  // 当成通用版本存下来。
+  if (!res.getHeader('CDN-Cache-Control')) {
+    const p = req.path || '/';
+    const isStatic = p.startsWith('/public/') || p.startsWith('/uploads/') || p.startsWith('/avatar/');
+    if (isStatic) {
+      // 静态资源与登录态无关，可以让 CDN 长期缓存
+      res.setHeader('CDN-Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      // 动态内容一律不允许在 CDN 侧落盘（页面按会话渲染）
+      res.setHeader('CDN-Cache-Control', 'no-store');
+    }
+  }
+
   next();
 }
 
@@ -180,6 +204,61 @@ function isPrivatePeer(addr) {
 const IP_RE = /^[0-9a-fA-F:.]{3,45}$/;
 
 /**
+ * CDN 场景：从 X-Forwarded-For 链里取出「真实客户端 IP」。
+ *
+ * 有 CDN 时请求链路是：
+ *   浏览器 → CDN 边缘 → 源站 nginx → Caddy → app
+ * 此时：
+ *   - X-Real-IP 被 nginx 写成 **CDN 节点的 IP**（不是用户 IP），不能直接用；
+ *   - X-Forwarded-For 形如 "用户IP, CDN节点IP"（$proxy_add_x_forwarded_for 追加）。
+ *
+ * 所以要从右往左跳过可信代理（TRUSTED_PROXIES 里的网段），
+ * 第一个不可信的地址才是真实客户端。这样用户自己伪造的 XFF 前缀不会被采信。
+ *
+ * TRUSTED_PROXIES 未配置时退化为「取最左一段」——与旧行为一致，
+ * 适用于没有 CDN、只有单层 nginx 的简单部署。
+ */
+const TRUSTED_PROXIES = String(process.env.TRUSTED_PROXIES || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+function ipToLong(ip) {
+  const a = ip.replace(/^::ffff:/, '').split('.');
+  if (a.length !== 4) return null;
+  const n = a.map(x => parseInt(x, 10));
+  if (n.some(v => !Number.isSafeInteger(v) || v < 0 || v > 255)) return null;
+  return ((n[0] << 24) >>> 0) + (n[1] << 16) + (n[2] << 8) + n[3];
+}
+
+function inCidr(ip, cidr) {
+  const [net, bitsStr] = cidr.split('/');
+  const bits = bitsStr === undefined ? 32 : parseInt(bitsStr, 10);
+  const ipL = ipToLong(ip);
+  const netL = ipToLong(net);
+  if (ipL === null || netL === null || !Number.isSafeInteger(bits) || bits < 0 || bits > 32) return false;
+  if (bits === 0) return true;
+  const mask = (0xffffffff << (32 - bits)) >>> 0;
+  return (ipL & mask) === (netL & mask);
+}
+
+function isTrustedProxy(ip) {
+  if (!ip) return false;
+  return TRUSTED_PROXIES.some(c => (c.includes('/') ? inCidr(ip, c) : c === ip));
+}
+
+function pickClientIp(xff) {
+  const parts = String(xff || '').split(',').map(s => s.trim()).filter(v => IP_RE.test(v));
+  if (parts.length === 0) return null;
+  if (TRUSTED_PROXIES.length === 0) return parts[0];
+  // 从右往左，跳过可信代理，第一个不可信的就是真实客户端
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (!isTrustedProxy(parts[i])) return parts[i];
+  }
+  return parts[0];
+}
+
+/**
  * 取限流用的客户端标识。
  *
  * 为什么要自己算而不直接用 req.ip：
@@ -189,19 +268,27 @@ const IP_RE = /^[0-9a-fA-F:.]{3,45}$/;
  * （例如留言板 10 次/10 分钟会变成全站额度，正常用户会被别人拖累）。
  *
  * 策略：
- *   - 直连对端是内网/回环 → 说明我们在代理后面，信任代理写入的头
- *     优先 X-Real-IP（nginx 用 $remote_addr 写入，最权威），
- *     其次 X-Forwarded-For 首段；
+ *   - 直连对端是内网/回环 → 说明我们在代理后面，信任代理写入的头；
  *   - 直连对端是公网 IP → 说明有人在绕过代理直连，此时**不信任**任何
  *     可伪造的头，直接用对端地址（否则攻击者随便填个 X-Real-IP 就能绕过限流）。
+ *
+ * 配了 TRUSTED_PROXIES（CDN 场景）时优先用 XFF 链解析出真实客户端，
+ * 因为此时 X-Real-IP 是 CDN 节点地址，所有用户会被算成同一个人。
  */
 function clientKey(req) {
   const peer = req.socket?.remoteAddress || req.connection?.remoteAddress || '';
   if (isPrivatePeer(peer)) {
+    const xff = req.get('x-forwarded-for');
+    // 配了可信代理 → 用 XFF 链解析（CDN 场景必须）
+    if (TRUSTED_PROXIES.length > 0) {
+      const real = pickClientIp(xff);
+      if (real) return real;
+    }
+    // 未配可信代理 → 单层 nginx 场景，X-Real-IP 最权威
     const real = String(req.get('x-real-ip') || '').trim();
     if (IP_RE.test(real)) return real;
-    const xff = String(req.get('x-forwarded-for') || '').split(',')[0].trim();
-    if (IP_RE.test(xff)) return xff;
+    const first = String(xff || '').split(',')[0].trim();
+    if (IP_RE.test(first)) return first;
   }
   return peer || 'unknown';
 }

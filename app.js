@@ -13,8 +13,23 @@ const CASDOOR_CONFIG = casdoor.C;
 const app = express();
 const PORT = process.env.PORT || 35555;
 
-// 反向代理后面才能拿到真实客户端 IP（限流按 IP 计数，必须正确）
-app.set('trust proxy', 1);
+// 反向代理信任配置。
+// 链路：浏览器 → (CDN) → nginx(TLS) → Caddy → app
+//   - 老写法 trust proxy: 1 只信任 1 跳，若前面还有 CDN，req.ip 会取错一层；
+//   - 这里改为信任「内网 + 回环」：容器网络与宿主反代都属于这一类，
+//     公网直连的对端不会被信任（防止伪造 X-Forwarded-For 绕过限流）。
+// 如果有 CDN，请在 .env 里用 TRUSTED_PROXIES 追加 CDN 回源 IP 段，
+// 应用侧的真实 IP 还原见 配置/security.js 的 clientKey()。
+app.set('trust proxy', 'loopback, linklocal, uniquelocal');
+
+// ============================================================
+// 安全响应头 + CDN 适配头
+// ------------------------------------------------------------
+// 必须放在 static 之前：否则 /public、/uploads 这些静态资源请求
+// 直接被 express.static 处理掉，永远不会经过这里，结果是静态资源
+// 缺 CSP/Vary/CDN-Cache-Control，既不利安全也不利 CDN 命中。
+// ============================================================
+app.use(security.securityHeaders);
 
 app.set('views', path.join(__dirname, '页面模板'));
 app.set('view engine', 'ejs');
@@ -32,8 +47,11 @@ const FINGERPRINTED_ASSET = /\.[0-9a-f]{10}\.(?:css|js|woff2?|ttf|otf|eot|png|jp
 function staticCacheHeaders(res, filePath) {
   if (FINGERPRINTED_ASSET.test(filePath)) {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    // 同步告诉 CDN：内容变了文件名就变，可以永久缓存
+    res.setHeader('CDN-Cache-Control', 'public, max-age=31536000, immutable');
   } else {
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('CDN-Cache-Control', 'public, max-age=3600');
   }
 }
 
@@ -42,25 +60,30 @@ app.use('/public', express.static(path.join(__dirname, '静态资源'), { setHea
 // 解析后是 /public/webfonts/，但字体实际放在 /public/font-awesome/webfonts/ 下，
 // 会导致所有图标 404。这里补一条映射，不改动原有目录结构。
 app.use('/public/webfonts', express.static(path.join(__dirname, '静态资源/font-awesome/webfonts'), { setHeaders: staticCacheHeaders }));
-// 用户上传的视频等文件：容器内 /app/uploads，由 docker-compose 挂宿主 ./uploads 持久化
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '7d' }));
+// 用户上传的视频等文件：容器内 /app/uploads，由 docker-compose 挂宿主 ./uploads 持久化。
+// 这些文件是用户上传的，名字里带随机串但**不带内容指纹**（同名文件内容可能变），
+// 所以给 7 天而不是 immutable —— 否则替换同名文件后 CDN 会一直发旧内容。
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '7d',
+  setHeaders: (res) => { res.setHeader('Cache-Control', 'public, max-age=604800'); }
+}));
 
 // 动态 HTML 一律不缓存。
 // 否则浏览器/边缘会把「游客版首页」缓存下来：用户登录成功后跳回首页，
 // 拿到的却是缓存里的未登录页面 —— 表现为右上角不显示昵称、按钮仍是「登录/注册」。
+// private + no-store 同时告诉浏览器和 CDN 都不要存。
 app.use((req, res, next) => {
   if (req.path.startsWith('/public') || req.path.startsWith('/uploads') || req.path.startsWith('/avatar')) {
     return next();
   }
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  // 部分 CDN 只认 CDN-Cache-Control，这里再显式说一次，防止边缘缓存私有页面
+  res.setHeader('CDN-Cache-Control', 'no-store');
   next();
 });
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
-// 安全响应头放在最前面：连 404/500 也要带上
-app.use(security.securityHeaders);
 
 // ============================================================
 // 启动期安全自检

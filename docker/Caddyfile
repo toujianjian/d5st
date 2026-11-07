@@ -1,5 +1,20 @@
 {
 	admin off
+
+	# ------------------------------------------------------------
+	# 信任来自内网/回环的上游代理（nginx / 各种反代容器）
+	# ------------------------------------------------------------
+	# 为什么要配：本文件里的 reverse_proxy 默认会用「Caddy 自己看到的对端」
+	# 覆盖 X-Forwarded-Proto 与 X-Forwarded-For。生产链路是
+	#   浏览器 → nginx(TLS) → Caddy → app
+	# 结果是 app 永远认为请求是 http（拿不到 https），也无法得知用户真实 IP：
+	#   - CSRF cookie 无法标记 Secure；
+	#   - 按 IP 的限流会把所有用户算成同一个来源。
+	# 声明可信上游后，Caddy 会保留/追加这些头，应用侧才拿得到真实值。
+	# 只信任私有网段，公网直连不会因此获得伪造头的能力。
+	servers {
+		trusted_proxies static private_ranges
+	}
 }
 
 # 统一入口：浏览器只访问本端口，由 Caddy 按路径分流
@@ -44,6 +59,12 @@
 
 	# 其余流量转发给 d5st 应用（根路径）
 	handle {
-		reverse_proxy app:35555
+		reverse_proxy app:35555 {
+			# 显式把上游传来的协议/主机/真实 IP 透传给应用，
+			# 避免 Caddy 用「自己看到的 http」覆盖，导致 app 判断不出 HTTPS
+			header_up X-Forwarded-Proto {http.request.header.X-Forwarded-Proto}
+			header_up X-Forwarded-Host {http.request.header.X-Forwarded-Host}
+			header_up X-Real-IP {http.request.header.X-Real-IP}
+		}
 	}
 }
