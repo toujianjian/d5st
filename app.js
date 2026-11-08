@@ -321,7 +321,20 @@ app.use((req, res, next) => {
   );
   
   if (isPublic) return next();
-  if (!req.session.user) return res.redirect('/login');
+
+  // 需要登录才能访问的路径前缀（与下方 app.use 挂载的业务模块一一对应）。
+  // 只有落在这里面的路径才会被重定向到 /login；
+  // 其余未知路径直接放行给下游的 404 处理。
+  //
+  // 之前是「非白名单一律 302 /login」，导致：
+  //   1) 搜索引擎抓到不存在的 URL 得到 302 而非 404，会把无效链接当有效页面反复抓；
+  //   2) 用户输错地址却被要求登录，多一次无意义跳转。
+  const PROTECTED_PREFIXES = [
+    '/admin', '/user', '/forum', '/messages', '/friends',
+    '/secret', '/settings', '/videos/manage', '/sponsor/history'
+  ];
+  const needsAuth = PROTECTED_PREFIXES.some(p => req.path === p || req.path.startsWith(p + '/'));
+  if (needsAuth && !req.session.user) return res.redirect('/login');
   next();
 });
 
