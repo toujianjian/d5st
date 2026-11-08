@@ -153,9 +153,17 @@ async function main() {
   // ==========================================================
   console.log('\n[3] 静态资源');
   // ==========================================================
+  // CSS bundle 的文件名带内容指纹（由 工具/build-assets.py 生成），
+  // 每次重新构建都可能变。写死文件名会让测试在构建后误报 404，
+  // 所以从实际页面里抓取当前引用的文件名。
+  const homePage = await guest.get('/');
+  const cssRefs = [...new Set(
+    [...homePage.body.matchAll(/\/public\/css\/[\w.-]+\.css/g)].map(m => m[0])
+  )];
+  assert(cssRefs.length >= 1, '首页没有引用任何 CSS');
+
   const assets = [
-    '/public/css/bundle-app.011218947b.css',
-    '/public/css/bundle-home.ae0e60a997.css',
+    ...cssRefs,
     '/public/js/main.js',
     '/public/images/logo.svg',
     '/public/images/banner1.svg',
@@ -168,8 +176,14 @@ async function main() {
     });
   }
   await test('FontAwesome 字体可访问（CSS 里 ../webfonts/ 的映射）', async () => {
-    const r = await guest.get('/public/webfonts/fa-solid-900.0b172f4669.woff2');
-    assert(r.status === 200, `返回 ${r.status}`);
+    // 字体文件名也带内容指纹，写死会在重新构建后误报。
+    // 从 fa-subset.css 里读出当前引用的 woff2 名字再请求。
+    const css = await guest.get('/public/font-awesome/fa-subset.css');
+    assert(css.status === 200, 'fa-subset.css 返回 ' + css.status);
+    const m = /\.\.\/webfonts\/([\w.-]+\.woff2)/.exec(css.body);
+    assert(m, 'fa-subset.css 里找不到 woff2 引用');
+    const r = await guest.get('/public/webfonts/' + m[1]);
+    assert(r.status === 200, `字体 ${m[1]} 返回 ${r.status}`);
   });
 
   // ==========================================================

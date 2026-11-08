@@ -250,9 +250,120 @@ def main():
     patch("layout.ejs", "/public/css/" + bundles["app"][0])
     patch("layout-home.ejs", "/public/css/" + bundles["home"][0])
 
-    # 报告
+    # home 布局的 preload 也自动同步（它用的是 bundle-home）
+    def patch_preload_home(urls):
+        p = TPL_DIR / "layout-home.ejs"
+        txt = p.read_text(encoding="utf-8")
+        lines = ["<!-- PRELOAD:BEGIN (由 工具/build-assets.py 生成，勿手改) -->"]
+        for u in urls:
+            lines.append('    <link rel="preload" href="%s" as="style" />' % u)
+        lines.append("    <noscript>")
+        for u in urls:
+            lines.append('      <link rel="stylesheet" href="%s" />' % u)
+        lines.append("    </noscript>")
+        lines.append("    <!-- PRELOAD:END -->")
+        block = "\n".join(lines)
+        if "<!-- PRELOAD:BEGIN" in txt:
+            txt = re.sub(r'<!-- PRELOAD:BEGIN.*?<!-- PRELOAD:END -->', block, txt, flags=re.S)
+            p.write_text(txt, encoding="utf-8")
+            return True
+        return False
+
+    # 立即应用到 home 布局（之前只定义了函数却没调用，导致它的 preload 块是空的）
+    print("preload(home): %s" % ("已同步" if patch_preload_home(["/public/css/" + bundles["home"][0]])
+                                 else "[警告] layout-home.ejs 未找到 PRELOAD 标记"))
+
+    # 首页布局专属样式（layout-home.ejs 原来的内联 <style>，约 3.7KB）
+    home_core_src = CSS_DIR / "layout-home.css"
+    if home_core_src.exists():
+        hc_payload = home_core_src.read_bytes()
+        hc_fname = "layout-home.%s.css" % h8(hc_payload)
+        (CSS_DIR / hc_fname).write_bytes(hc_payload)
+        for old in glob.glob(str(CSS_DIR / "layout-home.*.css")):
+            if os.path.basename(old) != hc_fname:
+                os.remove(old)
+
+        p = TPL_DIR / "layout-home.ejs"
+        txt = p.read_text(encoding="utf-8")
+        block = ('<!-- HOME-CSS:BEGIN (由 工具/build-assets.py 生成，勿手改) -->\n'
+                 '    <link rel="stylesheet" href="/public/css/%s" />\n'
+                 '    <!-- HOME-CSS:END -->' % hc_fname)
+        if "<!-- HOME-CSS:BEGIN" in txt:
+            txt = re.sub(r'<!-- HOME-CSS:BEGIN.*?<!-- HOME-CSS:END -->', block, txt, flags=re.S)
+            p.write_text(txt, encoding="utf-8")
+            print("layout-home: %s  %d B (gzip %d)" % (hc_fname, len(hc_payload), gz(hc_payload)))
+            # 首页的 preload 需要同时包含 bundle-home 与 layout-home，
+            # 这里在两者都就绪后统一重写一次
+            patch_preload_home(["/public/css/" + bundles["home"][0],
+                                "/public/css/" + hc_fname])
+        else:
+            print("[警告] layout-home.ejs 中未找到 HOME-CSS 标记")
+
+
+
+    # 布局核心样式单独成包（原先是 layout.ejs 里的内联 <style>，约 20KB）
+    # 单独而不是并进 bundle-app 的原因：layout-core 是所有页面共享的布局骨架，
+    # 改动频率远低于站点样式；分开可以让两者各自独立缓存，
+    # 改站点样式时不会让所有人的布局 CSS 缓存一起失效。
     def gz(b):
         return len(gzip.compress(b, 9))
+
+    core_src = CSS_DIR / "layout-core.css"
+    if core_src.exists():
+        core_payload = core_src.read_bytes()
+        core_fname = "layout-core.%s.css" % h8(core_payload)
+        (CSS_DIR / core_fname).write_bytes(core_payload)
+        # 清理旧的带指纹版本
+        for old in glob.glob(str(CSS_DIR / "layout-core.*.css")):
+            if os.path.basename(old) != core_fname:
+                os.remove(old)
+
+        def patch_layout_css(url):
+            p = TPL_DIR / "layout.ejs"
+            txt = p.read_text(encoding="utf-8")
+            block = ('<!-- LAYOUT-CSS:BEGIN (由 工具/build-assets.py 生成，勿手改) -->\n'
+                     '  <link rel="stylesheet" href="%s" />\n'
+                     '  <!-- LAYOUT-CSS:END -->' % url)
+            if "<!-- LAYOUT-CSS:BEGIN" in txt:
+                txt = re.sub(r'<!-- LAYOUT-CSS:BEGIN.*?<!-- LAYOUT-CSS:END -->', block, txt, flags=re.S)
+                p.write_text(txt, encoding="utf-8")
+                return True
+            return False
+
+        patched = patch_layout_css("/public/css/" + core_fname)
+        print("layout-core: %s  %d B (gzip %d)%s"
+              % (core_fname, len(core_payload), gz(core_payload),
+                 "" if patched else "  [警告] layout.ejs 中未找到 LAYOUT-CSS 标记"))
+
+        # 同步 preload 块：CSS 文件名带内容指纹，写死会失配
+        def patch_preload(urls):
+            p = TPL_DIR / "layout.ejs"
+            txt = p.read_text(encoding="utf-8")
+            lines = ["<!-- PRELOAD:BEGIN (由 工具/build-assets.py 生成，勿手改) -->"]
+            lines.append("  <%# 关键的布局与站点 CSS 并行预加载，避免串行等待 %>")
+            for u in urls:
+                lines.append('  <link rel="preload" href="%s" as="style" />' % u)
+            lines.append("  <noscript>")
+            for u in urls:
+                lines.append('    <link rel="stylesheet" href="%s" />' % u)
+            lines.append("  </noscript>")
+            lines.append("  <!-- PRELOAD:END -->")
+            block = "\n".join(lines)
+            if "<!-- PRELOAD:BEGIN" in txt:
+                txt = re.sub(r'<!-- PRELOAD:BEGIN.*?<!-- PRELOAD:END -->', block, txt, flags=re.S)
+                p.write_text(txt, encoding="utf-8")
+                return True
+            return False
+
+        pl = patch_preload(["/public/css/" + core_fname,
+                            "/public/css/" + bundles["app"][0]])
+        print("preload 块: %s" % ("已同步" if pl else "[警告] 未找到 PRELOAD 标记"))
+
+    else:
+        print("layout-core.css 不存在，跳过（布局样式仍为内联）")
+
+
+    # 报告
     print("图标: solid=%d (码位 %d), regular=%d (码位 %d), brands=%d"
           % (len(solid_names), len(solid_cps), len(regular_names), len(regular_cps), len(by_style["brands"])))
     print("字体: solid %d B%s -> %d B | regular %d B%s -> %d B"

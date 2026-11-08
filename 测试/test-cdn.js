@@ -75,11 +75,20 @@ const assert = (c, m) => { if (!c) throw new Error(m); };
   } catch (e) { bad('伪造代理头', e.message); }
 
   // 6) /public 的指纹资源应 immutable
+  // CSS bundle 名带内容指纹，每次构建都会变，所以从首页动态抓取。
   try {
-    const r = await req('/public/css/bundle-app.011218947b.css');
-    const cc = r.headers['cache-control'] || '';
-    assert(/immutable/.test(cc), '指纹资源未标记 immutable: ' + cc);
-    ok('指纹化资源：' + cc);
+    const home = await req('/');
+    // 指纹是 10 位十六进制（含 a-f），不能用 \d
+    const refs = [...new Set(
+      [...home.body.matchAll(/\/public\/css\/[\w-]+\.[0-9a-f]{10}\.css/g)].map(m => m[0])
+    )];
+    assert(refs.length > 0, '首页没有引用带指纹的 CSS');
+    for (const ref of refs) {
+      const r = await req(ref);
+      const cc = r.headers['cache-control'] || '';
+      assert(/immutable/.test(cc), `${ref} 未标记 immutable: ${cc}`);
+    }
+    ok(`指纹化资源（${refs.length} 个）均标记 immutable`);
   } catch (e) { bad('指纹资源缓存', e.message); }
 
   console.log('\n=== 真实 IP 解析单测 ===\n');

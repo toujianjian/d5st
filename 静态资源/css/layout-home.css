@@ -1,0 +1,79 @@
+/* ============================================================
+ * 首页布局专属样式（layout-home.css）
+ * ------------------------------------------------------------
+ * 原先是 页面模板/layout-home.ejs 里的内联 <style>。
+ * 内容主要是桌面视觉特效（自定义光标、光标揭示层、FPS 显示）的样式，
+ * 与全站共用的 layout-core.css 区分开，避免相互影响。
+ *
+ * 由 工具/build-assets.py 生成带指纹的副本，请勿直接引用本文件。
+ * 修改请改这里，然后运行： python 工具/build-assets.py
+ * ============================================================ */
+html:not(.pdaim-cursor-ready) .cursor-reveal,
+      html:not(.pdaim-cursor-ready) .cursor-pop {
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+      .pdaim-fps {
+        min-width: 58px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--bg) 12%, transparent);
+        color: color-mix(in srgb, var(--fg) 74%, transparent);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        text-align: center;
+        pointer-events: none;
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, var(--fg) 7%, transparent),
+          0 4px 12px color-mix(in srgb, var(--pdaim-glass-shadow) 10%, transparent);
+      }
+      @media (max-width: 720px), (pointer: coarse) {
+        .pdaim-fps { display: none !important; }
+      }
+      /* 移动端顶部汉堡按钮：保证三条横线可见（浅色背景下白色线条会看不清），
+         并给出可点击的手型光标与最小触控尺寸。 */
+      .mobile-menu-toggle {
+        color: var(--fg) !important;
+        cursor: pointer;
+        min-width: 44px;
+        min-height: 44px;
+      }
+      .mobile-menu-toggle span {
+        /* 按钮内容区仅 26px，而 3 条线各带 5px 上下外边距共需 36px，
+           会被 flex 压缩成 0 高（线条看不见）。收紧外边距并禁止收缩。 */
+        height: 2px !important;
+        margin: 3px 0 !important;
+        flex: 0 0 auto !important;
+        background-color: currentColor !important;
+      }
+
+      /* 首页弹窗样式（layout-home 此前没有，导致弹窗无法显示） */
+      .popup-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: none; align-items: center; justify-content: center;
+        z-index: 2000; backdrop-filter: blur(8px);
+      }
+      .popup-overlay.show { display: flex; }
+      .popup-container {
+        background: #fff; border-radius: 24px; padding: 32px;
+        width: 90%; max-width: 500px; position: relative;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      }
+      .popup-close-btn {
+        position: absolute; top: 16px; right: 16px;
+        width: 36px; height: 36px; border: none;
+        background: rgba(0, 0, 0, 0.05); border-radius: 50%;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        font-size: 16px; color: #999;
+      }
+      .popup-title { font-size: 22px; font-weight: 700; color: #2d2d2d; text-align: center; margin-bottom: 16px; }
+      .popup-content { font-size: 15px; color: #666; line-height: 1.7; text-align: center; margin-bottom: 24px; }
+      .popup-btn {
+        display: block; width: 100%; padding: 14px 24px;
+        border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer;
+        background: linear-gradient(135deg, #d32f2f, #b71c1c); color: #fff;
+      }
