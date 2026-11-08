@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title><%= title && title !== siteTitle ? (title + ' - ' + siteTitle) : siteTitle %></title>
+  <%# title 兜底：部分错误处理路径（如 body 解析失败）render 时没传 title，
+      直接引用会抛 ReferenceError 把 500 页面也搞崩，最终变成空响应。 %>
+  <title><%= (typeof title !== 'undefined' && title && title !== siteTitle) ? (title + ' - ' + siteTitle) : (typeof siteTitle !== 'undefined' ? siteTitle : 'D5ST 校园社区') %></title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="D5ST 校园社区 - 连接每一位同学，共享校园生活" />
   <!-- 字体：优先使用本地已装的思源宋体/站酷小薇，未安装时回退系统衬线体，避免外部 CDN 拖慢首屏 -->

@@ -121,7 +121,11 @@ router.post('/forgot-password/request',
 });
 
 // 直接跳转 Casdoor 登录（先探活，不可达时友好提示）
-router.get('/auth/login', async (req, res) => {
+// 限流：每次请求都会探活 Casdoor（一次 HTTP 往返），被刷时会拖慢整个应用，
+// 按 IP 限制 30 次/分钟足够正常登录。
+router.get('/auth/login',
+  rateLimit({ name: 'auth-login', window: 60 * 1000, max: 30 }),
+  async (req, res) => {
   const state = genState();
   req.session.csrfState = state;
   // 关键修复：OAuth state 同时写入独立 httpOnly cookie，避免写入 session 后在

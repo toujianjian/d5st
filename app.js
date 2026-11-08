@@ -82,8 +82,44 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// 请求体解析上限。
+// 默认 limit 是 100kb，对含长文本的帖子/评论来说太小，会直接 413；
+// 但也不能放开到无限——超大 body 是廉价的资源耗尽手段。
+// 这里给 2MB（正文本身另有 20k 字符的业务层校验），并显式限制参数个数，
+// 防止 `a[b][c][d]...` 这种嵌套参数把 CPU 打满（qs 深度攻击）。
+app.use(express.urlencoded({
+  extended: true,
+  limit: '2mb',
+  parameterLimit: 500,
+  depth: 5
+}));
+app.use(express.json({ limit: '2mb' }));
+
+// ============================================================
+// 页面级全局限流（防 CC）
+// ------------------------------------------------------------
+// 之前只在写操作与验证码上做了限流，GET 页面完全不设防：
+// 实测 400 个并发页面请求全部放行，每个页面渲染要查 5~10 次数据库，
+// 只要有人持续刷就能把连接池和 CPU 打满（典型的 CC 攻击）。
+// 这里加一层宽松的全局限性：只统计页面 GET，静态资源与健康检查不计数。
+// 阈值取 300 次/分钟/IP —— 正常浏览远远达不到，脚本刷立刻被挡。
+// ============================================================
+const pageFloodLimiter = security.rateLimit({
+  name: 'page-flood',
+  window: 60 * 1000,
+  max: 300
+});
+app.use((req, res, next) => {
+  // 只拦页面 GET；静态资源走静态中间件，不参与计数
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  const p = req.path || '/';
+  if (p.startsWith('/public/') || p.startsWith('/uploads/') || p.startsWith('/avatar/')) return next();
+  if (p === '/api/health') return next();
+  return pageFloodLimiter(req, res, next);
+});
+
+// 搜索接口单独限流：每次搜索都要做两次 LIKE 全表扫描，比普通页面更贵
+app.use('/search', security.rateLimit({ name: 'search', window: 60 * 1000, max: 30 }));
 
 // ============================================================
 // 启动期安全自检
@@ -533,6 +569,36 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
+  // ------------------------------------------------------------
+  // 客户端错误不能算 500
+  // ------------------------------------------------------------
+  // body-parser 在遇到畸形 JSON / 超大 body / 非法 charset 时会抛错，
+  // 这些是「请求方的问题」，必须回 4xx，否则：
+  //   1) 监控会把正常攻击流量误报成服务端故障；
+  //   2) 攻击者只要发一堆畸形 JSON 就能把 5xx 指标打满。
+  // err.type 由 body-parser 提供，err.status / err.statusCode 是通用约定。
+  const clientErrTypes = new Set([
+    'entity.parse.failed',      // JSON 语法错误
+    'entity.too.large',         // 超过 express.json() 的 limit
+    'encoding.unsupported',     // 不支持的字符集
+    'request.aborted',          // 客户端中断
+    'request.size.invalid',     // Content-Length 与实际不符
+    'charset.unsupported',
+    'parameters.too.many'
+  ]);
+  const status = err.status || err.statusCode;
+  const isClientErr = clientErrTypes.has(err.type) || (status >= 400 && status < 500);
+
+  if (isClientErr) {
+    const code = status || 400;
+    // 这类请求不记完整堆栈，避免日志被刷爆（只留一行摘要）
+    console.warn(`[请求被拒绝] ${req.method} ${req.path} → ${code} (${err.type || err.message})`);
+    if (req.path.startsWith('/api/') || (req.get('accept') || '').includes('application/json')) {
+      return res.status(code).json({ error: code === 413 ? '请求体过大' : '请求格式不正确' });
+    }
+    return res.status(code).type('text/plain; charset=utf-8').send(code === 413 ? '请求体过大' : '请求格式不正确');
+  }
+
   console.error('全局错误:', err);
   if (req.path.startsWith('/api/')) {
     return res.status(500).json({ error: '服务器内部错误' });
