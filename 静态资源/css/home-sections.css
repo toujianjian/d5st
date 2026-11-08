@@ -1,0 +1,147 @@
+/* ============================================================
+ * 首页区块样式（home-sections.css）
+ * ------------------------------------------------------------
+ * 原先是 页面模板/home/index.ejs 开头的内联 <style>，约 5.3KB
+ * （精彩推荐轮播、横幅比例、轮播按钮等）。
+ * 内联的问题：每次访问首页都随 HTML 重新下载，无法被浏览器/CDN 缓存。
+ *
+ * 由 工具/build-assets.py 生成带指纹的副本，请勿直接引用本文件。
+ * 修改请改这里，然后运行： python 工具/build-assets.py
+ * ============================================================ */
+/* 精彩推荐轮播 */
+  .d5st-carousel {
+    position: relative; border-radius: 20px; overflow: hidden;
+    box-shadow: 0 18px 48px rgba(0,0,0,.12);
+    background: rgba(0,0,0,.04);
+  }
+  .d5st-slide { display: none; text-decoration: none; color: inherit; }
+  .d5st-slide.is-active { display: block; animation: d5stFade .45s ease; }
+  @keyframes d5stFade { from { opacity: 0; } to { opacity: 1; } }
+  .d5st-slide-media {
+    /* 比例与默认横幅 banner1.svg（1200×320 = 15:4）一致，避免 cover 裁掉图内文字 */
+    width: 100%; aspect-ratio: 15 / 4;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: linear-gradient(135deg, rgba(211,47,47,.14), rgba(255,107,53,.14));
+  }
+  .d5st-slide-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .d5st-slide-ph { font-size: 46px; color: rgba(211,47,47,.35); }
+  .d5st-slide-body { padding: 18px 22px 22px; }
+  .d5st-slide-body h3 { margin: 0 0 6px; font-size: 20px; color: var(--fg, #111); }
+  .d5st-slide-body p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--muted, #666); }
+  .d5st-cv-btn {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,.42); color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; transition: background .25s;
+  }
+  .d5st-cv-btn:hover { background: rgba(0,0,0,.65); }
+  .d5st-cv-btn.prev { left: 14px; }
+  .d5st-cv-btn.next { right: 14px; }
+  .d5st-dots { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; gap: 8px; justify-content: center; }
+  /* 无障碍：触控目标至少 24×24（WCAG 2.5.8 / Lighthouse target-size）。
+     视觉圆点仍是 9px，用 padding + background-clip 把可点区域撑到 25px。 */
+  .d5st-dot {
+    width: 9px; height: 9px; padding: 8px; box-sizing: content-box;
+    background-color: rgba(255,255,255,.65); background-clip: content-box;
+    border: none; border-radius: 50%; cursor: pointer;
+    /* 用负偏移 outline 画视觉圆环（落在 content box 边缘），
+       避免 box-shadow 按 25px 外框画成大圆 */
+    outline: 1px solid rgba(0,0,0,.18); outline-offset: -8px;
+    transition: all .25s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .d5st-dot.is-active {
+    width: 22px; border-radius: 999px;
+    background-color: #fff;
+  }
+
+  /* CLS 治理：FontAwesome 用 font-display:block，字体到达前图标宽度为 0，
+     到达后撑开会把按钮行顶高（Lighthouse 实测 CLS 0.047 全来自这里）。
+     给图标预留 1em 固定宽度，字体加载前后布局不变。 */
+  .mobile-auth-row .ma-btn i,
+  .d5st-cv-btn i,
+  .d5st-head i,
+  .d5st-meta i,
+  .d5st-link-icon i {
+    display: inline-block;
+    width: 1em;
+    flex: none;
+    text-align: center;
+  }
+  @media (max-width: 720px) {
+    .d5st-cv-btn { width: 36px; height: 36px; }
+    .d5st-slide-body { padding: 14px 16px 18px; }
+  }
+
+  /* 性能：只对「页面最底部、首屏绝不可见」的区块启用 content-visibility。
+     整段 .d5st-block 都启用会导致占位高度(contain-intrinsic-size)与真实高度
+     不一致，下面内容在渲染瞬间被顶动 —— 实测 CLS 会从 0 变成 0.047。
+     只保留最后一个区块，既省一点布局开销，又不产生可见位移。 */
+  .d5st-content > section.d5st-block:last-of-type {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 420px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .d5st-track { transition: none !important; }
+    .reveal-on-scroll { opacity: 1 !important; transform: none !important; }
+  }
+
+  /* ===== 移动端：移除耗算力的 3D 首屏与自定义光标/线场背景 ===== */
+  @media (max-width: 1024px) {
+    .pdaim-line-field,
+    .hero,
+    .hero-stage,
+    .scroll-hint,
+    .cursor-orb,
+    .cursor-pop,
+    .cursor-reveal,
+    .pdaim-fps { display: none !important; }
+    /* 去掉毛玻璃的开销（移动端 backdrop-filter 很吃 GPU） */
+    .site-header { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  }
+
+  /* 移动端快捷操作行：桌面端隐藏，仅手机显示 */
+  .mobile-auth-row { display: none; }
+  @media (max-width: 1024px) {
+    .mobile-auth-row {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin: 6px 0 20px;
+    }
+    .mobile-auth-row .ma-btn {
+      flex: 1 1 40%; min-width: 120px; min-height: 46px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 0 16px; border-radius: 999px;
+      text-decoration: none; font-size: 15px; font-weight: 600;
+      /* 无障碍：颜色写死不跟随主题变量。
+         暗色主题下 --text-dark 会被改成浅色(#e0e6ed)，配半透明白底
+         实际对比度只有 1.96:1（Lighthouse 判定不合格）。
+         这里用不透明白底 + 深色文字，对比度 ≈ 13:1。 */
+      background: #ffffff; color: #2d2d2d;
+      border: 1px solid rgba(211,47,47,.25);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mobile-auth-row .ma-btn.primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff; border-color: transparent;
+      box-shadow: 0 8px 20px rgba(211,47,47,.3);
+    }
+  }
+
+  /* 移动端：把「精彩推荐」轮播与快捷按钮移到页面顶部（轮播上方留白，避免贴边/被遮挡） */
+  @media (max-width: 1024px) {
+    /* 顶栏为 fixed，顶部留白既避免遮挡又不过分占高 */
+    .page-shell { padding: 74px 14px 24px; }
+    .d5st-content { display: flex; flex-direction: column; padding: 0 4px 40px; }
+    .featured-carousel-block { order: -2; margin-top: 8px; padding-top: 12px; }
+    .mobile-auth-row { order: -1; }
+    .d5st-version { order: 99; }
+  }
+
+  /* 首页底部版本号（一般放备案号的位置） */
+  .d5st-version {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted, #999);
+    padding: 24px 0 28px;
+    letter-spacing: .5px;
+  }

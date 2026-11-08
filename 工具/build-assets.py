@@ -147,6 +147,11 @@ def make_subset(src, unicodes, label):
 
 
 def main():
+    # 放在函数最前面：后面的多处报告都要用它计算 gzip 体积，
+    # 如果定义在中途会出现 "referenced before assignment"
+    def gz(b):
+        return len(gzip.compress(b, 9))
+
     cmap, raw_css = parse_css()
     used = scan_used(cmap)
     by_style = {"solid": [], "regular": [], "brands": []}
@@ -283,19 +288,38 @@ def main():
             if os.path.basename(old) != hc_fname:
                 os.remove(old)
 
+        # 首页区块样式（轮播等，原 home/index.ejs 开头的内联 <style>）
+        sections_src = CSS_DIR / "home-sections.css"
+        sec_fname = None
+        if sections_src.exists():
+            sec_payload = sections_src.read_bytes()
+            sec_fname = "home-sections.%s.css" % h8(sec_payload)
+            (CSS_DIR / sec_fname).write_bytes(sec_payload)
+            for old in glob.glob(str(CSS_DIR / "home-sections.*.css")):
+                if os.path.basename(old) != sec_fname:
+                    os.remove(old)
+            print("home-sections: %s  %d B (gzip %d)"
+                  % (sec_fname, len(sec_payload), gz(sec_payload)))
+
         p = TPL_DIR / "layout-home.ejs"
         txt = p.read_text(encoding="utf-8")
+        links = ['    <link rel="stylesheet" href="/public/css/%s" />' % hc_fname]
+        if sec_fname:
+            links.append('    <link rel="stylesheet" href="/public/css/%s" />' % sec_fname)
         block = ('<!-- HOME-CSS:BEGIN (由 工具/build-assets.py 生成，勿手改) -->\n'
-                 '    <link rel="stylesheet" href="/public/css/%s" />\n'
-                 '    <!-- HOME-CSS:END -->' % hc_fname)
+                 + "\n".join(links) + '\n'
+                 '    <!-- HOME-CSS:END -->')
         if "<!-- HOME-CSS:BEGIN" in txt:
             txt = re.sub(r'<!-- HOME-CSS:BEGIN.*?<!-- HOME-CSS:END -->', block, txt, flags=re.S)
             p.write_text(txt, encoding="utf-8")
             print("layout-home: %s  %d B (gzip %d)" % (hc_fname, len(hc_payload), gz(hc_payload)))
-            # 首页的 preload 需要同时包含 bundle-home 与 layout-home，
-            # 这里在两者都就绪后统一重写一次
-            patch_preload_home(["/public/css/" + bundles["home"][0],
-                                "/public/css/" + hc_fname])
+            # 首页的 preload 需要同时包含 bundle-home 与两个布局/区块 CSS，
+            # 这里在都就绪后统一重写一次
+            preload_urls = ["/public/css/" + bundles["home"][0],
+                            "/public/css/" + hc_fname]
+            if sec_fname:
+                preload_urls.append("/public/css/" + sec_fname)
+            patch_preload_home(preload_urls)
         else:
             print("[警告] layout-home.ejs 中未找到 HOME-CSS 标记")
 
@@ -305,9 +329,6 @@ def main():
     # 单独而不是并进 bundle-app 的原因：layout-core 是所有页面共享的布局骨架，
     # 改动频率远低于站点样式；分开可以让两者各自独立缓存，
     # 改站点样式时不会让所有人的布局 CSS 缓存一起失效。
-    def gz(b):
-        return len(gzip.compress(b, 9))
-
     core_src = CSS_DIR / "layout-core.css"
     if core_src.exists():
         core_payload = core_src.read_bytes()
