@@ -264,7 +264,7 @@
             <% videos.forEach(function (v) { %>
               <a class="d5st-card reveal-on-scroll" data-reveal href="/videos/<%= v.id %>">
                 <div class="d5st-thumb">
-                  <% if (v.cover_url) { %><img src="<%= v.cover_url %>" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'" /><% } else { %>🎬<% } %>
+                  <% if (v.cover_url) { %><img src="<%= v.cover_url %>" alt="<%= v.title || '视频封面' %>" loading="lazy" decoding="async" onerror="this.style.display='none'" /><% } else { %>🎬<% } %>
                   <% if (v.duration) { %><span class="d5st-dur"><%= Math.floor(v.duration / 60) %>:<%= String(v.duration % 60).padStart(2, '0') %></span><% } %>
                 </div>
                 <h3 class="d5st-title" style="font-size:14px;"><%= v.title %></h3>
@@ -291,7 +291,7 @@
             <a class="d5st-slide<%= i === 0 ? ' is-active' : '' %>" href="<%= b.link_url || 'javascript:void(0)' %>"<% if (b.link_url) { %> target="_blank" rel="noopener"<% } %>>
               <div class="d5st-slide-media">
                 <% if (b.image_path) { %>
-                  <img src="<%= b.image_path %>" alt="<%= b.title %>" <%- i === 0 ? '' : 'loading="lazy" decoding="async" ' %>onerror="this.style.display='none'" />
+                  <img src="<%= b.image_path %>" alt="<%= b.title %>" <%- i === 0 ? 'fetchpriority="high" decoding="async" ' : 'loading="lazy" decoding="async" ' %>onerror="this.style.display='none'" />
                 <% } else { %>
                   <span class="d5st-slide-ph"><i class="fas fa-image"></i></span>
                 <% } %>

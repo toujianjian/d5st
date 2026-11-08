@@ -11,6 +11,16 @@
 <!-- ASSETS:BEGIN (由 工具/build-assets.py 生成，勿手改) -->
   <link rel="stylesheet" href="/public/css/bundle-app.011218947b.css" />
   <!-- ASSETS:END -->
+  <%#
+    关键资源预加载
+    ------------------------------------------------------------
+    stylesheet 默认要等 HTML 解析到 <link> 才开始下 CSS，而 CSS 又会阻塞渲染。
+    加 preload 让浏览器在解析 HTML 的同时并行发起请求，首屏能早一点出内容。
+    as="style" + onload 回填 rel 的写法保证：不支持 preload 的老浏览器
+    仍能通过 noscript 兜底正常加载，不会出现无样式页面。
+  %>
+  <link rel="preload" href="/public/css/bundle-app.011218947b.css" as="style" />
+  <noscript><link rel="stylesheet" href="/public/css/bundle-app.011218947b.css" /></noscript>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
   <script>
     /* 夜间模式偏好：在样式表解析前同步恢复，避免刷新时先闪一下浅色再变深 */
@@ -623,8 +633,18 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-      loadPopups();
-      loadNotifications();
+      /* 弹窗与通知推迟到浏览器空闲时再请求。
+         这两个接口绝大多数时候返回空（弹窗数组为 []、通知为空），
+         但请求一发出去就会占用主线程与连接，实测会把移动端首屏的可交互
+         时间往后推几百毫秒。用 requestIdleCallback 让它们排在首屏渲染之后，
+         没有该 API 的浏览器退回 200ms 延时——功能不受影响，只是晚一点。 */
+      var later = window.requestIdleCallback
+        ? function (fn) { window.requestIdleCallback(fn, { timeout: 2000 }); }
+        : function (fn) { setTimeout(fn, 200); };
+      later(function () {
+        loadPopups();
+        loadNotifications();
+      });
 
       /* 通知铃铛：点击开合（触屏没有 hover，仅靠 :hover 打不开） */
       var nb = document.getElementById('notificationBtn');

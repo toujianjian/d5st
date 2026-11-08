@@ -9,6 +9,10 @@
 <!-- ASSETS:BEGIN (由 工具/build-assets.py 生成，勿手改) -->
   <link rel="stylesheet" href="/public/css/bundle-home.ae0e60a997.css" />
   <!-- ASSETS:END -->
+    <%# 关键 CSS 预加载：让浏览器在解析 HTML 的同时就并行拉取样式，
+        而不是等到解析到 <link> 才开始。noscript 兜底保证老浏览器仍有样式。 %>
+    <link rel="preload" href="/public/css/bundle-home.ae0e60a997.css" as="style" />
+    <noscript><link rel="stylesheet" href="/public/css/bundle-home.ae0e60a997.css" /></noscript>
     <script>
       /* 在样式表解析前同步设定主题，避免刷新先闪一下浅色再变深 */
       (function () {
@@ -153,7 +157,31 @@
       })();
     </script>
 
-    <script src="/public/js/pidanai-liquid.js" defer></script>
+    <%#
+      桌面视觉特效脚本按需加载
+      ------------------------------------------------------------
+      pidanai-liquid.js 有 70KB，但内部第 8 行就是：
+        if (matchMedia("(max-width:1024px), (pointer:coarse)").matches) return;
+      也就是手机上它会**立刻退出、什么都不做** —— 但前提是浏览器已经
+      把这 70KB 下载并解析完了。移动端实测因此多吃 ~1 秒主线程阻塞（TBT）。
+
+      所以改成先用 matchMedia 判断，只在真正会用到特效的宽屏精确指针设备上
+      注入脚本。手机上完全不下载 → 省掉下载、解析、执行三重开销。
+      no-js 环境下 document.write 退化：脚本不加载，但页面内容本身完整。
+    %>
+    <script>
+      (function () {
+        var wantFx = false;
+        try {
+          wantFx = window.matchMedia('(min-width: 1025px) and (pointer: fine)').matches;
+        } catch (e) { wantFx = false; }
+        if (!wantFx) return;
+        var s = document.createElement('script');
+        s.src = '/public/js/pidanai-liquid.js';
+        s.defer = true;
+        document.head.appendChild(s);
+      })();
+    </script>
     <script src="/public/js/home-shell.js" defer></script>
   </body>
 </html>
