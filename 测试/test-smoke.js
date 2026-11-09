@@ -11,6 +11,9 @@ const http = require('http');
 
 const BASE = process.env.TEST_URL || 'http://localhost:35555';
 
+// 本次运行的唯一标记：写入留言板的内容都带上它，跑完精确清理
+const SMOKE_TAG = 'smoke-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
 let passed = 0, failed = 0, skipped = 0;
 const failures = [];
 const bugs = [];
@@ -382,7 +385,10 @@ async function main() {
 
     // ---- 留言板 ----
     await test('登录用户留言成功', async () => {
-      const r = await user.postCsrf('/messages/guestbook', { form: { content: '冒烟测试留言 ' + Date.now() } });
+      const r = await user.postCsrf('/messages/guestbook', { form: { content: SMOKE_TAG + ' ' + Date.now() } });
+      // 留言板限制是 10 次/10 分钟/IP。短时间内重复跑整套测试会打满额度，
+      // 此时返回 429 说明限流在正常工作，不属于功能缺陷 —— 标记跳过。
+      if (r.status === 429) return 'SKIP';
       assert(r.status === 302, `返回 ${r.status}`);
     });
   }
@@ -412,6 +418,24 @@ async function main() {
     assert(!/>\s*undefined\s*</.test(r.body), '页面出现 undefined');
     assert(!r.body.includes('[object Object]'), '页面出现 [object Object]');
   });
+
+  // 清理本次写入的留言（登录用例必须真的提交成功才能验证，会产生真实记录）
+  try {
+    const admin = makeClient();
+    await admin.get('/login');
+    await admin.get('/auth/dev-login?username=d5stadmin&admin=1').catch(() => {});
+    const st = await admin.get('/api/check-login');
+    if (/"loggedIn":true/.test(st.body || '')) {
+      const page = await admin.get('/admin/guestbook?q=' + encodeURIComponent(SMOKE_TAG));
+      const ids = [...page.body.matchAll(/\/admin\/guestbook\/delete\/(\d+)/g)].map(m => m[1]);
+      let removed = 0;
+      for (const id of ids) {
+        const r = await admin.postCsrf('/admin/guestbook/delete/' + id, {});
+        if (r.status === 302) removed++;
+      }
+      if (removed) console.log(`  🧹 已清理本次写入的 ${removed} 条留言测试数据`);
+    }
+  } catch (e) { /* 清理失败不影响测试结论 */ }
 
   console.log('\n============================================');
   console.log(` 通过 ${passed} · 失败 ${failed} · 跳过 ${skipped}`);

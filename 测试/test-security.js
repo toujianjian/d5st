@@ -17,16 +17,33 @@
 // 说明：需要站点已启动（默认 http://localhost:35555）。
 // 未登录用例不依赖 Casdoor；登录类用例在 ENABLE_DEV_LOGIN=1 时自动启用，
 // 否则跳过并标记 SKIP，不算失败。
+//
+// ⚠️ 数据卫生：本测试会向留言板写入真实记录（CSRF 正例必须真的提交成功才能验证），
+//   所有写入都带上 TEST_TAG 前缀，跑完自动删除。如果测试被中断留下残留，
+//   可用： node 测试/clean-testdata.js  清理。
 // ============================================================
 const http = require('http');
 
 const BASE = process.env.TEST_URL || 'http://localhost:35555';
 const ORIGIN = new URL(BASE).origin;
 
+// 本次运行的唯一标记，用于事后精确清理自己写的数据
+const TEST_TAG = 'selftest-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+// 记录本次创建成功的留言 id，结束时删除
+const createdIds = [];
+
 let passed = 0, failed = 0, skipped = 0;
 const failures = [];
 
 function log(icon, msg) { console.log(`  ${icon} ${msg}`); }
+
+// 尝试从响应里解析出新建记录的 id（留言板提交成功后会重定向回列表页）
+function trackCreated(client, res) {
+  try {
+    const m = /\/(\d+)$/.exec(String(res.location || ''));
+    if (m) createdIds.push(m[1]);
+  } catch (e) { /* 忽略 */ }
+}
 
 async function test(name, fn) {
   try {
@@ -170,18 +187,20 @@ async function main() {
     const c = makeClient();
     await c.get('/login');
     const r = await c.post('/messages/guestbook', {
-      form: { content: 'csrf-ok-test', _csrf: c.csrf() }
+      form: { content: TEST_TAG + '-csrf-ok', _csrf: c.csrf() }
     });
     assert(r.status !== 403, `正确 token 仍被拒: ${r.status}`);
+    if (r.status === 302 || r.status === 200) trackCreated(c, r);
   });
   await test('CSRF token 通过 X-CSRF-Token 头同样生效', async () => {
     const c = makeClient();
     await c.get('/login');
     const r = await c.post('/messages/guestbook', {
-      json: { content: 'csrf-header-test' },
+      json: { content: TEST_TAG + '-csrf-header' },
       headers: { 'X-CSRF-Token': c.csrf() }
     });
     assert(r.status !== 403, `头部 token 未被接受: ${r.status}`);
+    if (r.status === 302 || r.status === 200) trackCreated(c, r);
   });
 
   // ==========================================================
@@ -462,6 +481,38 @@ async function main() {
       assert(r.status === 302 && (r.location || '').includes('error='),
         `伪协议未被拒绝: ${r.status} → ${r.location}`);
     });
+  }
+
+  // ==========================================================
+  // 清理本次测试写入的数据
+  // ----------------------------------------------------------
+  // CSRF 正例必须真的提交成功才能验证「放行」，所以一定会产生真实记录。
+  // 这里把它们删掉，避免测试数据堆积在留言板里（生产环境尤其重要）。
+  // ==========================================================
+  try {
+    const c = makeClient();
+    await c.get('/login');
+    // 有管理员权限时走后台删除接口（最可靠）
+    const admin = makeClient();
+    await admin.get('/login');
+    const al = await admin.get('/auth/dev-login?username=d5stadmin&admin=1').catch(() => null);
+    const adminOk = al && /"loggedIn":true/.test((await admin.get('/api/check-login')).body || '');
+
+    if (adminOk) {
+      const page = await admin.get('/admin/guestbook?q=' + encodeURIComponent(TEST_TAG));
+      const ids = [...page.body.matchAll(/\/admin\/guestbook\/delete\/(\d+)/g)].map(m => m[1]);
+      let removed = 0;
+      for (const id of ids) {
+        const r = await admin.postCsrf('/admin/guestbook/delete/' + id, {});
+        if (r.status === 302) removed++;
+      }
+      if (removed) console.log(`  🧹 已清理本次写入的 ${removed} 条留言测试数据`);
+    } else if (createdIds.length) {
+      console.log(`  ⚠ 非管理员环境，无法自动清理 ${createdIds.length} 条测试留言`);
+      console.log(`     请运行： node 测试/clean-testdata.js`);
+    }
+  } catch (e) {
+    console.log('  ⚠ 测试数据清理失败:', e.message);
   }
 
   // ==========================================================

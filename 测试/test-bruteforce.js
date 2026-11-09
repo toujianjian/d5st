@@ -23,6 +23,10 @@ const BASE = process.env.TEST_URL || 'http://127.0.0.1:35545';
 const LEVEL = process.env.BRUTE_LEVEL || 'normal';
 const U = new URL(BASE);
 
+// 本次运行的唯一标记：所有写入留言板的内容都带上它，结束时精确清理。
+// 暴力测试会真的提交多条留言（限流允许的范围内），不清理会堆在库里。
+const BRUTE_TAG = 'brute-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
 // 强度档位：控制并发与总量，避免把自己的开发机也拖垮
 const PROFILES = {
   light: { concurrency: 10, rounds: 30, burst: 50 },
@@ -123,7 +127,19 @@ function makeClient() {
     get: (p, o) => call('GET', p, o),
     post: (p, o) => call('POST', p, o),
     csrf: () => jar.get('csrf_token') || '',
-    async prime() { await call('GET', '/login'); return this.csrf(); }
+    async prime() { await call('GET', '/login'); return this.csrf(); },
+    // 带 CSRF 的 POST：清理测试数据时删留言要用
+    postCsrf(p, o = {}) {
+      return call('POST', p, Object.assign({}, o, {
+        headers: Object.assign({ 'X-CSRF-Token': this.csrf() }, o.headers || {})
+      }));
+    },
+    async login(username) {
+      await call('GET', '/login');
+      await call('GET', '/auth/dev-login?username=' + encodeURIComponent(username) + '&admin=1').catch(() => {});
+      const st = await call('GET', '/api/check-login');
+      return /"loggedIn":true/.test(st.body || '');
+    }
   };
 }
 
@@ -162,7 +178,7 @@ async function testRateLimit() {
     const c = makeClient();
     await c.prime();
     const token = c.csrf();
-    const form = new URLSearchParams({ content: 'brute-guestbook-test', _csrf: token }).toString();
+    const form = new URLSearchParams({ content: BRUTE_TAG + '-guestbook', _csrf: token }).toString();
 
     const tasks = Array.from({ length: 30 }, () => () =>
       c.post('/messages/guestbook', {
@@ -232,7 +248,7 @@ async function testInjection() {
     const tasks = sqlPayloads.map(p => () =>
       c.post('/messages/guestbook', {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ content: p, author_name: p, _csrf: token }).toString()
+        body: new URLSearchParams({ content: BRUTE_TAG + ' ' + p, author_name: BRUTE_TAG, _csrf: token }).toString()
       })
     );
     const rs = await pool(tasks, 5);
@@ -318,7 +334,7 @@ async function testXSS() {
     const tasks = xss.slice(0, 5).map(p => () =>
       c.post('/messages/guestbook', {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ content: p, author_name: p, _csrf: token }).toString()
+        body: new URLSearchParams({ content: BRUTE_TAG + ' ' + p, author_name: BRUTE_TAG, _csrf: token }).toString()
       })
     );
     const rs = await pool(tasks, 3);
@@ -577,6 +593,34 @@ async function testRecovery() {
     console.log('\n失败明细:');
     failures.forEach((f, i) => console.log(`  ${i + 1}. ${f.m}\n     ${f.e}`));
   }
+  // ============================================================
+  // 清理本次写入的测试数据
+  // ------------------------------------------------------------
+  // 暴力测试为了验证限流/转义/XSS，会真的把留言写进库。
+  // 不清理会堆在留言板里污染站点内容，这里按 BRUTE_TAG 精确删除。
+  // ============================================================
+  try {
+    const admin = makeClient();
+    await admin.get('/login');
+    await admin.get('/auth/dev-login?username=d5stadmin&admin=1').catch(() => {});
+    const st = await admin.get('/api/check-login');
+    if (/"loggedIn":true/.test(st.body || '')) {
+      const page = await admin.get('/admin/guestbook?q=' + encodeURIComponent(BRUTE_TAG));
+      const ids = [...page.body.matchAll(/\/admin\/guestbook\/delete\/(\d+)/g)].map(m => m[1]);
+      let removed = 0;
+      for (const id of ids) {
+        const r = await admin.postCsrf('/admin/guestbook/delete/' + id, {});
+        if (r.status === 302) removed++;
+      }
+      console.log(`\n🧹 已清理本次写入的 ${removed} 条留言测试数据`);
+    } else {
+      console.log('\n⚠ 无法登录后台，测试留言可能残留（标记: ' + BRUTE_TAG + '）');
+      console.log('   请运行: node 测试/clean-testdata.js');
+    }
+  } catch (e) {
+    console.log('\n⚠ 清理测试数据失败:', e.message);
+  }
+
   console.log('');
   process.exit(fail > 0 ? 1 : 0);
 })().catch(e => { console.error('测试框架异常:', e); process.exit(2); });
